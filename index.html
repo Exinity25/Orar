@@ -236,9 +236,6 @@
     .pair-tag{color:#ff6d89}
     .pair-dot{opacity:.7}
     .week-tag{color:#ff6d89}
-    .week-switch{margin-left:auto;flex-shrink:0;border:1px solid rgba(255,109,137,.3);border-radius:8px;padding:5px 7px;background:rgba(217,19,59,.08);color:#ff8aa2;font:inherit;cursor:pointer;min-height:30px}
-    .week-switch:focus-visible{outline:2px solid #ff8aa2;outline-offset:2px}
-    .edit-meta:has(.week-switch){grid-template-columns:14px minmax(0,1fr) auto}
     .add-opposite{margin-top:8px;width:100%;font-size:11px;min-height:34px}
     .week-help{font-size:10px;color:#aab1bf;line-height:1.4}
     .week-edit{display:grid;grid-template-columns:14px 1fr;align-items:center;gap:5px}
@@ -492,6 +489,11 @@
     }
 
     @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
+    .week-toggle{top:calc(max(18px,env(safe-area-inset-top)) + 64px);color:#ff8aa2;gap:0;align-content:center}
+    .week-toggle svg{width:24px;height:24px}
+    .week-toggle-label{font-size:8px;font-weight:800;line-height:12px}
+    .subject .week-tag{font-size:.7em;white-space:nowrap;margin-left:5px}
+    @media(max-width:900px), (hover:none) and (pointer:coarse){.week-toggle{top:calc(max(12px,env(safe-area-inset-top)) + 58px)}}
   </style>
 </head>
 <body class="mobile-day-0">
@@ -502,6 +504,10 @@
       </svg>
     </button>
 
+    <button class="edit-toggle week-toggle" id="weekToggle" type="button" aria-label="Schimbă paritatea săptămânii">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M12 2a5 5 0 0 1 0 10a5 5 0 0 0 0 10a10 10 0 0 0 0-20" fill="currentColor"/><circle cx="12" cy="7" r="1.6" fill="#090e18"/><circle cx="12" cy="17" r="1.6" fill="currentColor"/></svg>
+      <span class="week-toggle-label" id="weekLabel">PARĂ</span>
+    </button>
     <header class="topbar">
       <div class="title-wrap">
         <h1>C_11/1</h1>
@@ -580,6 +586,7 @@
       delete item.pair;
       delete item.noteKind;
     });
+    let selectedWeek = storageGet('c11_1_selected_week') === 'IMPARĂ' ? 'IMPARĂ' : 'PARĂ';
     let editing = false;
     let expandedKey = null;
     let selectedDay = Number(storageGet('c11_1_selected_day') || 0);
@@ -677,6 +684,8 @@
 
     function render(){
       renderTabs();
+      document.getElementById('weekLabel').textContent = selectedWeek;
+      document.getElementById('weekToggle').setAttribute('aria-label', `Săptămâna ${selectedWeek}. Afișează săptămâna ${oppositeWeek(selectedWeek)}`);
       let html = `<div class="head-cell time-head">ORA</div>`;
       DAYS.forEach((day,i) => html += `<div class="head-cell day-col day-${i}">${day}</div>`);
 
@@ -684,7 +693,7 @@
         html += renderTimeCell(time,row);
         DAYS.forEach((_,day) => {
           const key = `${row}-${day}`;
-          const item = data.classes[key];
+          const item = activeItem(key);
           html += renderSlot(item,key,day);
         });
       });
@@ -707,7 +716,7 @@
     function renderSlot(item,key,day){
       if(!item){
         return `<div class="slot-cell empty day-col day-${day}" data-key="${key}">
-          ${editing ? `<button class="add-class" type="button" data-add="${key}">＋ Adaugă</button>` : ''}
+          ${editing ? `<button class="add-class" type="button" data-add="${key}">＋ Adaugă${data.classes[key] ? ' · '+selectedWeek : ''}</button>` : ''}
         </div>`;
       }
       return `<div class="slot-cell day-col day-${day}" data-key="${key}">${renderCard(item,key)}</div>`;
@@ -715,25 +724,18 @@
 
     function oppositeWeek(week){return week === 'PARĂ' ? 'IMPARĂ' : 'PARĂ';}
 
-    function switchWeek(key){
+    function activeItem(key){
       const item = data.classes[key];
-      if(!item || !item.alternate){
-        showToast('Nu există încă o activitate în cealaltă săptămână. Adaug-o în modul de editare.');
-        return;
-      }
-      const other = item.alternate;
-      delete item.alternate;
-      data.classes[key] = {...other, alternate:item};
-      expandedKey = null;
-      saveData();
-      render();
-      const button = grid.querySelector(`[data-switch-week="${key}"]`);
-      if(button) button.focus({preventScroll:true});
+      if(!item) return null;
+      if(item.week === 'MEREU' || item.week === selectedWeek) return item;
+      return item.alternate && item.alternate.week === selectedWeek ? item.alternate : null;
     }
 
-    function weekButton(item,key){
-      if(!item.week || item.week === 'MEREU') return '';
-      return `<button type="button" class="week-switch" data-switch-week="${key}" aria-label="Afișat: săptămâna ${escapeHtml(item.week)}. Schimbă la ${oppositeWeek(item.week)}" title="Vezi săptămâna ${oppositeWeek(item.week)}">${escapeHtml(item.week)} ⇄</button>`;
+    function selectWeek(week){
+      selectedWeek = week;
+      storageSet('c11_1_selected_week',week);
+      expandedKey = null;
+      render();
     }
 
     function renderCard(item,key){
@@ -750,15 +752,15 @@
               <select class="edit-select" data-field="type" data-key="${key}" aria-label="Tip activitate">
                 ${['CURS','SEMINAR','LABORATOR'].map(v=>`<option value="${v}" ${item.type===v?'selected':''}>${v}</option>`).join('')}
               </select>
-              ${weekButton(item,key)}
+
             </div>
             <div class="week-edit">
               <span class="week-mark">◐</span>
               <select class="edit-select" data-field="week" data-key="${key}" aria-label="Frecvență">
-                ${['MEREU','PARĂ','IMPARĂ'].map(v=>`<option ${item.alternate && v==='MEREU'?'disabled':''} value="${v}" ${(item.week || (item.pair?'PARĂ':'MEREU'))===v?'selected':''}>${v}</option>`).join('')}
+                ${['MEREU','PARĂ','IMPARĂ'].map(v=>`<option ${data.classes[key].alternate && v==='MEREU'?'disabled':''} value="${v}" ${(item.week || (item.pair?'PARĂ':'MEREU'))===v?'selected':''}>${v}</option>`).join('')}
               </select>
             </div>
-            ${item.alternate ? '<div class="week-help">Două activități: câte una pentru fiecare paritate. Pentru MEREU, șterge mai întâi activitatea opusă.</div>' : ''}
+            ${data.classes[key].alternate ? '<div class="week-help">Două activități: câte una pentru fiecare paritate. Pentru MEREU, șterge mai întâi activitatea opusă.</div>' : ''}
             <input class="edit-input subject-input" data-field="subject" data-key="${key}" value="${escapeHtml(item.subject)}" aria-label="Materia">
             <div class="edit-meta">
               <span class="meta-icon">${ICONS.person}</span>
@@ -769,7 +771,7 @@
               <input class="edit-input" data-field="location" data-key="${key}" value="${escapeHtml(item.location)}" aria-label="Locație">
             </div>
           </div>
-          ${item.week !== 'MEREU' && !item.alternate ? `<button type="button" class="add-class add-opposite" data-add-opposite="${key}">＋ Adaugă în săptămâna ${oppositeWeek(item.week)}</button>` : ''}
+          ${item.week !== 'MEREU' && !data.classes[key].alternate ? `<button type="button" class="add-class add-opposite" data-add-opposite="${key}">＋ Adaugă în săptămâna ${oppositeWeek(item.week)}</button>` : ''}
         </article>`;
       }
 
@@ -778,9 +780,9 @@
         <div class="type-row">
           <span class="type-icon">${typeIcon(item.type)}</span>
           <span>${escapeHtml(item.type)}</span>
-          ${weekButton(item,key)}
+
         </div>
-        <div class="subject">${escapeHtml(item.subject)}</div>
+        <div class="subject">${escapeHtml(item.subject)}${item.week !== 'MEREU' ? `<span class="week-tag">(${escapeHtml(item.week)})</span>` : ''}</div>
         <div class="meta-stack">
           <div class="meta-line"><span class="meta-icon">${ICONS.person}</span><span class="meta-text">${escapeHtml(item.professor)}</span></div>
           <div class="meta-line"><span class="meta-icon">${ICONS.pin}</span><span class="meta-text">${escapeHtml(item.location)}</span></div>
@@ -803,16 +805,14 @@
     }
 
     function attachDynamicHandlers(){
-      grid.querySelectorAll('[data-switch-week]').forEach(button => {
-        button.addEventListener('click', e => {e.stopPropagation();switchWeek(button.dataset.switchWeek);});
-      });
       grid.querySelectorAll('[data-add-opposite]').forEach(button => {
         button.addEventListener('click', () => {
           const key = button.dataset.addOpposite;
           const item = data.classes[key];
           if(!item || item.week === 'MEREU' || item.alternate) return;
           item.alternate = {type:'CURS',week:oppositeWeek(item.week),subject:'Materie nouă',professor:'Profesor',location:'Locație',note:'',deadline:''};
-          switchWeek(key);
+          selectWeek(item.alternate.week);
+          saveData();
           const input = grid.querySelector(`[data-key="${key}"][data-field="subject"]`);
           if(input){input.focus();input.select();}
         });
@@ -842,7 +842,7 @@
         area.addEventListener('click', e=>e.stopPropagation());
         area.addEventListener('input', e => {
           const key = e.target.dataset.note;
-          const item = data.classes[key];
+          const item = activeItem(key);
           item.note = e.target.value;
           saveData('Notiță salvată');
           const card = e.target.closest('.class-card');
@@ -857,7 +857,7 @@
         input.addEventListener('click', e=>e.stopPropagation());
         input.addEventListener('change', e => {
           const key = e.target.dataset.deadline;
-          const item = data.classes[key];
+          const item = activeItem(key);
           item.deadline = e.target.value || '';
           saveData(item.deadline ? 'Termen salvat' : 'Termen eliminat');
           const card = e.target.closest('.class-card');
@@ -885,7 +885,10 @@
       grid.querySelectorAll('[data-add]').forEach(btn => {
         btn.addEventListener('click', () => {
           const key = btn.dataset.add;
-          data.classes[key] = {type:'CURS',week:'MEREU',subject:'Materie nouă',professor:'Profesor',location:'Locație',note:'',deadline:''};
+          const existing = data.classes[key];
+          const added = {type:'CURS',week:existing ? selectedWeek : 'MEREU',subject:'Materie nouă',professor:'Profesor',location:'Locație',note:'',deadline:''};
+          if(existing) existing.alternate = added;
+          else data.classes[key] = added;
           saveData('Activitate adăugată');
           render();
           requestAnimationFrame(() => {
@@ -898,8 +901,9 @@
       grid.querySelectorAll('[data-delete]').forEach(btn => {
         btn.addEventListener('click', () => {
           const key = btn.dataset.delete;
-          const other = data.classes[key].alternate;
-          if(other) data.classes[key] = other;
+          const root = data.classes[key];
+          if(activeItem(key) === root.alternate) delete root.alternate;
+          else if(root.alternate) data.classes[key] = root.alternate;
           else delete data.classes[key];
           if(expandedKey === key) expandedKey = null;
           saveData('Activitate ștearsă');
@@ -911,16 +915,24 @@
     function updateField(e){
       const key = e.target.dataset.key;
       const field = e.target.dataset.field;
-      if(!data.classes[key]) return;
-      const item = data.classes[key];
-      if(field === 'week' && item.alternate){
+      const item = activeItem(key);
+      if(!item) return;
+      const root = data.classes[key];
+      if(field === 'week' && root.alternate){
         if(e.target.value === 'MEREU'){e.target.value = item.week;return;}
-        item.alternate.week = oppositeWeek(e.target.value);
+        const other = item === root ? root.alternate : root;
+        other.week = oppositeWeek(e.target.value);
       }
       item[field] = e.target.value;
+      if(field === 'week' && item.week !== 'MEREU'){
+        selectedWeek = item.week;
+        storageSet('c11_1_selected_week',selectedWeek);
+      }
       saveData('Modificare salvată');
       if((field === 'type' || field === 'week') && e.type === 'change') render();
     }
+
+    document.getElementById('weekToggle').addEventListener('click', () => selectWeek(oppositeWeek(selectedWeek)));
 
     editToggle.addEventListener('click', () => {
       editing = !editing;
