@@ -545,8 +545,37 @@
       body.editing .schedule-grid{--row-height:196px}
     }
     @media(max-width:900px) and (orientation:landscape){
-      .schedule-grid{--row-height:92px}
+      .schedule-grid{
+        --row-height:92px;
+        align-items:start;
+        grid-auto-rows:auto;
+      }
       body.editing .schedule-grid{--row-height:156px}
+      .schedule-grid .time-cell,
+      .schedule-grid .slot-cell{
+        height:var(--row-height);
+        min-height:var(--row-height);
+        align-self:start;
+      }
+      .schedule-grid .slot-cell:not(.empty){display:block}
+      .schedule-grid .class-card{
+        height:100%;
+        min-height:100%;
+      }
+      .schedule-grid .note-open-slot,
+      .schedule-grid .slot-cell:has(.class-card[aria-expanded="true"]){
+        height:auto;
+        min-height:var(--row-height)!important;
+        overflow:visible;
+        animation:none!important;
+        align-self:start;
+      }
+      .schedule-grid .note-open-slot .class-card,
+      .schedule-grid .slot-cell:has(.class-card[aria-expanded="true"]) .class-card{
+        height:auto;
+        min-height:var(--row-height);
+        overflow:visible;
+      }
     }
     .schedule-shell{position:relative}
     /* Fast feedback; no input is delayed while transitions play. */
@@ -870,55 +899,183 @@
     }
 
     let weekFadeMotions = [];
-    function selectWeek(week){
+
+    function parityAffectedKeys(){
+      return Object.keys(data.classes).filter(key => {
+        const root = data.classes[key];
+        if(!root) return false;
+        const rootParity = root.week && root.week !== 'MEREU';
+        const altParity = root.alternate && root.alternate.week && root.alternate.week !== 'MEREU';
+        return Boolean(rootParity || altParity);
+      });
+    }
+
+    async function selectWeek(week){
       if(week === selectedWeek) return;
 
       const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       weekFadeMotions.forEach(m => { try{ m.cancel(); }catch(e){} });
       weekFadeMotions = [];
 
-      if(reduce || !grid.animate){
-        selectedWeek = week;
-        storageSet('c11_1_selected_week',week);
-        expandedKey = null;
-        render();
-        return;
-      }
+      const affectedKeys = parityAffectedKeys();
 
-      const shell = grid.parentElement;
-      const ghost = grid.cloneNode(true);
-      ghost.removeAttribute('id');
-      ghost.querySelectorAll('[id]').forEach(node => node.removeAttribute('id'));
-      Object.assign(ghost.style,{
-        position:'absolute',
-        left:grid.offsetLeft + 'px',
-        top:grid.offsetTop + 'px',
-        width:grid.offsetWidth + 'px',
-        minHeight:grid.offsetHeight + 'px',
-        margin:'0',
-        zIndex:'30',
-        pointerEvents:'none'
-      });
-      shell.appendChild(ghost);
+      if(!reduce){
+        affectedKeys.forEach(key => {
+          const card = grid.querySelector(`[data-key="${key}"] .class-card`);
+          if(!card || !card.animate) return;
+          const motion = card.animate(
+            [
+              {opacity:1,transform:'translateY(0) scale(1)'},
+              {opacity:0,transform:'translateY(-5px) scale(.985)'}
+            ],
+            {duration:120,easing:'cubic-bezier(.4,0,1,1)',fill:'forwards'}
+          );
+          weekFadeMotions.push(motion);
+        });
+        if(weekFadeMotions.length){
+          await Promise.allSettled(weekFadeMotions.map(m => m.finished));
+        }
+      }
 
       selectedWeek = week;
       storageSet('c11_1_selected_week',week);
       expandedKey = null;
       render();
 
-      const outgoing = ghost.animate(
-        [{opacity:1},{opacity:0}],
-        {duration:220,easing:'ease-out',fill:'forwards'}
-      );
-      const incoming = grid.animate(
-        [{opacity:0},{opacity:1}],
-        {duration:220,easing:'ease-out'}
-      );
-      weekFadeMotions = [outgoing,incoming];
+      weekFadeMotions = [];
+      if(!reduce){
+        affectedKeys.forEach(key => {
+          const card = grid.querySelector(`[data-key="${key}"] .class-card`);
+          if(!card || !card.animate) return;
+          const motion = card.animate(
+            [
+              {opacity:0,transform:'translateY(6px) scale(.985)'},
+              {opacity:1,transform:'translateY(0) scale(1)'}
+            ],
+            {duration:180,easing:'cubic-bezier(.16,1,.3,1)'}
+          );
+          weekFadeMotions.push(motion);
+        });
+        Promise.allSettled(weekFadeMotions.map(m => m.finished)).then(() => {
+          weekFadeMotions = [];
+        });
+      }
+    }
 
-      Promise.allSettled([outgoing.finished,incoming.finished]).then(() => {
-        ghost.remove();
-        weekFadeMotions = [];
+    function isLandscapePhone(){
+      return Boolean(window.matchMedia && window.matchMedia('(max-width:900px) and (orientation:landscape)').matches);
+    }
+
+    let noteToggleMotionId = 0;
+
+    async function toggleNoteCard(key){
+      const motionId = ++noteToggleMotionId;
+      const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const landscape = isLandscapePhone();
+      const opening = expandedKey !== key;
+
+      if(!landscape || reduce){
+        expandedKey = opening ? key : null;
+        render();
+        if(expandedKey){
+          requestAnimationFrame(() => {
+            const area = grid.querySelector(`[data-note="${expandedKey}"]`);
+            if(area) area.focus({preventScroll:true});
+          });
+        }
+        return;
+      }
+
+      if(!opening){
+        const slot = grid.querySelector(`[data-key="${key}"]`);
+        const card = slot && slot.querySelector('.class-card');
+        const panel = card && card.querySelector('.note-panel');
+        if(!slot || !card){
+          expandedKey = null;
+          render();
+          return;
+        }
+
+        const startHeight = slot.getBoundingClientRect().height;
+        const baseHeight = parseFloat(getComputedStyle(grid).getPropertyValue('--row-height')) || 92;
+
+        slot.style.overflow = 'hidden';
+        card.style.overflow = 'hidden';
+
+        const animations = [];
+        if(slot.animate) animations.push(slot.animate(
+          [{height:`${startHeight}px`},{height:`${baseHeight}px`}],
+          {duration:240,easing:'cubic-bezier(.4,0,.2,1)',fill:'forwards'}
+        ));
+        if(card.animate) animations.push(card.animate(
+          [{height:`${startHeight}px`},{height:`${baseHeight}px`}],
+          {duration:240,easing:'cubic-bezier(.4,0,.2,1)',fill:'forwards'}
+        ));
+        if(panel && panel.animate) animations.push(panel.animate(
+          [{opacity:1,transform:'translateY(0) scaleY(1)'},{opacity:0,transform:'translateY(-7px) scaleY(.94)'}],
+          {duration:165,easing:'ease-in',fill:'forwards'}
+        ));
+
+        if(animations.length) await Promise.allSettled(animations.map(a => a.finished));
+        if(motionId !== noteToggleMotionId) return;
+
+        expandedKey = null;
+        render();
+        return;
+      }
+
+      // Keep only one notes card open. If another one is open, close it before opening this one.
+      if(expandedKey && expandedKey !== key){
+        expandedKey = null;
+        render();
+      }
+
+      const oldSlot = grid.querySelector(`[data-key="${key}"]`);
+      const baseHeight = oldSlot ? oldSlot.getBoundingClientRect().height : (parseFloat(getComputedStyle(grid).getPropertyValue('--row-height')) || 92);
+
+      expandedKey = key;
+      render();
+
+      const slot = grid.querySelector(`[data-key="${key}"]`);
+      const card = slot && slot.querySelector('.class-card');
+      const panel = card && card.querySelector('.note-panel');
+      if(!slot || !card) return;
+
+      const targetHeight = Math.max(baseHeight, card.scrollHeight);
+
+      slot.style.height = `${baseHeight}px`;
+      slot.style.overflow = 'hidden';
+      card.style.height = `${baseHeight}px`;
+      card.style.overflow = 'hidden';
+
+      // Force the starting height to be committed before the expansion animation.
+      slot.getBoundingClientRect();
+
+      const animations = [];
+      if(slot.animate) animations.push(slot.animate(
+        [{height:`${baseHeight}px`},{height:`${targetHeight}px`}],
+        {duration:270,easing:'cubic-bezier(.16,1,.3,1)'}
+      ));
+      if(card.animate) animations.push(card.animate(
+        [{height:`${baseHeight}px`},{height:`${targetHeight}px`}],
+        {duration:270,easing:'cubic-bezier(.16,1,.3,1)'}
+      ));
+      if(panel && panel.animate) animations.push(panel.animate(
+        [{opacity:0,transform:'translateY(-8px) scaleY(.94)'},{opacity:1,transform:'translateY(0) scaleY(1)'}],
+        {duration:230,easing:'cubic-bezier(.16,1,.3,1)'}
+      ));
+
+      if(animations.length) await Promise.allSettled(animations.map(a => a.finished));
+      if(motionId !== noteToggleMotionId) return;
+
+      slot.style.height = '';
+      slot.style.overflow = '';
+      card.style.height = '';
+      card.style.overflow = '';
+
+      requestAnimationFrame(() => {
+        const area = grid.querySelector(`[data-note="${key}"]`);
+        if(area) area.focus({preventScroll:true});
       });
     }
 
@@ -994,14 +1151,7 @@
         card.addEventListener('click', e => {
           if(e.target.closest('.note-panel, .week-switch')) return;
           const key = card.dataset.card;
-          expandedKey = expandedKey === key ? null : key;
-          render();
-          if(expandedKey){
-            requestAnimationFrame(() => {
-              const area = grid.querySelector(`[data-note="${expandedKey}"]`);
-              if(area) area.focus({preventScroll:true});
-            });
-          }
+          toggleNoteCard(key);
         });
         card.addEventListener('keydown', e => {
           if((e.key === 'Enter' || e.key === ' ') && !e.target.closest('.note-panel, .week-switch')){
