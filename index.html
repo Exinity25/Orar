@@ -236,8 +236,8 @@
     .pair-tag{color:#ff6d89}
     .pair-dot{opacity:.7}
     .week-tag{color:#ff6d89}
-    .add-opposite{margin-top:8px;width:100%;font-size:11px;min-height:34px}
-    .week-help{font-size:10px;color:#aab1bf;line-height:1.4}
+
+
     .week-edit{display:grid;grid-template-columns:14px 1fr;align-items:center;gap:5px}
     .week-mark{width:12px;height:12px;display:grid;place-items:center;color:#ef4269;font-size:12px;font-weight:900}
 
@@ -494,6 +494,19 @@
     .week-toggle-label{font-size:8px;font-weight:800;line-height:12px}
     .subject .week-tag{font-size:.7em;white-space:nowrap;margin-left:5px}
     @media(max-width:900px), (hover:none) and (pointer:coarse){.week-toggle{top:calc(max(12px,env(safe-area-inset-top)) + 58px)}}
+    /* Fixed, shared row sizes: parity never changes the timetable geometry. */
+    .schedule-grid{--row-height:160px;grid-template-rows:auto;grid-auto-rows:var(--row-height)}
+    body.editing .schedule-grid{--row-height:280px}
+    .schedule-grid .time-cell,.schedule-grid .slot-cell{height:var(--row-height);min-height:0}
+    .schedule-grid .class-card{height:100%;min-height:0;overflow:auto;overscroll-behavior:contain}
+    @media(max-width:900px), (hover:none) and (pointer:coarse){
+      .schedule-grid{--row-height:144px}
+      body.editing .schedule-grid{--row-height:280px}
+    }
+    @media(max-width:900px) and (orientation:landscape){
+      .schedule-grid{--row-height:130px}
+      body.editing .schedule-grid{--row-height:220px}
+    }
   </style>
 </head>
 <body class="mobile-day-0">
@@ -760,7 +773,7 @@
                 ${['MEREU','PARĂ','IMPARĂ'].map(v=>`<option ${data.classes[key].alternate && v==='MEREU'?'disabled':''} value="${v}" ${(item.week || (item.pair?'PARĂ':'MEREU'))===v?'selected':''}>${v}</option>`).join('')}
               </select>
             </div>
-            ${data.classes[key].alternate ? '<div class="week-help">Două activități: câte una pentru fiecare paritate. Pentru MEREU, șterge mai întâi activitatea opusă.</div>' : ''}
+
             <input class="edit-input subject-input" data-field="subject" data-key="${key}" value="${escapeHtml(item.subject)}" aria-label="Materia">
             <div class="edit-meta">
               <span class="meta-icon">${ICONS.person}</span>
@@ -771,7 +784,7 @@
               <input class="edit-input" data-field="location" data-key="${key}" value="${escapeHtml(item.location)}" aria-label="Locație">
             </div>
           </div>
-          ${item.week !== 'MEREU' && !data.classes[key].alternate ? `<button type="button" class="add-class add-opposite" data-add-opposite="${key}">＋ Adaugă în săptămâna ${oppositeWeek(item.week)}</button>` : ''}
+
         </article>`;
       }
 
@@ -805,18 +818,6 @@
     }
 
     function attachDynamicHandlers(){
-      grid.querySelectorAll('[data-add-opposite]').forEach(button => {
-        button.addEventListener('click', () => {
-          const key = button.dataset.addOpposite;
-          const item = data.classes[key];
-          if(!item || item.week === 'MEREU' || item.alternate) return;
-          item.alternate = {type:'CURS',week:oppositeWeek(item.week),subject:'Materie nouă',professor:'Profesor',location:'Locație',note:'',deadline:''};
-          selectWeek(item.alternate.week);
-          saveData();
-          const input = grid.querySelector(`[data-key="${key}"][data-field="subject"]`);
-          if(input){input.focus();input.select();}
-        });
-      });
       grid.querySelectorAll('[data-card]').forEach(card => {
         if(editing) return;
         card.addEventListener('click', e => {
