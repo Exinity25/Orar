@@ -577,6 +577,28 @@
         overflow:visible;
       }
     }
+
+    @media (max-width:900px) and (orientation:portrait){
+      .schedule-grid{
+        grid-auto-rows:auto;
+        align-items:stretch;
+      }
+      .schedule-grid .note-open-slot,
+      .schedule-grid .slot-cell:has(.class-card[aria-expanded="true"]){
+        height:auto;
+        min-height:var(--row-height)!important;
+        overflow:hidden;
+        animation:none!important;
+      }
+      .schedule-grid .note-open-slot .class-card,
+      .schedule-grid .slot-cell:has(.class-card[aria-expanded="true"]) .class-card{
+        height:auto;
+        min-height:var(--row-height);
+        overflow:visible;
+      }
+      .note-panel{will-change:transform,opacity}
+    }
+
     .schedule-shell{position:relative}
     /* Fast feedback; no input is delayed while transitions play. */
     button,.day-tab,.class-card{transition:transform 120ms cubic-bezier(.2,.8,.2,1),background-color 140ms ease,border-color 140ms ease,box-shadow 140ms ease}
@@ -586,8 +608,8 @@
     button:focus-visible,.class-card:focus-visible{outline:2px solid #ff8aa2;outline-offset:2px}
     .week-toggle svg{transition:transform 180ms cubic-bezier(.2,.8,.2,1)}
     body[data-week="IMPARĂ"] .week-toggle svg{transform:rotate(180deg)}
-    .note-panel{animation:note-reveal 220ms cubic-bezier(.16,1,.3,1) both;transform-origin:top}
-    @keyframes note-reveal{from{opacity:0;transform:translateY(-8px) scaleY(.96)}to{opacity:1;transform:translateY(0) scaleY(1)}}
+    .note-panel{animation:note-reveal 300ms cubic-bezier(.22,1,.36,1) both;transform-origin:top;will-change:transform,opacity}
+    @keyframes note-reveal{0%{opacity:0;transform:translateY(-9px) scaleY(.955)}55%{opacity:.78;transform:translateY(-2px) scaleY(.992)}100%{opacity:1;transform:translateY(0) scaleY(1)}}
     @media(prefers-reduced-motion:reduce){button,.day-tab,.class-card,.week-toggle svg{transition:none!important}.note-panel,.note-open-slot{animation:none!important}}
   </style>
 </head>
@@ -971,10 +993,10 @@
     async function toggleNoteCard(key){
       const motionId = ++noteToggleMotionId;
       const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      const landscape = isLandscapePhone();
+      const mobileLayout = Boolean(window.matchMedia && window.matchMedia('(max-width:1050px), (hover:none) and (pointer:coarse)').matches);
       const opening = expandedKey !== key;
 
-      if(!landscape || reduce){
+      if(!mobileLayout || reduce){
         expandedKey = opening ? key : null;
         render();
         if(expandedKey){
@@ -1005,15 +1027,15 @@
         const animations = [];
         if(slot.animate) animations.push(slot.animate(
           [{height:`${startHeight}px`},{height:`${baseHeight}px`}],
-          {duration:240,easing:'cubic-bezier(.4,0,.2,1)',fill:'forwards'}
+          {duration:300,easing:'cubic-bezier(.22,1,.36,1)',fill:'forwards'}
         ));
         if(card.animate) animations.push(card.animate(
           [{height:`${startHeight}px`},{height:`${baseHeight}px`}],
-          {duration:240,easing:'cubic-bezier(.4,0,.2,1)',fill:'forwards'}
+          {duration:300,easing:'cubic-bezier(.22,1,.36,1)',fill:'forwards'}
         ));
         if(panel && panel.animate) animations.push(panel.animate(
           [{opacity:1,transform:'translateY(0) scaleY(1)'},{opacity:0,transform:'translateY(-7px) scaleY(.94)'}],
-          {duration:165,easing:'ease-in',fill:'forwards'}
+          {duration:220,easing:'cubic-bezier(.4,0,.2,1)',fill:'forwards'}
         ));
 
         if(animations.length) await Promise.allSettled(animations.map(a => a.finished));
@@ -1054,15 +1076,15 @@
       const animations = [];
       if(slot.animate) animations.push(slot.animate(
         [{height:`${baseHeight}px`},{height:`${targetHeight}px`}],
-        {duration:270,easing:'cubic-bezier(.16,1,.3,1)'}
+        {duration:340,easing:'cubic-bezier(.22,1,.36,1)'}
       ));
       if(card.animate) animations.push(card.animate(
         [{height:`${baseHeight}px`},{height:`${targetHeight}px`}],
-        {duration:270,easing:'cubic-bezier(.16,1,.3,1)'}
+        {duration:340,easing:'cubic-bezier(.22,1,.36,1)'}
       ));
       if(panel && panel.animate) animations.push(panel.animate(
         [{opacity:0,transform:'translateY(-8px) scaleY(.94)'},{opacity:1,transform:'translateY(0) scaleY(1)'}],
-        {duration:230,easing:'cubic-bezier(.16,1,.3,1)'}
+        {duration:300,easing:'cubic-bezier(.22,1,.36,1)'}
       ));
 
       if(animations.length) await Promise.allSettled(animations.map(a => a.finished));
