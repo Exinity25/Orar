@@ -236,6 +236,11 @@
     .pair-tag{color:#ff6d89}
     .pair-dot{opacity:.7}
     .week-tag{color:#ff6d89}
+    .week-switch{margin-left:auto;flex-shrink:0;border:1px solid rgba(255,109,137,.3);border-radius:8px;padding:5px 7px;background:rgba(217,19,59,.08);color:#ff8aa2;font:inherit;cursor:pointer;min-height:30px}
+    .week-switch:focus-visible{outline:2px solid #ff8aa2;outline-offset:2px}
+    .edit-meta:has(.week-switch){grid-template-columns:14px minmax(0,1fr) auto}
+    .add-opposite{margin-top:8px;width:100%;font-size:11px;min-height:34px}
+    .week-help{font-size:10px;color:#aab1bf;line-height:1.4}
     .week-edit{display:grid;grid-template-columns:14px 1fr;align-items:center;gap:5px}
     .week-mark{width:12px;height:12px;display:grid;place-items:center;color:#ef4269;font-size:12px;font-weight:900}
 
@@ -398,7 +403,7 @@
       .subject,.meta-line{overflow-wrap:anywhere}
       .head-cell{height:36px;font-size:11px}
       .time-cell{min-height:92px;font-size:14px;overflow:hidden}
-      .time-edit{width:calc(100% - 20px);max-width:calc(100% - 20px);padding:0;margin:0 auto;transform:translateX(-5px)}
+      .time-edit{width:calc(100% - 20px);max-width:calc(100% - 20px);padding:0;margin:0 auto;transform:none}
       .time-edit input{width:100%;max-width:100%;min-width:0;padding:6px 0;font-size:11px;-webkit-appearance:none;appearance:none}
       .slot-cell{min-height:92px}
       .class-card{min-height:90px;padding:10px 10px 9px 12px}
@@ -471,7 +476,7 @@
       .edit-meta{grid-template-columns:11px minmax(0,1fr);gap:3px}
       .week-edit{grid-template-columns:11px minmax(0,1fr);gap:3px}
       .delete-class{width:19px;height:19px;top:5px;right:5px;font-size:13px}
-      .time-edit{width:calc(100% - 14px);max-width:calc(100% - 14px);min-width:0;padding:0;margin:0 auto;gap:3px;transform:translateX(-4px)}
+      .time-edit{width:calc(100% - 14px);max-width:calc(100% - 14px);min-width:0;padding:0;margin:0 auto;gap:3px;transform:none}
       .time-edit input{width:100%;max-width:100%;min-width:0;padding:4px 0;font-size:9px;-webkit-appearance:none;appearance:none}
       .deadline-wrap{width:min(84px,44%)}
       .deadline-input{font-size:8px;padding:4px 1px}
@@ -708,6 +713,29 @@
       return `<div class="slot-cell day-col day-${day}" data-key="${key}">${renderCard(item,key)}</div>`;
     }
 
+    function oppositeWeek(week){return week === 'PARĂ' ? 'IMPARĂ' : 'PARĂ';}
+
+    function switchWeek(key){
+      const item = data.classes[key];
+      if(!item || !item.alternate){
+        showToast('Nu există încă o activitate în cealaltă săptămână. Adaug-o în modul de editare.');
+        return;
+      }
+      const other = item.alternate;
+      delete item.alternate;
+      data.classes[key] = {...other, alternate:item};
+      expandedKey = null;
+      saveData();
+      render();
+      const button = grid.querySelector(`[data-switch-week="${key}"]`);
+      if(button) button.focus({preventScroll:true});
+    }
+
+    function weekButton(item,key){
+      if(!item.week || item.week === 'MEREU') return '';
+      return `<button type="button" class="week-switch" data-switch-week="${key}" aria-label="Afișat: săptămâna ${escapeHtml(item.week)}. Schimbă la ${oppositeWeek(item.week)}" title="Vezi săptămâna ${oppositeWeek(item.week)}">${escapeHtml(item.week)} ⇄</button>`;
+    }
+
     function renderCard(item,key){
       const noteExists = Boolean((item.note || '').trim());
       const noteClass = noteState(item);
@@ -722,13 +750,15 @@
               <select class="edit-select" data-field="type" data-key="${key}" aria-label="Tip activitate">
                 ${['CURS','SEMINAR','LABORATOR'].map(v=>`<option value="${v}" ${item.type===v?'selected':''}>${v}</option>`).join('')}
               </select>
+              ${weekButton(item,key)}
             </div>
             <div class="week-edit">
               <span class="week-mark">◐</span>
               <select class="edit-select" data-field="week" data-key="${key}" aria-label="Frecvență">
-                ${['MEREU','PARĂ','IMPARĂ'].map(v=>`<option value="${v}" ${(item.week || (item.pair?'PARĂ':'MEREU'))===v?'selected':''}>${v}</option>`).join('')}
+                ${['MEREU','PARĂ','IMPARĂ'].map(v=>`<option ${item.alternate && v==='MEREU'?'disabled':''} value="${v}" ${(item.week || (item.pair?'PARĂ':'MEREU'))===v?'selected':''}>${v}</option>`).join('')}
               </select>
             </div>
+            ${item.alternate ? '<div class="week-help">Două activități: câte una pentru fiecare paritate. Pentru MEREU, șterge mai întâi activitatea opusă.</div>' : ''}
             <input class="edit-input subject-input" data-field="subject" data-key="${key}" value="${escapeHtml(item.subject)}" aria-label="Materia">
             <div class="edit-meta">
               <span class="meta-icon">${ICONS.person}</span>
@@ -739,6 +769,7 @@
               <input class="edit-input" data-field="location" data-key="${key}" value="${escapeHtml(item.location)}" aria-label="Locație">
             </div>
           </div>
+          ${item.week !== 'MEREU' && !item.alternate ? `<button type="button" class="add-class add-opposite" data-add-opposite="${key}">＋ Adaugă în săptămâna ${oppositeWeek(item.week)}</button>` : ''}
         </article>`;
       }
 
@@ -747,7 +778,7 @@
         <div class="type-row">
           <span class="type-icon">${typeIcon(item.type)}</span>
           <span>${escapeHtml(item.type)}</span>
-          ${(item.week && item.week !== 'MEREU') ? `<span class="pair-dot">·</span><span class="week-tag">${escapeHtml(item.week)}</span>` : ''}
+          ${weekButton(item,key)}
         </div>
         <div class="subject">${escapeHtml(item.subject)}</div>
         <div class="meta-stack">
@@ -772,10 +803,24 @@
     }
 
     function attachDynamicHandlers(){
+      grid.querySelectorAll('[data-switch-week]').forEach(button => {
+        button.addEventListener('click', e => {e.stopPropagation();switchWeek(button.dataset.switchWeek);});
+      });
+      grid.querySelectorAll('[data-add-opposite]').forEach(button => {
+        button.addEventListener('click', () => {
+          const key = button.dataset.addOpposite;
+          const item = data.classes[key];
+          if(!item || item.week === 'MEREU' || item.alternate) return;
+          item.alternate = {type:'CURS',week:oppositeWeek(item.week),subject:'Materie nouă',professor:'Profesor',location:'Locație',note:'',deadline:''};
+          switchWeek(key);
+          const input = grid.querySelector(`[data-key="${key}"][data-field="subject"]`);
+          if(input){input.focus();input.select();}
+        });
+      });
       grid.querySelectorAll('[data-card]').forEach(card => {
         if(editing) return;
         card.addEventListener('click', e => {
-          if(e.target.closest('.note-panel')) return;
+          if(e.target.closest('.note-panel, .week-switch')) return;
           const key = card.dataset.card;
           expandedKey = expandedKey === key ? null : key;
           render();
@@ -787,7 +832,7 @@
           }
         });
         card.addEventListener('keydown', e => {
-          if((e.key === 'Enter' || e.key === ' ') && !e.target.closest('.note-panel')){
+          if((e.key === 'Enter' || e.key === ' ') && !e.target.closest('.note-panel, .week-switch')){
             e.preventDefault();card.click();
           }
         });
@@ -853,7 +898,9 @@
       grid.querySelectorAll('[data-delete]').forEach(btn => {
         btn.addEventListener('click', () => {
           const key = btn.dataset.delete;
-          delete data.classes[key];
+          const other = data.classes[key].alternate;
+          if(other) data.classes[key] = other;
+          else delete data.classes[key];
           if(expandedKey === key) expandedKey = null;
           saveData('Activitate ștearsă');
           render();
@@ -865,7 +912,12 @@
       const key = e.target.dataset.key;
       const field = e.target.dataset.field;
       if(!data.classes[key]) return;
-      data.classes[key][field] = e.target.value;
+      const item = data.classes[key];
+      if(field === 'week' && item.alternate){
+        if(e.target.value === 'MEREU'){e.target.value = item.week;return;}
+        item.alternate.week = oppositeWeek(e.target.value);
+      }
+      item[field] = e.target.value;
       saveData('Modificare salvată');
       if((field === 'type' || field === 'week') && e.type === 'change') render();
     }
