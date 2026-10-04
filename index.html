@@ -495,17 +495,17 @@
     .subject .week-tag{font-size:.7em;white-space:nowrap;margin-left:5px}
     @media(max-width:900px), (hover:none) and (pointer:coarse){.week-toggle{top:calc(max(12px,env(safe-area-inset-top)) + 58px)}}
     /* Fixed, shared row sizes: parity never changes the timetable geometry. */
-    .schedule-grid{--row-height:160px;grid-template-rows:auto;grid-auto-rows:var(--row-height)}
-    body.editing .schedule-grid{--row-height:280px}
+    .schedule-grid{--row-height:120px;grid-template-rows:auto;grid-auto-rows:var(--row-height)}
+    body.editing .schedule-grid{--row-height:200px}
     .schedule-grid .time-cell,.schedule-grid .slot-cell{height:var(--row-height);min-height:0}
     .schedule-grid .class-card{height:100%;min-height:0;overflow:auto;overscroll-behavior:contain}
     @media(max-width:900px), (hover:none) and (pointer:coarse){
-      .schedule-grid{--row-height:144px}
-      body.editing .schedule-grid{--row-height:280px}
+      .schedule-grid{--row-height:116px}
+      body.editing .schedule-grid{--row-height:200px}
     }
     @media(max-width:900px) and (orientation:landscape){
-      .schedule-grid{--row-height:130px}
-      body.editing .schedule-grid{--row-height:220px}
+      .schedule-grid{--row-height:100px}
+      body.editing .schedule-grid{--row-height:160px}
     }
     /* Fast feedback; no input is delayed while transitions play. */
     button,.day-tab,.class-card{transition:transform 120ms cubic-bezier(.2,.8,.2,1),background-color 140ms ease,border-color 140ms ease,box-shadow 140ms ease}
