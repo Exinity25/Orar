@@ -297,10 +297,10 @@
       margin-top:11px;
       padding-top:10px;
       border-top:1px solid rgba(255,255,255,.09);
-      animation:reveal .18s ease both;
       cursor:default;
+      contain:layout paint;
     }
-    @keyframes reveal{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+    .note-panel{will-change:opacity,transform}
     .note-top{display:flex;align-items:center;gap:8px;margin-bottom:7px}
     .note-label{font-size:10px;text-transform:uppercase;letter-spacing:.09em;font-weight:900;color:#dce0e9}
     .deadline-wrap{
@@ -993,10 +993,9 @@
     async function toggleNoteCard(key){
       const motionId = ++noteToggleMotionId;
       const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      const mobileLayout = Boolean(window.matchMedia && window.matchMedia('(max-width:1050px), (hover:none) and (pointer:coarse)').matches);
       const opening = expandedKey !== key;
 
-      if(!mobileLayout || reduce){
+      if(reduce){
         expandedKey = opening ? key : null;
         render();
         if(expandedKey){
@@ -1010,35 +1009,30 @@
 
       if(!opening){
         const slot = grid.querySelector(`[data-key="${key}"]`);
-        const card = slot && slot.querySelector('.class-card');
-        const panel = card && card.querySelector('.note-panel');
-        if(!slot || !card){
+        const panel = slot && slot.querySelector('.note-panel');
+        if(!slot){
           expandedKey = null;
           render();
           return;
         }
 
         const startHeight = slot.getBoundingClientRect().height;
-        const baseHeight = parseFloat(getComputedStyle(grid).getPropertyValue('--row-height')) || 92;
+        const baseHeight = parseFloat(getComputedStyle(grid).getPropertyValue('--row-height')) || 88;
 
         slot.style.overflow = 'hidden';
-        card.style.overflow = 'hidden';
+        slot.style.willChange = 'height';
 
-        const animations = [];
-        if(slot.animate) animations.push(slot.animate(
+        const motions = [];
+        if(slot.animate) motions.push(slot.animate(
           [{height:`${startHeight}px`},{height:`${baseHeight}px`}],
-          {duration:300,easing:'cubic-bezier(.22,1,.36,1)',fill:'forwards'}
+          {duration:220,easing:'cubic-bezier(.2,.8,.2,1)',fill:'forwards'}
         ));
-        if(card.animate) animations.push(card.animate(
-          [{height:`${startHeight}px`},{height:`${baseHeight}px`}],
-          {duration:300,easing:'cubic-bezier(.22,1,.36,1)',fill:'forwards'}
-        ));
-        if(panel && panel.animate) animations.push(panel.animate(
-          [{opacity:1,transform:'translateY(0) scaleY(1)'},{opacity:0,transform:'translateY(-7px) scaleY(.94)'}],
-          {duration:220,easing:'cubic-bezier(.4,0,.2,1)',fill:'forwards'}
+        if(panel && panel.animate) motions.push(panel.animate(
+          [{opacity:1,transform:'translateY(0)'},{opacity:0,transform:'translateY(-4px)'}],
+          {duration:150,easing:'ease-out',fill:'forwards'}
         ));
 
-        if(animations.length) await Promise.allSettled(animations.map(a => a.finished));
+        if(motions.length) await Promise.allSettled(motions.map(a => a.finished));
         if(motionId !== noteToggleMotionId) return;
 
         expandedKey = null;
@@ -1046,14 +1040,13 @@
         return;
       }
 
-      // Keep only one notes card open. If another one is open, close it before opening this one.
       if(expandedKey && expandedKey !== key){
         expandedKey = null;
         render();
       }
 
       const oldSlot = grid.querySelector(`[data-key="${key}"]`);
-      const baseHeight = oldSlot ? oldSlot.getBoundingClientRect().height : (parseFloat(getComputedStyle(grid).getPropertyValue('--row-height')) || 92);
+      const baseHeight = oldSlot ? oldSlot.getBoundingClientRect().height : (parseFloat(getComputedStyle(grid).getPropertyValue('--row-height')) || 88);
 
       expandedKey = key;
       render();
@@ -1067,37 +1060,41 @@
 
       slot.style.height = `${baseHeight}px`;
       slot.style.overflow = 'hidden';
-      card.style.height = `${baseHeight}px`;
-      card.style.overflow = 'hidden';
+      slot.style.willChange = 'height';
 
-      // Force the starting height to be committed before the expansion animation.
-      slot.getBoundingClientRect();
-
-      const animations = [];
-      if(slot.animate) animations.push(slot.animate(
-        [{height:`${baseHeight}px`},{height:`${targetHeight}px`}],
-        {duration:340,easing:'cubic-bezier(.22,1,.36,1)'}
-      ));
-      if(card.animate) animations.push(card.animate(
-        [{height:`${baseHeight}px`},{height:`${targetHeight}px`}],
-        {duration:340,easing:'cubic-bezier(.22,1,.36,1)'}
-      ));
-      if(panel && panel.animate) animations.push(panel.animate(
-        [{opacity:0,transform:'translateY(-8px) scaleY(.94)'},{opacity:1,transform:'translateY(0) scaleY(1)'}],
-        {duration:300,easing:'cubic-bezier(.22,1,.36,1)'}
-      ));
-
-      if(animations.length) await Promise.allSettled(animations.map(a => a.finished));
-      if(motionId !== noteToggleMotionId) return;
-
-      slot.style.height = '';
-      slot.style.overflow = '';
-      card.style.height = '';
-      card.style.overflow = '';
+      if(panel){
+        panel.style.opacity = '0';
+        panel.style.transform = 'translateY(-4px)';
+      }
 
       requestAnimationFrame(() => {
-        const area = grid.querySelector(`[data-note="${key}"]`);
-        if(area) area.focus({preventScroll:true});
+        requestAnimationFrame(async () => {
+          const motions = [];
+          if(slot.animate) motions.push(slot.animate(
+            [{height:`${baseHeight}px`},{height:`${targetHeight}px`}],
+            {duration:240,easing:'cubic-bezier(.2,.8,.2,1)',fill:'forwards'}
+          ));
+          if(panel && panel.animate) motions.push(panel.animate(
+            [{opacity:0,transform:'translateY(-4px)'},{opacity:1,transform:'translateY(0)'}],
+            {duration:180,easing:'ease-out',fill:'forwards'}
+          ));
+
+          if(motions.length) await Promise.allSettled(motions.map(a => a.finished));
+          if(motionId !== noteToggleMotionId) return;
+
+          slot.style.height = '';
+          slot.style.overflow = '';
+          slot.style.willChange = '';
+          if(panel){
+            panel.style.opacity = '';
+            panel.style.transform = '';
+          }
+
+          requestAnimationFrame(() => {
+            const area = grid.querySelector(`[data-note="${key}"]`);
+            if(area) area.focus({preventScroll:true});
+          });
+        });
       });
     }
 
@@ -1143,9 +1140,9 @@
         <div class="type-row">
           <span class="type-icon">${typeIcon(item.type)}</span>
           <span>${escapeHtml(item.type)}</span>
-
+          ${item.week !== 'MEREU' ? `<span class="pair-dot">•</span><span class="week-tag">${escapeHtml(item.week)}</span>` : ''}
         </div>
-        <div class="subject">${escapeHtml(item.subject)}${item.week !== 'MEREU' ? `<span class="week-tag">(${escapeHtml(item.week)})</span>` : ''}</div>
+        <div class="subject">${escapeHtml(item.subject)}</div>
         <div class="meta-stack">
           <div class="meta-line"><span class="meta-icon">${ICONS.person}</span><span class="meta-text">${escapeHtml(item.professor)}</span></div>
           <div class="meta-line"><span class="meta-icon">${ICONS.pin}</span><span class="meta-text">${escapeHtml(item.location)}</span></div>
