@@ -1,0 +1,12 @@
+{
+  "name": "Orar",
+  "short_name": "Orar",
+  "description": "Orar interactiv",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#05070c",
+  "theme_color": "#080b12",
+  "lang": "ro"
+}
