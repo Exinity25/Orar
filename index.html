@@ -287,13 +287,16 @@
     .note-label{font-size:10px;text-transform:uppercase;letter-spacing:.09em;font-weight:900;color:#dce0e9}
     .deadline-wrap{
       margin-left:auto;
-      display:flex;align-items:center;gap:6px;
+      display:flex;
+      align-items:center;
+      min-width:0;
+      width:min(118px,46%);
     }
-    .deadline-label{
-      color:#9ca5b7;font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
-    }
+    .deadline-label{display:none}
     .deadline-input{
-      max-width:142px;
+      width:100%;
+      min-width:0;
+      max-width:100%;
       border:1px solid rgba(255,255,255,.12);
       background:rgba(255,255,255,.04);
       color:#f3f4f8;
@@ -394,7 +397,9 @@
       .slot-cell,.head-cell,.class-card{max-width:100%;overflow:hidden}
       .subject,.meta-line{overflow-wrap:anywhere}
       .head-cell{height:36px;font-size:11px}
-      .time-cell{min-height:92px;font-size:14px}
+      .time-cell{min-height:92px;font-size:14px;overflow:hidden}
+      .time-edit{width:calc(100% - 20px);max-width:calc(100% - 20px);padding:0;margin:0 auto;transform:translateX(-5px)}
+      .time-edit input{width:100%;max-width:100%;min-width:0;padding:6px 0;font-size:11px;-webkit-appearance:none;appearance:none}
       .slot-cell{min-height:92px}
       .class-card{min-height:90px;padding:10px 10px 9px 12px}
       .subject{font-size:14px}
@@ -449,6 +454,8 @@
         display:flex!important;
       }
       .day-col{min-width:0!important;width:auto!important}
+      .slot-cell.empty.day-col{display:flex!important;align-items:center!important;justify-content:center!important}
+      .slot-cell.empty.day-col::before{display:block!important;position:static!important;transform:none!important;margin:auto!important}
       .head-cell{height:30px;font-size:8px}
       .time-cell{min-height:72px;font-size:10px}
       .slot-cell{min-height:72px}
@@ -464,8 +471,10 @@
       .edit-meta{grid-template-columns:11px minmax(0,1fr);gap:3px}
       .week-edit{grid-template-columns:11px minmax(0,1fr);gap:3px}
       .delete-class{width:19px;height:19px;top:5px;right:5px;font-size:13px}
-      .time-edit{width:100%;max-width:100%;min-width:0;padding:0 2px;gap:3px}
-      .time-edit input{width:100%;min-width:0;padding:4px 1px;font-size:9px}
+      .time-edit{width:calc(100% - 14px);max-width:calc(100% - 14px);min-width:0;padding:0;margin:0 auto;gap:3px;transform:translateX(-4px)}
+      .time-edit input{width:100%;max-width:100%;min-width:0;padding:4px 0;font-size:9px;-webkit-appearance:none;appearance:none}
+      .deadline-wrap{width:min(84px,44%)}
+      .deadline-input{font-size:8px;padding:4px 1px}
       .footer-mark img{width:min(250px,42vw)}
     }
 
