@@ -507,6 +507,17 @@
       .schedule-grid{--row-height:130px}
       body.editing .schedule-grid{--row-height:220px}
     }
+    /* Fast feedback; no input is delayed while transitions play. */
+    button,.day-tab,.class-card{transition:transform 120ms cubic-bezier(.2,.8,.2,1),background-color 140ms ease,border-color 140ms ease,box-shadow 140ms ease}
+    button:active{transform:scale(.95)}
+    .day-tab:active{transform:scale(.97)}
+    .class-card:active:not(:has(input:active,select:active,textarea:active)){background:rgba(25,30,43,.98)}
+    button:focus-visible,.class-card:focus-visible{outline:2px solid #ff8aa2;outline-offset:2px}
+    .week-toggle svg{transition:transform 180ms cubic-bezier(.2,.8,.2,1)}
+    body[data-week="IMPARĂ"] .week-toggle svg{transform:rotate(180deg)}
+    .note-panel{animation:note-reveal 150ms cubic-bezier(.2,.8,.2,1) both;transform-origin:top}
+    @keyframes note-reveal{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+    @media(prefers-reduced-motion:reduce){button,.day-tab,.class-card,.week-toggle svg{transition:none!important}.note-panel{animation:none!important}}
   </style>
 </head>
 <body class="mobile-day-0">
@@ -697,6 +708,7 @@
 
     function render(){
       renderTabs();
+      document.body.dataset.week = selectedWeek;
       document.getElementById('weekLabel').textContent = selectedWeek;
       document.getElementById('weekToggle').setAttribute('aria-label', `Săptămâna ${selectedWeek}. Afișează săptămâna ${oppositeWeek(selectedWeek)}`);
       let html = `<div class="head-cell time-head">ORA</div>`;
@@ -744,11 +756,22 @@
       return item.alternate && item.alternate.week === selectedWeek ? item.alternate : null;
     }
 
+    let gridMotion;
+    function animateSchedule(){
+      if(!grid.animate || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
+      if(gridMotion) gridMotion.cancel();
+      gridMotion = grid.animate([
+        {opacity:.65,transform:'translateY(4px)'},
+        {opacity:1,transform:'translateY(0)'}
+      ],{duration:170,easing:'cubic-bezier(.2,.8,.2,1)'});
+    }
+
     function selectWeek(week){
       selectedWeek = week;
       storageSet('c11_1_selected_week',week);
       expandedKey = null;
       render();
+      animateSchedule();
     }
 
     function renderCard(item,key){
@@ -942,24 +965,42 @@
       editToggle.setAttribute('aria-pressed', String(editing));
       editToggle.setAttribute('aria-label', editing ? 'Oprește modul de editare' : 'Activează modul de editare');
       render();
+      animateSchedule();
       showToast(editing ? 'Mod editare activ' : 'Mod vizualizare activ');
+      if(!editing && pendingAppUpdate) location.reload();
     });
 
     mobileTabs.addEventListener('click', e => {
       const btn = e.target.closest('[data-day]');
       if(!btn) return;
+      if(selectedDay === Number(btn.dataset.day)) return;
       selectedDay = Number(btn.dataset.day);
       storageSet('c11_1_selected_day', selectedDay);
       renderTabs();
+      animateSchedule();
     });
 
 
 
     render();
 
+    let pendingAppUpdate = false;
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').catch(() => {});
+        const hadController = Boolean(navigator.serviceWorker.controller);
+        let reloading = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if(!hadController || reloading) return;
+          if(editing){pendingAppUpdate = true;return;}
+          reloading = true;
+          location.reload();
+        });
+        navigator.serviceWorker.register('./sw.js', {updateViaCache:'none'}).then(registration => {
+          registration.update().catch(() => {});
+          document.addEventListener('visibilitychange', () => {
+            if(document.visibilityState === 'visible') registration.update().catch(() => {});
+          });
+        }).catch(() => {});
       });
     }
 
