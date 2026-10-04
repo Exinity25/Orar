@@ -111,10 +111,12 @@
     .mobile-tabs::-webkit-scrollbar{display:none}
     .day-tab{
       flex:0 0 auto;
+      transition:transform .16s ease,background .18s ease,border-color .18s ease,color .18s ease,box-shadow .18s ease;
       padding:9px 15px;border-radius:999px;border:1px solid rgba(255,255,255,.12);
       background:rgba(8,12,20,.88);color:#d8dce5;font-weight:800;font-size:12px;letter-spacing:.04em;text-transform:uppercase;
     }
-    .day-tab.active{background:linear-gradient(90deg,#9d0a27,#c91137);border-color:transparent;color:#fff}
+    .day-tab.active{background:linear-gradient(90deg,#9d0a27,#c91137);border-color:transparent;color:#fff;box-shadow:0 8px 18px rgba(201,17,55,.18)}
+    .day-tab:active{transform:scale(.94)}
 
     .schedule-shell{
       width:100%;
@@ -180,7 +182,7 @@
     .time-edit input:focus{border-color:rgba(255,49,93,.7);box-shadow:0 0 0 3px rgba(217,19,59,.12)}
 
     .slot-cell{
-      min-height:86px;
+      min-height:82px;
       position:relative;
       overflow:hidden;
       background:rgba(8,12,20,.94);
@@ -193,6 +195,7 @@
       background:rgba(7,11,18,.88);
     }
     .slot-cell.empty::before{content:"—";opacity:.62}
+    .note-open-slot{overflow:visible;z-index:6}
     body.editing .slot-cell.empty::before{display:none}
 
     .add-class{
@@ -209,8 +212,8 @@
 
     .class-card{
       position:relative;
-      min-height:84px;
-      height:100%;
+      min-height:80px;
+      height:auto;
       padding:10px 12px 9px 14px;
       border-left:3px solid var(--accent);
       background:linear-gradient(90deg,rgba(9,14,24,.99),rgba(9,13,22,.96));
@@ -219,6 +222,16 @@
       transition:background .2s ease,transform .2s ease;
     }
     .class-card:hover{background:linear-gradient(90deg,rgba(13,19,31,.99),rgba(10,15,25,.97))}
+    .slot-cell:has(.class-card[aria-expanded="true"]){
+      overflow:visible;
+      z-index:6;
+    }
+    .class-card[aria-expanded="true"]{
+      height:auto;
+      min-height:80px;
+      overflow:visible;
+      z-index:7;
+    }
     body.editing .class-card{cursor:default;user-select:auto;padding-right:38px}
 
     .type-row{
@@ -278,6 +291,9 @@
     body.editing .note-dot{right:35px}
 
     .note-panel{
+      position:relative;
+      z-index:8;
+      pointer-events:auto;
       margin-top:11px;
       padding-top:10px;
       border-top:1px solid rgba(255,255,255,.09);
@@ -311,6 +327,7 @@
     .deadline-input:focus{border-color:rgba(255,255,255,.3);box-shadow:0 0 0 3px rgba(255,255,255,.04)}
     .note-area{
       width:100%;min-height:84px;resize:vertical;
+      pointer-events:auto;
       border:1px solid rgba(255,255,255,.11);
       background:rgba(0,0,0,.22);
       color:#fff;
@@ -399,11 +416,11 @@
       .slot-cell,.head-cell,.class-card{max-width:100%;overflow:hidden}
       .subject,.meta-line{overflow-wrap:anywhere}
       .head-cell{height:36px;font-size:11px}
-      .time-cell{min-height:92px;font-size:14px;overflow:hidden}
+      .time-cell{min-height:88px;font-size:14px;overflow:hidden}
       .time-edit{width:calc(100% - 20px);max-width:calc(100% - 20px);padding:0;margin:0 auto;transform:none}
       .time-edit input{width:100%;max-width:100%;min-width:0;padding:6px 0;font-size:11px;-webkit-appearance:none;appearance:none}
-      .slot-cell{min-height:92px}
-      .class-card{min-height:90px;padding:10px 10px 9px 12px}
+      .slot-cell{min-height:88px}
+      .class-card{min-height:86px;padding:9px 10px 8px 12px}
       .subject{font-size:14px}
       .meta-line{font-size:10px}
       
@@ -459,9 +476,9 @@
       .slot-cell.empty.day-col{display:flex!important;align-items:center!important;justify-content:center!important}
       .slot-cell.empty.day-col::before{display:block!important;position:static!important;transform:none!important;margin:auto!important}
       .head-cell{height:30px;font-size:8px}
-      .time-cell{min-height:72px;font-size:10px}
-      .slot-cell{min-height:72px}
-      .class-card{min-height:70px;padding:7px 6px 6px 8px}
+      .time-cell{min-height:68px;font-size:10px}
+      .slot-cell{min-height:68px}
+      .class-card{min-height:66px;padding:6px 6px 5px 8px}
       .type-row{font-size:7px;gap:3px}
       .type-icon{width:11px;height:11px}
       .subject{font-size:9px;line-height:1.08}
@@ -744,7 +761,7 @@
           ${editing ? `<button class="add-class" type="button" data-add="${key}">＋ Adaugă${data.classes[key] ? ' · '+selectedWeek : ''}</button>` : ''}
         </div>`;
       }
-      return `<div class="slot-cell day-col day-${day}" data-key="${key}">${renderCard(item,key)}</div>`;
+      return `<div class="slot-cell day-col day-${day} ${(!editing && expandedKey === key) ? 'note-open-slot' : ''}" data-key="${key}">${renderCard(item,key)}</div>`;
     }
 
     function oppositeWeek(week){return week === 'PARĂ' ? 'IMPARĂ' : 'PARĂ';}
@@ -757,13 +774,33 @@
     }
 
     let gridMotion;
-    function animateSchedule(){
+    function animateSchedule(direction=0){
       if(!grid.animate || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
       if(gridMotion) gridMotion.cancel();
+      const from = direction === 1 ? 'translateX(24px)' : direction === -1 ? 'translateX(-24px)' : 'translateY(4px)';
       gridMotion = grid.animate([
-        {opacity:.65,transform:'translateY(4px)'},
-        {opacity:1,transform:'translateY(0)'}
-      ],{duration:170,easing:'cubic-bezier(.2,.8,.2,1)'});
+        {opacity:.35,transform:from},
+        {opacity:1,transform:'translate(0,0)'}
+      ],{duration:210,easing:'cubic-bezier(.2,.8,.2,1)'});
+    }
+
+    async function changeDay(nextDay){
+      if(nextDay === selectedDay) return;
+      const forward = nextDay > selectedDay;
+      const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if(grid.animate && !reduce){
+        if(gridMotion) gridMotion.cancel();
+        const out = grid.animate([
+          {opacity:1,transform:'translateX(0)'},
+          {opacity:.15,transform:forward ? 'translateX(-24px)' : 'translateX(24px)'}
+        ],{duration:120,easing:'cubic-bezier(.4,0,.8,.2)'});
+        try{ await out.finished; }catch(e){}
+      }
+      selectedDay = nextDay;
+      expandedKey = null;
+      storageSet('c11_1_selected_day', selectedDay);
+      render();
+      animateSchedule(forward ? 1 : -1);
     }
 
     function selectWeek(week){
@@ -973,11 +1010,9 @@
     mobileTabs.addEventListener('click', e => {
       const btn = e.target.closest('[data-day]');
       if(!btn) return;
-      if(selectedDay === Number(btn.dataset.day)) return;
-      selectedDay = Number(btn.dataset.day);
-      storageSet('c11_1_selected_day', selectedDay);
-      renderTabs();
-      animateSchedule();
+      const nextDay = Number(btn.dataset.day);
+      if(selectedDay === nextDay) return;
+      changeDay(nextDay);
     });
 
 
