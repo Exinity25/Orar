@@ -164,9 +164,10 @@
       letter-spacing:.015em;
     }
     .time-sep{display:none}
-    .time-edit{display:flex;flex-direction:column;gap:6px;width:82px}
+    .time-edit{display:flex;flex-direction:column;gap:6px;width:100%;max-width:100%;min-width:0;padding:0 5px}
     .time-edit input{
       width:100%;
+      min-width:0;
       border:1px solid rgba(255,255,255,.13);
       border-radius:7px;
       background:rgba(255,255,255,.045);
@@ -357,7 +358,7 @@
     .toast.show{opacity:1;transform:translate(-50%,0)}
 
     @media (min-width:901px){
-      body::before{background-position:center center;background-size:contain;}
+      body::before{background-position:center center;background-size:cover;}
     }
 
     @media (max-width:900px) and (orientation:portrait), (hover:none) and (pointer:coarse) and (orientation:portrait){
@@ -405,6 +406,67 @@
       body.mobile-day-2 .day-col:not(.day-2),
       body.mobile-day-3 .day-col:not(.day-3),
       body.mobile-day-4 .day-col:not(.day-4){display:none}
+    }
+
+    @media (max-width:900px) and (orientation:landscape){
+      .app{
+        padding:calc(8px + env(safe-area-inset-top)) 8px calc(16px + env(safe-area-inset-bottom));
+        overflow-y:auto;
+        overflow-x:hidden;
+      }
+      .topbar{min-height:66px}
+      .title-wrap{padding:0 54px}
+      h1{font-size:25px}
+      .subtitle{font-size:10px;margin-top:5px}
+      .mobile-tabs{display:none!important}
+      .schedule-shell{
+        width:100%;
+        max-width:none;
+        overflow:visible!important;
+        padding-bottom:0;
+      }
+      .schedule-grid{
+        display:grid;
+        width:100%;
+        max-width:none;
+        min-width:0!important;
+        grid-template-columns:64px repeat(5,minmax(0,1fr))!important;
+        gap:3px;
+        overflow:visible!important;
+      }
+      body.mobile-day-0 .day-col,
+      body.mobile-day-1 .day-col,
+      body.mobile-day-2 .day-col,
+      body.mobile-day-3 .day-col,
+      body.mobile-day-4 .day-col{
+        display:block!important;
+      }
+      body.mobile-day-0 .head-cell.day-col,
+      body.mobile-day-1 .head-cell.day-col,
+      body.mobile-day-2 .head-cell.day-col,
+      body.mobile-day-3 .head-cell.day-col,
+      body.mobile-day-4 .head-cell.day-col{
+        display:flex!important;
+      }
+      .day-col{min-width:0!important;width:auto!important}
+      .head-cell{height:30px;font-size:8px}
+      .time-cell{min-height:72px;font-size:10px}
+      .slot-cell{min-height:72px}
+      .class-card{min-height:70px;padding:7px 6px 6px 8px}
+      .type-row{font-size:7px;gap:3px}
+      .type-icon{width:11px;height:11px}
+      .subject{font-size:9px;line-height:1.08}
+      .meta-line{font-size:7px;gap:3px}
+      .meta-icon{width:10px;height:10px}
+      .edit-fields{gap:4px;padding-right:21px}
+      .edit-input,.edit-select{font-size:8px;padding:5px 5px}
+      .edit-input.subject-input{font-size:9px}
+      .edit-meta{grid-template-columns:11px minmax(0,1fr);gap:3px}
+      .week-edit{grid-template-columns:11px minmax(0,1fr);gap:3px}
+      .delete-class{width:19px;height:19px;top:5px;right:5px;font-size:13px}
+      .time-edit{width:100%;max-width:100%;min-width:0;padding:0 2px;gap:3px}
+      .time-edit input{width:100%;min-width:0;padding:4px 1px;font-size:9px}
+      .footer-mark img{width:min(250px,42vw)}
     }
 
     @media (max-width:430px){
