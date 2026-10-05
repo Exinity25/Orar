@@ -8,7 +8,7 @@
     'https://www.googleapis.com/auth/drive.readonly',
     'https://www.googleapis.com/auth/drive.appdata'];
   const esc = (s='') => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const safeURL = value => {try{const u=new URL(value);return u.protocol==='https:'?u.href:'';}catch{return '';}};
+  const safeURL = value => {try{const u=new URL(String(value||'').trim());return ['https:','http:','mailto:','tel:'].includes(u.protocol)?u.href:'';}catch{return '';}};
   const link = (url,title,cls='classroom-link') => {const safe=safeURL(url);return safe?`<a class="${cls}" href="${esc(safe)}" target="_blank" rel="noopener noreferrer">${esc(title)} ↗</a>`:'';};
   const linkifyText = value => String(value||'').split(/(https?:\/\/[^\s]+|www\.[^\s]+)/gi).map(part=>{
     if(!/^(https?:\/\/|www\.)/i.test(part))return esc(part);
@@ -145,24 +145,28 @@
         const nativeGoogleDoc=mime==='application/vnd.google-apps.document'||mime==='application/vnd.google-apps.spreadsheet'||mime==='application/vnd.google-apps.presentation';
         const officeMimeDownloadable=/application\/(?:vnd\.openxmlformats-officedocument\.(?:wordprocessingml\.document|spreadsheetml\.sheet)|vnd\.ms-(?:excel|word)|msword)/i.test(mime);
         const downloadableOffice=/\.(docx?|xlsx?|xlsm|csv)$/i.test(driveName)||officeMimeDownloadable;
-        // Classroom titles can omit or alter the extension. Prefer the authenticated
-        // Drive API download for real Office files so desktop browsers never depend
-        // on Google iframe cookies / a second Google sign-in.
-        if((googleNative && nativeGoogleDoc) || archive || (!localSupported && !downloadableOffice && !officeDocument)){
-          const driveBox=viewer.querySelector('[data-cr-viewer-content]');
-          const frame=document.createElement('iframe');frame.className='classroom-drive-office-preview';frame.title='Previzualizare '+name;
-          const encodedId=encodeURIComponent(fileId);
-          const googlePreview=mime==='application/vnd.google-apps.document'?'https://docs.google.com/document/d/'+encodedId+'/preview'
-            :mime==='application/vnd.google-apps.spreadsheet'?'https://docs.google.com/spreadsheets/d/'+encodedId+'/preview'
-            :mime==='application/vnd.google-apps.presentation'?'https://docs.google.com/presentation/d/'+encodedId+'/preview'
-            :'https://drive.google.com/file/d/'+encodedId+'/preview';
-          frame.src=googlePreview;
-          frame.setAttribute('allow','clipboard-read; clipboard-write; fullscreen');frame.setAttribute('allowfullscreen','');
-          frame.setAttribute('referrerpolicy','no-referrer-when-downgrade');
-          driveBox.replaceChildren(frame);disableViewerZoom();return;
+        let renderName=driveName,renderMime=mime,response;
+        if(nativeGoogleDoc){
+          const target=mime==='application/vnd.google-apps.spreadsheet'
+            ?{mime:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',ext:'.xlsx'}
+            :mime==='application/vnd.google-apps.document'
+              ?{mime:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',ext:'.docx'}
+              :{mime:'application/pdf',ext:'.pdf'};
+          renderMime=target.mime;
+          renderName=/\.[a-z0-9]{2,6}$/i.test(driveName)?driveName.replace(/\.[a-z0-9]{2,6}$/i,target.ext):driveName+target.ext;
+          response=await fetch(base+'/export?mimeType='+encodeURIComponent(target.mime),{headers:{Authorization:'Bearer '+token},cache:'no-store',credentials:'omit'});
+        }else{
+          if(archive || (!localSupported && !downloadableOffice && !officeDocument)){
+            const driveBox=viewer.querySelector('[data-cr-viewer-content]');
+            const frame=document.createElement('iframe');frame.className='classroom-drive-office-preview';frame.title='Previzualizare '+driveName;
+            frame.src='https://drive.google.com/file/d/'+encodeURIComponent(fileId)+'/preview';
+            frame.setAttribute('allow','clipboard-read; clipboard-write; fullscreen');frame.setAttribute('allowfullscreen','');
+            frame.setAttribute('referrerpolicy','no-referrer-when-downgrade');
+            driveBox.replaceChildren(frame);disableViewerZoom();return;
+          }
+          if(metadata?.capabilities?.canDownload===false)throw Error('Fișierul poate fi văzut în Google Drive, dar proprietarul sau organizația a dezactivat descărcarea. Din acest motiv nu poate fi afișat local în site.');
+          response=await fetch(base+'?alt=media',{headers:{Authorization:'Bearer '+token},cache:'no-store',credentials:'omit'});
         }
-        if(metadata?.capabilities?.canDownload===false)throw Error('Fișierul poate fi văzut în Google Drive, dar proprietarul sau organizația a dezactivat descărcarea. Din acest motiv nu poate fi afișat local în site.');
-        const response=await fetch(base+'?alt=media',{headers:{Authorization:'Bearer '+token},cache:'no-store',credentials:'omit'});
         if(generation!==viewerGeneration)return;
         if(response.status===401)throw Error('Sesiunea Google a expirat. Reconectează contul.');
         if(!response.ok){
@@ -170,11 +174,11 @@
           const reason=String(payload?.error?.errors?.[0]?.reason || payload?.error?.status || '');
           const server=String(payload?.error?.message||'');
           const hay=(reason+' '+server).toLowerCase();
-          if(hay.includes('download') || hay.includes('cannotdownload'))throw Error('Google permite vizualizarea fișierului, dar nu permite descărcarea lui pentru acest cont. Viewerul local nu poate ocoli această restricție.');
+          if(hay.includes('download') || hay.includes('cannotdownload') || hay.includes('export'))throw Error('Google nu permite exportul/descărcarea acestui fișier pentru contul curent.');
           if(hay.includes('insufficient') || hay.includes('scope'))throw Error('Tokenul Google nu are permisiunea Drive read-only. Deconectează-te și conectează-te din nou.');
-          throw Error('Fișierul nu a putut fi descărcat din Google Drive'+(reason?' ('+reason+')':'')+'.');
+          throw Error('Fișierul nu a putut fi încărcat din Google Drive'+(reason?' ('+reason+')':'')+'.');
         }
-        if(/\.pdf$/i.test(driveName)||mime==='application/pdf'){
+        if(/\.pdf$/i.test(renderName)||renderMime==='application/pdf'){
           const data=await response.arrayBuffer();if(generation!==viewerGeneration)return;
           const pdfjs=await loadPdfJs();if(generation!==viewerGeneration)return;
           const pdf=await pdfjs.getDocument({data:new Uint8Array(data)}).promise;if(generation!==viewerGeneration)return;
@@ -230,7 +234,7 @@
           }
           enableViewerZoom(pages);return;
         }
-        if(/\.(xlsx?|xlsm|csv)$/i.test(driveName)||/(?:spreadsheetml\.sheet|ms-excel)/i.test(mime)){
+        if(/\.(xlsx?|xlsm|csv)$/i.test(renderName)||/(?:spreadsheetml\.sheet|ms-excel)/i.test(renderMime)){
           const data=await response.arrayBuffer();if(generation!==viewerGeneration)return;
           const XLSX=await loadXlsx();if(generation!==viewerGeneration)return;
           const workbook=XLSX.read(data,{type:'array',cellStyles:true,cellDates:true,cellNF:true,cellFormula:true,cellHTML:true}),box=viewer.querySelector('[data-cr-viewer-content]');
@@ -346,7 +350,7 @@
           };
           renderSheet(workbook.SheetNames[0]);return;
         }
-        if(/\.docx?$/i.test(driveName)||/(?:wordprocessingml\.document|msword)/i.test(mime)){
+        if(/\.docx?$/i.test(renderName)||/(?:wordprocessingml\.document|msword)/i.test(renderMime)){
           const data=await response.arrayBuffer();if(generation!==viewerGeneration)return;
           const [mammoth,purify]=await Promise.all([loadMammoth(),loadPurify()]);if(generation!==viewerGeneration)return;
           const result=await mammoth.convertToHtml({arrayBuffer:data},{
@@ -366,7 +370,7 @@
           });
           const box=viewer.querySelector('[data-cr-viewer-content]');box.replaceChildren(doc);enableViewerZoom(doc);return;
         }
-        if(/\.(jpe?g|png|gif|webp|bmp|svg|avif|heic|heif)$/i.test(driveName)||mime.startsWith('image/')){
+        if(/\.(jpe?g|png|gif|webp|bmp|svg|avif|heic|heif)$/i.test(renderName)||renderMime.startsWith('image/')){
           const blob=await response.blob();if(generation!==viewerGeneration)return;
           viewerObjectUrl=URL.createObjectURL(blob);
           const stage=document.createElement('div');stage.className='classroom-image-stage';
@@ -376,11 +380,13 @@
           if(generation!==viewerGeneration)return;
           const availableW=Math.max(1,box.clientWidth-16),availableH=Math.max(1,box.clientHeight-16);
           const naturalW=Math.max(1,img.naturalWidth||availableW),naturalH=Math.max(1,img.naturalHeight||availableH);
-          const fit=Math.min(1,availableW/naturalW,availableH/naturalH);
-          img.style.width=naturalW+'px';img.style.maxWidth='none';img.style.height='auto';
-          stage.style.width=Math.max(availableW,naturalW)+'px';stage.style.minHeight=Math.max(availableH,naturalH)+'px';
-          enableViewerZoom(stage,fit,fit);
-          img.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();});
+          const fit=Math.min(1,availableW/naturalW,availableH/naturalH),fitW=Math.max(1,Math.round(naturalW*fit)),fitH=Math.max(1,Math.round(naturalH*fit));
+          img.style.width=fitW+'px';img.style.height=fitH+'px';img.style.maxWidth='none';img.style.maxHeight='none';
+          stage.style.width=availableW+'px';stage.style.minWidth=availableW+'px';stage.style.minHeight=availableH+'px';
+          enableViewerZoom(stage,1,1);
+          const cancelImageTap=e=>{e.preventDefault();e.stopPropagation();};
+          img.addEventListener('click',cancelImageTap,{capture:true});
+          img.addEventListener('dblclick',cancelImageTap,{capture:true});
           return;
         }
         if(/\.(txt|md|json|xml|log|html?|css|js|ts|py|java|c|cpp|h)$/i.test(name)){
