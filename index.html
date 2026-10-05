@@ -130,6 +130,7 @@
     .undo-toggle:hover:not(:disabled){transform:translateY(-1px);border-color:rgba(255,255,255,.32)}
     .undo-toggle:disabled{opacity:.34;cursor:default}
     body[data-orar-theme="ice"] .undo-toggle{background:rgba(255,255,255,.94);color:#111827;border-color:#0f234126}
+    .redo-toggle{left:calc(max(18px,env(safe-area-inset-left)) + 126px)}
 
     .mobile-tabs{display:none;gap:7px;overflow:auto;padding:0 1px 12px;scrollbar-width:none}
     .mobile-tabs::-webkit-scrollbar{display:none}
@@ -431,6 +432,7 @@
       .edit-toggle,.day-tab,.class-card,.add-class,.delete-class{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
       .edit-toggle{position:fixed;z-index:9999;pointer-events:auto}
       .undo-toggle{width:48px;height:48px;top:max(12px,env(safe-area-inset-top));left:calc(max(12px,env(safe-area-inset-left)) + 58px)}
+      .redo-toggle{left:calc(max(12px,env(safe-area-inset-left)) + 106px)}
       .mobile-tabs{position:relative;z-index:20;pointer-events:auto}
       .schedule-shell,.schedule-grid,.slot-cell,.class-card{position:relative;z-index:2;pointer-events:auto}
       .mobile-tabs{display:flex;max-width:100%;margin:0 auto 4px;justify-content:flex-start}
@@ -688,6 +690,9 @@
     <button class="undo-toggle" id="undoToggle" type="button" aria-label="Nu există modificări de anulat" title="Undo" disabled>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7 4 12l5 5"/><path d="M5 12h8a6 6 0 0 1 6 6"/></svg>
     </button>
+    <button class="undo-toggle redo-toggle" id="redoToggle" type="button" aria-label="Nu există modificări de refăcut" title="Redo" disabled>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 7 5 5-5 5"/><path d="M19 12h-8a6 6 0 0 0-6 6"/></svg>
+    </button>
 
     <button class="edit-toggle" id="editToggle" aria-label="Activează modul de editare" aria-pressed="false" title="Editează orarul">
       <svg class="edit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -803,32 +808,50 @@
     function clone(obj){ return JSON.parse(JSON.stringify(obj)); }
 
     const undoToggle = document.getElementById('undoToggle');
-    const undoStack = [];
+    const redoToggle = document.getElementById('redoToggle');
+    const undoStack = [], redoStack = [];
+    const historySnapshot=()=>({data:clone(data),selectedWeek,selectedDay});
+    const historyEntry=()=>{const snapshot=historySnapshot();return {snapshot,signature:JSON.stringify(snapshot)};};
     function updateUndoButton(){
       undoToggle.disabled = undoStack.length === 0;
+      redoToggle.disabled = redoStack.length === 0;
       undoToggle.setAttribute('aria-label', undoStack.length ? 'Anulează ultima modificare' : 'Nu există modificări de anulat');
+      redoToggle.setAttribute('aria-label', redoStack.length ? 'Refă ultima modificare anulată' : 'Nu există modificări de refăcut');
     }
     function recordUndo(){
-      const snapshot={data:clone(data),selectedWeek,selectedDay};
-      const signature=JSON.stringify(snapshot);
-      if(undoStack.length && undoStack[undoStack.length-1].signature===signature)return;
-      undoStack.push({snapshot,signature});
+      const entry=historyEntry();
+      if(undoStack.length && undoStack[undoStack.length-1].signature===entry.signature)return;
+      undoStack.push(entry);
       if(undoStack.length>30)undoStack.shift();
+      redoStack.length=0;
       updateUndoButton();
     }
-    function undoLastChange(){
-      const entry=undoStack.pop();
-      if(!entry)return;
+    function applyHistory(entry,message){
       data=clone(entry.snapshot.data);
       selectedWeek=entry.snapshot.selectedWeek;
       selectedDay=entry.snapshot.selectedDay;
       expandedKey=null;
       storageSet('c11_1_selected_week',selectedWeek);
       storageSet('c11_1_selected_day',selectedDay);
-      saveData('Modificare anulată');
+      saveData(message);
       render();
       updateUndoButton();
+    }
+    function undoLastChange(){
+      const entry=undoStack.pop();
+      if(!entry)return;
+      redoStack.push(historyEntry());
+      if(redoStack.length>30)redoStack.shift();
+      applyHistory(entry,'Modificare anulată');
       showToast('Ultima modificare a fost anulată');
+    }
+    function redoLastChange(){
+      const entry=redoStack.pop();
+      if(!entry)return;
+      undoStack.push(historyEntry());
+      if(undoStack.length>30)undoStack.shift();
+      applyHistory(entry,'Modificare refăcută');
+      showToast('Modificarea a fost refăcută');
     }
 
     function loadData(){
@@ -1436,6 +1459,7 @@
 
     document.getElementById('weekToggle').addEventListener('click', () => selectWeek(oppositeWeek(selectedWeek)));
     undoToggle.addEventListener('click', undoLastChange);
+    redoToggle.addEventListener('click', redoLastChange);
 
     editToggle.addEventListener('click', () => {
       if(editing) saveData('Salvat');
