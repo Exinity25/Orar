@@ -595,3 +595,35 @@ body[data-orar-theme] .classroom-attachments .classroom-link:hover{
   .classroom-viewer-zoom span{min-width:32px;font-size:9px}
   .classroom-viewer-zoom .hub-small-button{min-width:27px;padding:4px 6px}
 }
+
+
+/* Theme the RIGHT drawer edge/glow only; the left side remains untouched. */
+body[data-orar-theme] .hub-drawer{
+  border-right-color:color-mix(in srgb,var(--accent) 38%,transparent)!important;
+  box-shadow:18px 0 60px #0007,1px 0 18px color-mix(in srgb,var(--accent) 18%,transparent)!important;
+}
+.hub-brand-dot{color:#f55677}
+body[data-orar-theme] .hub-brand-dot{color:var(--accent-2)!important}
+
+/* Give viewer controls an opaque black safe header, outside the document/glow area. */
+.classroom-viewer-header{
+  position:relative;
+  z-index:3;
+  min-height:74px;
+  background:#070a11!important;
+  box-shadow:0 14px 28px #070a11,0 22px 34px #0009;
+}
+.classroom-viewer-content{position:relative;z-index:1;touch-action:pan-x pan-y}
+.classroom-excel-scroll{touch-action:pan-x pan-y;transform-origin:top left}
+
+/* Never let the site theme recolor the workbook itself. Cell fills/fonts are applied inline from XLSX styles. */
+.classroom-excel-table,
+.classroom-excel-table td,
+.classroom-excel-table th{color-scheme:light}
+.classroom-excel-table td{background-clip:padding-box}
+@media(max-width:640px){
+  .classroom-viewer-header{
+    min-height:104px;
+    padding:max(18px,env(safe-area-inset-top)) 14px 16px!important;
+  }
+}
