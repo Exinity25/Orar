@@ -201,35 +201,57 @@
             const ctx=canvas.getContext('2d',{alpha:false,desynchronized:false});
             if(ctx){ctx.imageSmoothingEnabled=true;if('imageSmoothingQuality' in ctx)ctx.imageSmoothingQuality='high';}
             await page.render({canvasContext:ctx,viewport,transform:ratio===1?null:[ratio,0,0,ratio,0,0],intent:'display'}).promise;
+            const links=document.createElement('div');links.className='classroom-pdf-links';links.style.width=viewport.width+'px';links.style.height=viewport.height+'px';
+            const seenLinks=new Set();
+            const addPdfLink=(href,left,top,width,height,label='Deschide linkul din PDF')=>{
+              if(!href)return;
+              const key=[href,Math.round(left),Math.round(top),Math.round(width),Math.round(height)].join('|');if(seenLinks.has(key))return;seenLinks.add(key);
+              const a=document.createElement('a');a.className='classroom-pdf-link';a.href=href;a.style.left=Math.max(0,left)+'px';a.style.top=Math.max(0,top)+'px';a.style.width=Math.max(14,width)+'px';a.style.height=Math.max(14,height)+'px';a.setAttribute('aria-label',label);
+              a.addEventListener('pointerdown',e=>e.stopPropagation());
+              a.addEventListener('touchstart',e=>e.stopPropagation(),{passive:true});
+              a.addEventListener('click',e=>{
+                e.preventDefault();e.stopPropagation();
+                if(href.startsWith('#pdf-page-')){const target=pages.querySelector(href);if(target)target.scrollIntoView({behavior:'smooth',block:'start'});}
+                else window.open(href,'_blank','noopener,noreferrer');
+              });
+              links.append(a);
+            };
             const annotations=await page.getAnnotations({intent:'display'});
-            if(annotations?.length){
-              const links=document.createElement('div');links.className='classroom-pdf-links';links.style.width=viewport.width+'px';links.style.height=viewport.height+'px';
-              for(const annotation of annotations){
-                if(annotation.subtype!=='Link' || !annotation.rect)continue;
-                const rawUrl=annotation.url||annotation.unsafeUrl||annotation.action||'';
-                let href=safeURL(rawUrl);
-                if(!href && annotation.dest){
-                  try{
-                    const dest=typeof annotation.dest==='string'?await pdf.getDestination(annotation.dest):annotation.dest;
-                    if(dest?.[0]){
-                      const ref=dest[0],index=typeof ref==='object'?await pdf.getPageIndex(ref):Math.max(0,Number(ref)||0);
-                      href='#pdf-page-'+(index+1);
-                    }
-                  }catch{}
-                }
-                if(!href)continue;
-                const rect=viewport.convertToViewportRectangle(annotation.rect),left=Math.min(rect[0],rect[2]),top=Math.min(rect[1],rect[3]),width=Math.abs(rect[0]-rect[2]),height=Math.abs(rect[1]-rect[3]);
-                const a=document.createElement('a');a.className='classroom-pdf-link';a.href=href;a.style.left=left+'px';a.style.top=top+'px';a.style.width=Math.max(12,width)+'px';a.style.height=Math.max(12,height)+'px';a.setAttribute('aria-label','Deschide linkul din PDF');
-                a.addEventListener('pointerdown',e=>e.stopPropagation());
-                a.addEventListener('click',e=>{
-                  e.preventDefault();e.stopPropagation();
-                  if(href.startsWith('#pdf-page-')){const target=pages.querySelector(href);if(target)target.scrollIntoView({behavior:'smooth',block:'start'});}
-                  else window.open(href,'_blank','noopener,noreferrer');
-                });
-                links.append(a);
+            for(const annotation of annotations||[]){
+              if(annotation.subtype!=='Link' || !annotation.rect)continue;
+              const rawUrl=annotation.url||annotation.unsafeUrl||'';
+              let href=safeURL(rawUrl);
+              if(!href && annotation.dest){
+                try{
+                  const dest=typeof annotation.dest==='string'?await pdf.getDestination(annotation.dest):annotation.dest;
+                  if(dest?.[0]){
+                    const ref=dest[0],index=typeof ref==='object'?await pdf.getPageIndex(ref):Math.max(0,Number(ref)||0);
+                    href='#pdf-page-'+(index+1);
+                  }
+                }catch{}
               }
-              if(links.childElementCount)wrap.append(links);
+              if(!href)continue;
+              const rect=viewport.convertToViewportRectangle(annotation.rect),left=Math.min(rect[0],rect[2]),top=Math.min(rect[1],rect[3]),width=Math.abs(rect[0]-rect[2]),height=Math.abs(rect[1]-rect[3]);
+              addPdfLink(href,left,top,width,height);
             }
+            // Some PDFs visually contain URLs but do not encode them as Link annotations.
+            // Detect URL text runs too and place real clickable hit areas over them.
+            try{
+              const textContent=await page.getTextContent();
+              const urlRe=/(https?:\/\/[^\s<>"')\]]+|www\.[^\s<>"')\]]+)/gi;
+              for(const item of textContent.items||[]){
+                const str=String(item.str||'');if(!str)continue;
+                let match;urlRe.lastIndex=0;
+                while((match=urlRe.exec(str))){
+                  let raw=match[0].replace(/[.,;!?]+$/,'');
+                  const href=safeURL(/^www\./i.test(raw)?'https://'+raw:raw);if(!href)continue;
+                  const tx=pdfjs.Util.transform(viewport.transform,item.transform),fontH=Math.max(10,Math.hypot(tx[2],tx[3]));
+                  const fullW=Math.max(fontH,Math.abs(Number(item.width)||0)*viewport.scale),ratioStart=match.index/Math.max(1,str.length),ratioWidth=raw.length/Math.max(1,str.length);
+                  addPdfLink(href,tx[4]+fullW*ratioStart,tx[5]-fontH,Math.max(18,fullW*ratioWidth),fontH*1.2,'Deschide '+raw);
+                }
+              }
+            }catch{}
+            if(links.childElementCount)wrap.append(links);
             wrap.id='pdf-page-'+pageNo;
           }
           enableViewerZoom(pages);return;
