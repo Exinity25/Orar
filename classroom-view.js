@@ -290,7 +290,7 @@
       profile.classList.remove('hub-hidden');
     }
     function saveSession(){try{localStorage.setItem(SESSION_KEY,JSON.stringify({token,expires,grantedScopes}));}catch{}}
-    const CLOUD_FILE='orar-sync.json',SYNC_KEYS=['c11_1_data','c11_1_selected_week','c11_1_selected_day','student_hub_data','student_hub_theme','student_hub_bg_mode','student_hub_bg_name'];
+    const CLOUD_FILE='orar-sync.json',SYNC_KEYS=['c11_1_bleach_schedule_v3','orar_subject_homework_v1','c11_1_selected_week','c11_1_selected_day'];
     let cloudFileId='',cloudTimer=0,cloudApplying=false;
     const cloudPayload=()=>{const values={};for(const key of SYNC_KEYS){const value=localStorage.getItem(key);if(value!==null)values[key]=value;}return {version:1,updatedAt:Date.now(),values};};
     async function findCloudFile(){
@@ -310,15 +310,26 @@
     }
     function scheduleCloudUpload(){clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>uploadCloud().catch(()=>{}),700);}
     async function restoreCloud(){
-      if(!token||!grantedScopes.includes('drive.appdata'))return;
+      if(!token||Date.now()>=expires||!grantedScopes.includes('drive.appdata'))return;
       const id=await findCloudFile();if(!id){scheduleCloudUpload();return;}
       const r=await fetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(id)+'?alt=media',{headers:{Authorization:'Bearer '+token},cache:'no-store'});if(!r.ok)return;
       const remote=await r.json();if(!remote?.values)return;
-      cloudApplying=true;let changed=false;
-      for(const key of SYNC_KEYS){if(Object.prototype.hasOwnProperty.call(remote.values,key)&&localStorage.getItem(key)!==String(remote.values[key])){localStorage.setItem(key,String(remote.values[key]));changed=true;}}
-      cloudApplying=false;if(changed)location.reload();
+      cloudApplying=true;let changed=false,needsBackfill=false;
+      for(const key of SYNC_KEYS){
+        const hasRemote=Object.prototype.hasOwnProperty.call(remote.values,key),local=localStorage.getItem(key);
+        if(hasRemote){
+          const value=String(remote.values[key]);
+          if(local!==value){localStorage.setItem(key,value);changed=true;}
+        }else if(local!==null)needsBackfill=true;
+      }
+      cloudApplying=false;
+      if(changed){location.reload();return;}
+      if(needsBackfill)scheduleCloudUpload();
     }
     window.addEventListener('orar-local-change',scheduleCloudUpload);
+    window.addEventListener('focus',()=>restoreCloud().catch(()=>{}));
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')restoreCloud().catch(()=>{});});
+    setInterval(()=>{if(document.visibilityState==='visible')restoreCloud().catch(()=>{});},8000);
     function forgetSession(){try{localStorage.removeItem(SESSION_KEY);}catch{}}
     function restoreSession(){
       try{localStorage.removeItem(OLD_SESSION_KEY);const saved=JSON.parse(localStorage.getItem(SESSION_KEY)||'null');if(saved?.token && Number(saved.expires)>Date.now()+5000){token=saved.token;expires=Number(saved.expires);grantedScopes=String(saved.grantedScopes||'');return true;}forgetSession();}catch{forgetSession();}
