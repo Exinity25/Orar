@@ -4,7 +4,8 @@
     'https://www.googleapis.com/auth/classroom.courses.readonly',
     'https://www.googleapis.com/auth/classroom.courseworkmaterials.readonly',
     'https://www.googleapis.com/auth/classroom.coursework.me.readonly',
-    'https://www.googleapis.com/auth/classroom.announcements.readonly'];
+    'https://www.googleapis.com/auth/classroom.announcements.readonly',
+    'https://www.googleapis.com/auth/drive.readonly'];
   const esc = (s='') => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const safeURL = value => {try{const u=new URL(value);return u.protocol==='https:'?u.href:'';}catch{return '';}};
   const link = (url,title,cls='classroom-link') => {const safe=safeURL(url);return safe?`<a class="${cls}" href="${esc(safe)}" target="_blank" rel="noopener noreferrer">${esc(title)} ↗</a>`:'';};
@@ -20,7 +21,16 @@
     if(!file?.id || !previewable(title))return '';
     return `<button class="classroom-link classroom-preview-link" type="button" data-cr-preview="${esc(file.id)}" data-cr-preview-title="${esc(title)}">${esc(title)} <span aria-hidden="true">▣</span></button>`;
   };
-  let gisPromise;
+  let gisPromise,xlsxPromise;
+  function loadXlsx(){
+    if(window.XLSX)return Promise.resolve(window.XLSX);
+    if(xlsxPromise)return xlsxPromise;
+    xlsxPromise=new Promise((resolve,reject)=>{
+      const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';s.async=true;
+      s.onload=()=>window.XLSX?resolve(window.XLSX):reject(Error('Nu s-a putut încărca viewerul Excel.'));
+      s.onerror=()=>{xlsxPromise=null;s.remove();reject(Error('Nu s-a putut încărca viewerul Excel.'));};document.head.append(s);
+    });return xlsxPromise;
+  }
   function loadGoogle(){
     if(window.google?.accounts?.oauth2)return Promise.resolve();
     if(gisPromise)return gisPromise;
@@ -33,24 +43,61 @@
     const page=document.createElement('main');page.id='hubClassroomPage';page.className='hub-page hub-hidden';page.setAttribute('aria-labelledby','classroomHeading');root.append(page);
     const profile=document.createElement('div');profile.className='classroom-profile hub-hidden';root.querySelector('.hub-drawer').append(profile);
     const viewer=document.createElement('div');viewer.className='classroom-viewer hub-hidden';viewer.setAttribute('role','dialog');viewer.setAttribute('aria-modal','true');viewer.setAttribute('aria-labelledby','classroomViewerTitle');
-    viewer.innerHTML=`<div class="classroom-viewer-backdrop" data-cr-viewer-close></div><section class="classroom-viewer-dialog"><header class="classroom-viewer-header"><div><span class="classroom-kind">Previzualizare</span><h2 id="classroomViewerTitle" data-cr-viewer-title>Fișier</h2></div><div class="classroom-viewer-actions"><a class="hub-small-button classroom-viewer-drive" data-cr-viewer-drive target="_blank" rel="noopener noreferrer">Deschide în Drive ↗</a><button class="hub-small-button classroom-viewer-close" type="button" data-cr-viewer-close aria-label="Închide previzualizarea">✕</button></div></header><iframe data-cr-viewer-frame title="Previzualizare fișier" referrerpolicy="no-referrer" allowfullscreen></iframe></section>`;root.append(viewer);
-    let viewerReturnFocus=null;
+    viewer.innerHTML=`<div class="classroom-viewer-backdrop" data-cr-viewer-close></div><section class="classroom-viewer-dialog"><header class="classroom-viewer-header"><div><span class="classroom-kind">Previzualizare locală</span><h2 id="classroomViewerTitle" data-cr-viewer-title>Fișier</h2></div><div class="classroom-viewer-actions"><a class="hub-small-button classroom-viewer-drive" data-cr-viewer-drive target="_blank" rel="noopener noreferrer">Deschide în Drive ↗</a><button class="hub-small-button classroom-viewer-close" type="button" data-cr-viewer-close aria-label="Închide previzualizarea">✕</button></div></header><div class="classroom-viewer-content" data-cr-viewer-content></div></section>`;root.append(viewer);
+    let viewerReturnFocus=null,viewerObjectUrl='',viewerGeneration=0;
+    function resetViewerContent(){
+      if(viewerObjectUrl){URL.revokeObjectURL(viewerObjectUrl);viewerObjectUrl='';}
+      viewer.querySelector('[data-cr-viewer-content]').replaceChildren();
+    }
+    function viewerMessage(text,kind='status'){
+      const box=viewer.querySelector('[data-cr-viewer-content]');box.innerHTML=`<div class="classroom-viewer-message" role="${kind}">${esc(text)}</div>`;
+    }
     function closeViewer(restore=true){
       if(viewer.classList.contains('hub-hidden'))return;
-      viewer.classList.add('hub-hidden');viewer.querySelector('[data-cr-viewer-frame]').src='about:blank';document.body.classList.remove('classroom-viewer-open');
+      viewerGeneration++;resetViewerContent();viewer.classList.add('hub-hidden');document.body.classList.remove('classroom-viewer-open');
       if(restore && viewerReturnFocus?.isConnected)viewerReturnFocus.focus({preventScroll:true});viewerReturnFocus=null;
     }
-    function openViewer(id,title){
+    async function openViewer(id,title){
       const fileId=String(id||'');if(!/^[A-Za-z0-9_-]+$/.test(fileId))return;
-      viewerReturnFocus=document.activeElement instanceof HTMLElement?document.activeElement:null;
-      viewer.querySelector('[data-cr-viewer-title]').textContent=title||'Fișier';
-      viewer.querySelector('[data-cr-viewer-frame]').src='https://drive.google.com/file/d/'+encodeURIComponent(fileId)+'/preview';
+      const name=String(title||'Fișier'),generation=++viewerGeneration;
+      viewerReturnFocus=document.activeElement instanceof HTMLElement?document.activeElement:null;resetViewerContent();
+      viewer.querySelector('[data-cr-viewer-title]').textContent=name;
       viewer.querySelector('[data-cr-viewer-drive]').href='https://drive.google.com/file/d/'+encodeURIComponent(fileId)+'/view';
-      viewer.classList.remove('hub-hidden');document.body.classList.add('classroom-viewer-open');viewer.querySelector('.classroom-viewer-close').focus({preventScroll:true});
+      viewer.classList.remove('hub-hidden');document.body.classList.add('classroom-viewer-open');viewerMessage('Se încarcă fișierul…');viewer.querySelector('.classroom-viewer-close').focus({preventScroll:true});
+      if(!token || Date.now()>=expires){viewerMessage('Sesiunea Google a expirat. Închide viewerul și reconectează contul.','alert');return;}
+      try{
+        const response=await fetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(fileId)+'?alt=media',{headers:{Authorization:'Bearer '+token},cache:'no-store',credentials:'omit'});
+        if(generation!==viewerGeneration)return;
+        if(response.status===401)throw Error('Sesiunea Google a expirat. Reconectează contul.');
+        if(response.status===403)throw Error('Google Drive nu a permis citirea fișierului. Activează Google Drive API și reconectează contul pentru permisiunea Drive read-only.');
+        if(!response.ok)throw Error('Fișierul nu a putut fi descărcat din Google Drive.');
+        if(/\.pdf$/i.test(name)){
+          const blob=await response.blob();if(generation!==viewerGeneration)return;
+          viewerObjectUrl=URL.createObjectURL(blob.type==='application/pdf'?blob:new Blob([blob],{type:'application/pdf'}));
+          const frame=document.createElement('iframe');frame.className='classroom-local-pdf';frame.title='Previzualizare PDF';frame.src=viewerObjectUrl;viewer.querySelector('[data-cr-viewer-content]').replaceChildren(frame);return;
+        }
+        if(/\.xlsx?$/i.test(name)){
+          const data=await response.arrayBuffer();if(generation!==viewerGeneration)return;
+          const XLSX=await loadXlsx();if(generation!==viewerGeneration)return;
+          const workbook=XLSX.read(data,{type:'array'}),box=viewer.querySelector('[data-cr-viewer-content]');
+          if(!workbook.SheetNames.length)throw Error('Fișierul Excel nu conține foi care pot fi afișate.');
+          const renderSheet=sheetName=>{
+            const rows=XLSX.utils.sheet_to_json(workbook.Sheets[sheetName],{header:1,defval:'',raw:false});
+            const limit=2500,shown=rows.slice(0,limit),table=document.createElement('table');table.className='classroom-excel-table';
+            const tbody=document.createElement('tbody');shown.forEach((row,rowIndex)=>{const tr=document.createElement('tr');(row.length?row:['']).forEach(value=>{const cell=document.createElement(rowIndex===0?'th':'td');cell.textContent=String(value??'');tr.append(cell);});tbody.append(tr);});table.append(tbody);
+            const wrap=document.createElement('div');wrap.className='classroom-excel-scroll';wrap.append(table);
+            const fragment=document.createDocumentFragment();
+            if(workbook.SheetNames.length>1){const select=document.createElement('select');select.className='classroom-sheet-select';select.setAttribute('aria-label','Alege foaia Excel');workbook.SheetNames.forEach(n=>{const option=document.createElement('option');option.value=n;option.textContent=n;option.selected=n===sheetName;select.append(option);});select.addEventListener('change',()=>renderSheet(select.value));fragment.append(select);}
+            fragment.append(wrap);if(rows.length>limit){const note=document.createElement('p');note.className='classroom-viewer-limit';note.textContent='Sunt afișate primele '+limit+' de rânduri.';fragment.append(note);}box.replaceChildren(fragment);
+          };
+          renderSheet(workbook.SheetNames[0]);return;
+        }
+        throw Error('Acest tip de fișier nu are viewer local.');
+      }catch(error){if(generation===viewerGeneration)viewerMessage(error?.message||'Nu am putut afișa fișierul.','alert');}
     }
     viewer.addEventListener('click',e=>{if(e.target.closest('[data-cr-viewer-close]'))closeViewer();});
     viewer.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();closeViewer();}});
-    const SESSION_KEY='orar_classroom_session_v1';
+    const SESSION_KEY='orar_classroom_session_v2',OLD_SESSION_KEY='orar_classroom_session_v1';
     const ACCOUNT_KEY='orar_classroom_account_v1';
     let token='',expires=0,client=null,courses=[],posts=[],selected=null,loading=false,message='',warning='',generation=0,session=0,expireTimer,visible=false,reauthenticating=false;
     const configured=()=>/^[\w.-]+\.apps\.googleusercontent\.com$/.test(window.ORAR_CLASSROOM_CLIENT_ID||'');
@@ -64,7 +111,7 @@
     function saveSession(){try{localStorage.setItem(SESSION_KEY,JSON.stringify({token,expires}));}catch{}}
     function forgetSession(){try{localStorage.removeItem(SESSION_KEY);}catch{}}
     function restoreSession(){
-      try{const saved=JSON.parse(localStorage.getItem(SESSION_KEY)||'null');if(saved?.token && Number(saved.expires)>Date.now()+5000){token=saved.token;expires=Number(saved.expires);return true;}forgetSession();}catch{forgetSession();}
+      try{localStorage.removeItem(OLD_SESSION_KEY);const saved=JSON.parse(localStorage.getItem(SESSION_KEY)||'null');if(saved?.token && Number(saved.expires)>Date.now()+5000){token=saved.token;expires=Number(saved.expires);return true;}forgetSession();}catch{forgetSession();}
       return false;
     }
     function scheduleExpiry(){clearTimeout(expireTimer);if(token&&expires>Date.now())expireTimer=setTimeout(()=>clearSession('Sesiunea Google trebuie reînnoită.',false),Math.max(0,expires-Date.now()));}
