@@ -361,9 +361,14 @@
     const configured=()=>/^[\w.-]+\.apps\.googleusercontent\.com$/.test(window.ORAR_CLASSROOM_CLIENT_ID||'');
     function rememberedAccount(){try{const value=JSON.parse(localStorage.getItem(ACCOUNT_KEY)||'null');return value&&value.email?value:null;}catch{return null;}}
     function renderProfile(account,connected=Boolean(token&&Date.now()<expires)){
-      if(!account?.email){profile.replaceChildren();profile.classList.add('hub-hidden');return;}
+      profile.classList.remove('is-open');
+      if(!account?.email){
+        const disabled=!configured()||!client||reauthenticating;
+        profile.innerHTML=`<button class="classroom-profile-summary classroom-profile-signin" type="button" data-cr-profile-signin ${disabled?'disabled':''}><span class="classroom-profile-avatar classroom-profile-google" aria-hidden="true">G</span><span class="classroom-profile-copy"><strong>${reauthenticating?'Se conectează…':'Conectează contul Google'}</strong><span>Classroom · Drive · sincronizare</span></span><span class="classroom-profile-signin-arrow" aria-hidden="true">→</span></button>`;
+        profile.classList.remove('hub-hidden');return;
+      }
       const picture=safeURL(account.picture||'');
-      profile.innerHTML=`<button class="classroom-profile-summary" type="button" data-cr-profile-toggle aria-expanded="false">${picture?`<img src="${esc(picture)}" alt="" referrerpolicy="no-referrer">`:'<span class="classroom-profile-avatar" aria-hidden="true">G</span>'}<span class="classroom-profile-copy"><strong>${esc(account.name||'Cont Google')}</strong><span>${esc(account.email)}</span></span><span class="classroom-profile-chevron" aria-hidden="true">›</span></button><div class="classroom-profile-menu"><div class="classroom-profile-details"><strong>${connected?'Cont Google conectat':'Cont Google memorat'}</strong><span>${esc(account.email)}</span></div><button class="hub-small-button classroom-profile-logout" type="button" data-cr-logout>Deconectează</button></div>`;
+      profile.innerHTML=`<button class="classroom-profile-summary" type="button" data-cr-profile-toggle aria-expanded="false">${picture?`<img src="${esc(picture)}" alt="" referrerpolicy="no-referrer">`:'<span class="classroom-profile-avatar" aria-hidden="true">G</span>'}<span class="classroom-profile-copy"><strong>${esc(account.name||'Cont Google')}</strong><span>${esc(account.email)}</span></span><span class="classroom-profile-chevron" aria-hidden="true">›</span></button><div class="classroom-profile-menu"><div class="classroom-profile-details"><strong>${connected?'Cont Google conectat':'Sesiunea Google trebuie reînnoită'}</strong><span>${esc(account.email)}</span></div>${!connected?`<button class="hub-small-button classroom-profile-reconnect" type="button" data-cr-profile-signin ${!client||reauthenticating?'disabled':''}>${reauthenticating?'Se reconectează…':'Reconectează contul'}</button>`:''}<button class="hub-small-button classroom-profile-logout" type="button" data-cr-logout>Deconectează</button></div>`;
       profile.classList.remove('hub-hidden');
     }
     function saveSession(){try{localStorage.setItem(SESSION_KEY,JSON.stringify({token,expires,grantedScopes}));}catch{}}
@@ -431,12 +436,14 @@
     function scheduleExpiry(){clearTimeout(expireTimer);if(token&&expires>Date.now())expireTimer=setTimeout(()=>clearSession('Sesiunea Google trebuie reînnoită.',false),Math.max(0,expires-Date.now()));}
     function clearSession(text='',forgetAccount=false){
       closeViewer(false);generation++;session++;clearTimeout(expireTimer);token='';expires=0;grantedScopes='';forgetSession();courses=[];posts=[];selected=null;loading=false;message=text;warning='';reauthenticating=false;
-      if(forgetAccount){try{localStorage.removeItem(ACCOUNT_KEY);}catch{}profile.replaceChildren();profile.classList.add('hub-hidden');}
-      else renderProfile(rememberedAccount(),false);
+      if(forgetAccount){try{localStorage.removeItem(ACCOUNT_KEY);}catch{}}
+      renderProfile(rememberedAccount(),false);
       render();
     }
     function logout(){const old=token;clearSession('',true);if(old && window.google?.accounts?.oauth2)window.google.accounts.oauth2.revoke(old,()=>{});}
     profile.addEventListener('click',e=>{
+      const signIn=e.target.closest('[data-cr-profile-signin]');
+      if(signIn){if(client && !signIn.disabled)requestAccess(Boolean(rememberedAccount()));return;}
       const toggle=e.target.closest('[data-cr-profile-toggle]');
       if(toggle){const open=profile.classList.toggle('is-open');toggle.setAttribute('aria-expanded',String(open));return;}
       if(e.target.closest('[data-cr-logout]'))logout();
@@ -572,12 +579,13 @@
               if(account.email){try{localStorage.setItem(ACCOUNT_KEY,JSON.stringify(account));}catch{}renderProfile(account,true);} restoreCloud().catch(()=>{});
             }catch{renderProfile(rememberedAccount(),true);}
           },error_callback:()=>{reauthenticating=false;message='Reconectarea Google nu a putut fi făcută automat. Apasă din nou pe conectare.';render();}});
+        renderProfile(rememberedAccount(),Boolean(token&&Date.now()<expires));
         render();
-      }catch(e){message=e.message;render();}
+      }catch(e){message=e.message;renderProfile(rememberedAccount(),Boolean(token&&Date.now()<expires));render();}
     }
     function requestAccess(preferRemembered=false){
       if(!client || reauthenticating)return;
-      const remembered=rememberedAccount();reauthenticating=true;message='';render();
+      const remembered=rememberedAccount();reauthenticating=true;message='';renderProfile(remembered,Boolean(token&&Date.now()<expires));render();
       const options=preferRemembered&&remembered?{prompt:'',login_hint:remembered.email}:{prompt:'select_account'};
       try{client.requestAccessToken(options);}catch{reauthenticating=false;render();}
     }
