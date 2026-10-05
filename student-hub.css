@@ -354,3 +354,65 @@ body[data-orar-theme="violet"]::after{background:linear-gradient(rgba(5,3,8,.14)
 }
 
 .card-color-cycle,.card-color-edit{display:none!important}
+
+
+/* v33 polish: add-card frame, accent picker, overlay removal, and iPhone safe-area continuity */
+body.editing .slot-cell.empty.day-col::before{display:none!important;content:none!important}
+body.editing .slot-cell.empty{
+  padding:0!important;
+  border:1px dashed rgba(255,255,255,.25)!important;
+  background:rgba(7,11,18,.88)!important;
+}
+body.editing .slot-cell.empty .add-class{
+  width:100%!important;height:100%!important;min-height:100%!important;margin:0!important;
+  border:0!important;border-radius:inherit!important;background:transparent!important;
+  display:flex!important;align-items:center!important;justify-content:center!important;
+}
+body[data-orar-theme="ice"].editing .slot-cell.empty{
+  border-color:#94a3b8!important;background:#fff!important;
+}
+body[data-orar-theme="ice"].editing .slot-cell.empty .add-class{
+  background:transparent!important;color:#334155!important;
+}
+
+/* Keep the selected accent visible on the card border in view mode only. */
+body:not(.editing) .class-card:not(.card-tone-default){border-left-color:var(--card-custom)!important}
+
+/* The picker must not be clipped by its timetable cell. */
+.slot-cell:has(.card-color-picker[open]){overflow:visible!important;z-index:60!important}
+.class-card:has(.card-color-picker[open]){overflow:visible!important;z-index:61!important}
+.card-color-swatch{border-radius:50%!important}
+.card-color-menu{grid-template-columns:repeat(4,1fr);width:172px;gap:7px;padding:9px}
+.card-color-menu button{
+  min-width:0;min-height:46px;padding:4px 2px!important;
+  display:grid!important;place-items:center!important;gap:3px!important;
+  text-align:center!important;border-radius:9px!important;
+}
+.card-color-menu button span:last-child{font-size:7px;line-height:1.15}
+.card-color-swatch{width:21px!important;height:21px!important;flex:0 0 21px!important;border:2px solid rgba(255,255,255,.42)!important}
+.card-color-menu button[aria-checked="true"] .card-color-swatch{box-shadow:0 0 0 2px var(--accent),0 0 0 4px rgba(255,255,255,.12)}
+body[data-orar-theme="ice"] .card-color-menu button[aria-checked="true"] .card-color-swatch{box-shadow:0 0 0 2px #2563eb,0 0 0 4px #dbeafe}
+body[data-orar-theme="ice"] .card-color-menu button span:last-child{color:#334155}
+
+/* Remove the theme veil/fade from non-default themes and while documents are open. */
+body[data-orar-theme]::after,
+body.classroom-viewer-open::after{display:none!important}
+
+/* Improve ICE contrast in Classroom. */
+body[data-orar-theme="ice"] .classroom-course-summary{color:#111827!important}
+body[data-orar-theme="ice"] .classroom-course-copy strong{color:#111827!important}
+body[data-orar-theme="ice"] .classroom-course-copy>span{color:#475569!important}
+body[data-orar-theme="ice"] .classroom-course-chevron{color:#2563eb!important}
+
+/* Keep the visual background continuous into the iPhone home-indicator safe area. */
+html,body{height:100%;min-height:100%;overscroll-behavior:none}
+body::before{min-height:calc(100dvh + env(safe-area-inset-bottom))}
+.app,.hub-page{min-height:100dvh!important}
+
+@media (max-width:900px) and (orientation:landscape), (max-width:960px) and (orientation:landscape) and (hover:none) and (pointer:coarse){
+  body.editing .slot-cell.empty{border-radius:var(--radius)!important}
+  body.editing .slot-cell.empty .add-class{font-size:14px!important}
+  .card-color-menu{grid-template-columns:repeat(4,1fr);width:150px;gap:5px;padding:7px;right:0;bottom:24px}
+  .card-color-menu button{min-height:39px!important}
+  .card-color-swatch{width:17px!important;height:17px!important;flex-basis:17px!important}
+}
