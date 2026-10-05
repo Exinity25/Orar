@@ -1,4 +1,4 @@
-const CACHE = 'orar-v27-classroom-persist';
+const CACHE = 'orar-v28-customize-local-files';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './student-hub.css', './student-hub.js', './classroom-config.js', './classroom-view.js'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
