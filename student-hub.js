@@ -38,18 +38,19 @@
           <nav class="hub-nav" aria-label="Secțiuni">
             <button class="hub-nav-item" data-hub-view="schedule" aria-current="page" type="button"><span class="hub-icon">${icons.calendar}</span><span class="hub-nav-copy"><strong>Orar</strong><small>Programul săptămânii</small></span></button>
             <button class="hub-nav-item" data-hub-view="subjects" type="button"><span class="hub-icon">${icons.book}</span><span class="hub-nav-copy"><strong>Materii</strong><small>Teme și termene</small></span></button>
-            <a class="hub-nav-item" id="hubClassroom" href="https://classroom.google.com/" target="_blank" rel="noopener noreferrer"><span class="hub-icon">${icons.classroom}</span><span class="hub-nav-copy"><strong>Classroom</strong><small>Deschide Google Classroom</small></span><span class="hub-external" aria-hidden="true">↗</span></a>
+            <button class="hub-nav-item" id="hubClassroom" data-hub-view="classroom" type="button"><span class="hub-icon">${icons.classroom}</span><span class="hub-nav-copy"><strong>Classroom</strong><small>Clase și materiale</small></span></button>
           </nav>
         </aside>
       </div>
       <main class="hub-page hub-hidden" id="hubSubjects" aria-labelledby="hubHeading">
-        <div class="hub-content"><header class="hub-page-header"><span class="hub-eyebrow">Totul, pe materii</span><h1 class="hub-heading" id="hubHeading" tabindex="-1">Materii</h1><p class="hub-intro">Un singur loc pentru temele și termenele tale.</p><div class="hub-stats" id="hubStats"></div></header>
+        <div class="hub-content"><header class="hub-page-header"><h1 class="hub-heading" id="hubHeading" tabindex="-1">Materii</h1><p class="hub-intro">Un singur loc pentru temele și termenele tale.</p><div class="hub-stats" id="hubStats"></div></header>
         <label class="hub-search"><span aria-hidden="true">⌕</span><input id="hubSearch" type="search" placeholder="Caută o materie…" aria-label="Caută o materie" autocomplete="off"></label>
         <div class="hub-subject-list" id="hubSubjectList"></div>
-        <p class="hub-local-note">Temele se salvează pe acest dispozitiv. Nu se sincronizează cu Google Classroom.</p></div>
+        </div>
       </main>
       <div class="hub-status" id="hubStatus" role="status" aria-live="polite"></div>`;
     document.body.append(root);
+    const classroom = window.OrarClassroom.mount(root);
     const $ = selector => root.querySelector(selector);
     const menu=$('#hubMenu'), layer=$('#hubLayer'), page=$('#hubSubjects'), list=$('#hubSubjectList');
     layer.inert = true;
@@ -95,30 +96,29 @@
       list.innerHTML=visible.map((subject,index)=>{
         const {id,name,count,current}=subject, tasks=tasksFor(id), draft=draftFor(id), pending=tasks.filter(t=>!t.done).length;
         const sorted=[...tasks].sort((a,b)=>Number(Boolean(a.done))-Number(Boolean(b.done)) || (validDate(a.deadline)||'9999').localeCompare(validDate(b.deadline)||'9999'));
-        return `<details class="hub-subject" data-subject-id="${esc(id)}" ${openSubjects.has(id)?'open':''}><summary><span class="hub-icon hub-subject-mark">${icons.book}</span><span class="hub-subject-name"><strong>${esc(name)}</strong><small>${current?count+(count===1?' activitate în orar':' activități în orar'):'Păstrată dintr-un orar anterior'} · ${pending?pending+(pending===1?' temă de făcut':' teme de făcut'):'Nicio temă în așteptare'}</small></span><span class="hub-chevron" aria-hidden="true">›</span></summary><div class="hub-subject-body"><ul class="hub-tasks">${sorted.map(task=>taskMarkup(task,id)).join('')}</ul>${tasks.length?'':'<p class="hub-empty">Adaugă prima temă pentru această materie.</p>'}<form class="hub-form"><label for="hubTaskText${index}">${draft.editing?'Editează tema':'Temă nouă'}<textarea id="hubTaskText${index}" name="text" placeholder="Ce ai de pregătit?" required maxlength="5000">${esc(draft.text)}</textarea></label><div class="hub-form-footer"><label for="hubTaskDate${index}">Termen (opțional)<input id="hubTaskDate${index}" type="date" name="deadline" value="${esc(draft.deadline)}"></label><button class="hub-primary" type="submit">${draft.editing?'Salvează':'Adaugă tema'}</button>${draft.editing?'<button class="hub-small-button" type="button" data-task-cancel>Anulează</button>':''}</div></form></div></details>`;
+        return `<details class="hub-subject" data-subject-id="${esc(id)}" ${openSubjects.has(id)?'open':''}><summary><span class="hub-icon hub-subject-mark">${icons.book}</span><span class="hub-subject-name"><strong>${esc(name)}</strong><small>${current?count+(count===1?' activitate în orar':' activități în orar'):'Păstrată dintr-un orar anterior'} · ${pending?pending+(pending===1?' temă de făcut':' teme de făcut'):'Nicio temă în așteptare'}</small></span><span class="hub-chevron" aria-hidden="true">›</span></summary><div class="hub-subject-body"><ul class="hub-tasks">${sorted.map(task=>taskMarkup(task,id)).join('')}</ul>${tasks.length?'':'<p class="hub-empty">Adaugă prima temă pentru această materie.</p>'}<form class="hub-form"><label for="hubTaskText${index}">${draft.editing?'Editează tema':'Temă nouă'}<textarea id="hubTaskText${index}" name="text" placeholder="Ce ai de pregătit?" required maxlength="5000">${esc(draft.text)}</textarea></label><div class="hub-form-footer"><label for="hubTaskDate${index}">Termen<input id="hubTaskDate${index}" type="date" name="deadline" value="${esc(draft.deadline)}"></label><button class="hub-primary" type="submit">${draft.editing?'Salvează':'Adaugă tema'}</button>${draft.editing?'<button class="hub-small-button" type="button" data-task-cancel>Anulează</button>':''}</div></form></div></details>`;
       }).join('') || '<p class="hub-empty">'+(search?'Nu am găsit această materie.':'Adaugă materiile în orar, iar ele vor apărea aici.')+'</p>';
       list.querySelectorAll('details').forEach(el=>el.addEventListener('toggle',()=>{if(!el.isConnected)return;el.open?openSubjects.add(el.dataset.subjectId):openSubjects.delete(el.dataset.subjectId);}));
     };
     const closeMenu = (restore=true) => {
       layer.classList.remove('is-open');layer.setAttribute('aria-hidden','true');layer.inert=true;
-      menu.setAttribute('aria-expanded','false');app.inert=false;page.inert=false;menu.inert=false;
+      menu.setAttribute('aria-expanded','false');app.inert=false;page.inert=false;classroom.element.inert=false;menu.inert=false;
       if(restore)menu.focus({preventScroll:true});
     };
     const openMenu = () => {
       layer.inert=false;layer.setAttribute('aria-hidden','false');layer.classList.add('is-open');menu.setAttribute('aria-expanded','true');
-      app.inert=true;page.inert=true;menu.inert=true;$('#hubClose').focus({preventScroll:true});
+      app.inert=true;page.inert=true;classroom.element.inert=true;menu.inert=true;$('#hubClose').focus({preventScroll:true});
     };
     const changeView = next => {
       view=next;closeMenu(false);
-      app.classList.toggle('hub-hidden',view!=='schedule');page.classList.toggle('hub-hidden',view!=='subjects');
+      app.classList.toggle('hub-hidden',view!=='schedule');page.classList.toggle('hub-hidden',view!=='subjects');classroom.element.classList.toggle('hub-hidden',view!=='classroom');
       root.querySelectorAll('[data-hub-view]').forEach(el=>el.dataset.hubView===view?el.setAttribute('aria-current','page'):el.removeAttribute('aria-current'));
       if(view==='subjects'){
         renderSubjects();page.classList.remove('is-entering');void page.offsetWidth;page.classList.add('is-entering');$('#hubHeading').focus({preventScroll:true});
-      } else menu.focus({preventScroll:true});
+      } else if(view==='classroom') classroom.show(); else menu.focus({preventScroll:true});
     };
     menu.addEventListener('click',openMenu);$('#hubClose').addEventListener('click',()=>closeMenu());$('#hubBackdrop').addEventListener('click',()=>closeMenu());
     root.querySelectorAll('[data-hub-view]').forEach(el=>el.addEventListener('click',()=>changeView(el.dataset.hubView)));
-    $('#hubClassroom').addEventListener('click',()=>closeMenu());
     layer.addEventListener('keydown',e=>{
       if(e.key==='Escape'){e.preventDefault();closeMenu();}
       if(e.key==='Tab'){
@@ -168,3 +168,4 @@
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible' && view==='subjects')renderSubjects();});
   }};
 })();
+
