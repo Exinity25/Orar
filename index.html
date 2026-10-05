@@ -432,9 +432,12 @@
       body.mobile-day-4 .day-col:not(.day-4){display:none}
     }
 
-    @media (max-width:900px) and (orientation:landscape){
+    @media (max-width:900px) and (orientation:landscape), (max-width:960px) and (orientation:landscape) and (hover:none) and (pointer:coarse){
       .app{
-        padding:calc(8px + env(safe-area-inset-top)) 8px calc(16px + env(safe-area-inset-bottom));
+        padding-top:calc(8px + env(safe-area-inset-top));
+        padding-right:max(18px,env(safe-area-inset-right));
+        padding-bottom:calc(16px + env(safe-area-inset-bottom));
+        padding-left:max(18px,env(safe-area-inset-left));
         overflow-y:auto;
         overflow-x:hidden;
       }
@@ -444,8 +447,10 @@
       .subtitle{font-size:10px;margin-top:5px}
       .mobile-tabs{display:none!important}
       .schedule-shell{
-        width:100%;
+        width:calc(100% - 6px);
         max-width:none;
+        margin-left:auto;
+        margin-right:auto;
         overflow:visible!important;
         padding-bottom:0;
       }
@@ -511,6 +516,10 @@
     .week-toggle-label{display:none}
     .subject .week-tag{font-size:.7em;white-space:nowrap;margin-left:5px}
     @media(max-width:900px), (hover:none) and (pointer:coarse){.week-toggle{top:calc(max(12px,env(safe-area-inset-top)) + 58px)}}
+    @media (max-width:900px) and (orientation:landscape), (max-width:960px) and (orientation:landscape) and (hover:none) and (pointer:coarse){
+      #editToggle{top:max(12px,env(safe-area-inset-top));right:max(12px,env(safe-area-inset-right))}
+      #weekToggle{top:max(12px,env(safe-area-inset-top));right:calc(max(12px,env(safe-area-inset-right)) + 56px)}
+    }
     /* Compact rows that still grow naturally when a note is opened. */
     .schedule-grid{--row-height:112px;grid-template-rows:auto;grid-auto-rows:minmax(var(--row-height),auto)}
     body.editing .schedule-grid{--row-height:196px}
@@ -544,7 +553,7 @@
       .schedule-grid{--row-height:108px}
       body.editing .schedule-grid{--row-height:196px}
     }
-    @media(max-width:900px) and (orientation:landscape){
+    @media(max-width:900px) and (orientation:landscape), (max-width:960px) and (orientation:landscape) and (hover:none) and (pointer:coarse){
       .schedule-grid{
         --row-height:92px;
         align-items:start;
