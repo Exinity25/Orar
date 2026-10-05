@@ -733,3 +733,16 @@ body[data-orar-theme] .hub-brand-dot{color:var(--accent-2)!important}
 .classroom-excel-table td[style*="background-color"]{
   background-image:none!important;
 }
+
+
+/* PDFs use the browser's real PDF document viewer: all pages, scroll and native zoom in/out. */
+.classroom-local-pdf{
+  display:block!important;
+  width:100%!important;
+  height:100%!important;
+  min-height:100%!important;
+  border:0!important;
+  transform:none!important;
+  transform-origin:initial!important;
+  background:#eef1f5!important;
+}

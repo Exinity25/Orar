@@ -112,7 +112,7 @@
         if(/\.pdf$/i.test(name)){
           const blob=await response.blob();if(generation!==viewerGeneration)return;
           viewerObjectUrl=URL.createObjectURL(blob.type==='application/pdf'?blob:new Blob([blob],{type:'application/pdf'}));
-          const frame=document.createElement('iframe');frame.className='classroom-local-pdf';frame.title='Previzualizare PDF';frame.src=viewerObjectUrl+'#zoom=page-width';viewer.querySelector('[data-cr-viewer-content]').replaceChildren(frame);enableFramePinch(frame);return;
+          const frame=document.createElement('iframe');frame.className='classroom-local-pdf';frame.title='Document PDF';frame.src=viewerObjectUrl+'#page=1&zoom=page-width&view=FitH&toolbar=1&navpanes=0';frame.setAttribute('allowfullscreen','');viewer.querySelector('[data-cr-viewer-content]').replaceChildren(frame);disableViewerZoom();return;
         }
         if(/\.xlsx?$/i.test(name)){
           const data=await response.arrayBuffer();if(generation!==viewerGeneration)return;
