@@ -139,10 +139,10 @@
           enableViewerZoom(pages);return;
         }
         if(/\.xlsx?$/i.test(name)){
-          const box=viewer.querySelector('[data-cr-viewer-content]');
+          const driveBox=viewer.querySelector('[data-cr-viewer-content]');
           const frame=document.createElement('iframe');frame.className='classroom-drive-office-preview';frame.title='Fișier Excel original';
           frame.src='https://drive.google.com/file/d/'+encodeURIComponent(fileId)+'/preview';
-          frame.setAttribute('allow','clipboard-read; clipboard-write');box.replaceChildren(frame);disableViewerZoom();return;
+          frame.setAttribute('allow','clipboard-read; clipboard-write');driveBox.replaceChildren(frame);disableViewerZoom();return;
           const data=await response.arrayBuffer();if(generation!==viewerGeneration)return;
           const XLSX=await loadXlsx();if(generation!==viewerGeneration)return;
           const workbook=XLSX.read(data,{type:'array',cellStyles:true,cellDates:true,cellNF:true,cellFormula:true,cellHTML:true}),box=viewer.querySelector('[data-cr-viewer-content]');
