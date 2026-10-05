@@ -556,3 +556,42 @@ body[data-orar-theme] .classroom-link,
 body[data-orar-theme] .classroom-inline-link{color:var(--accent-2)!important}
 body[data-orar-theme] .hub-primary,
 body[data-orar-theme] .hub-nav-item[aria-current="page"]{border-color:color-mix(in srgb,var(--accent) 32%,transparent)!important}
+
+
+/* Theme-aware feedback and Classroom loading accents. */
+body[data-orar-theme] .hub-status{
+  border-color:var(--accent-2)!important;
+  outline:1px solid color-mix(in srgb,var(--accent) 72%,transparent);
+  outline-offset:0;
+}
+body[data-orar-theme] .classroom-notice[role="status"]{
+  color:var(--accent-2)!important;
+  background:color-mix(in srgb,var(--accent) 9%,transparent)!important;
+  border:1px solid color-mix(in srgb,var(--accent-2) 42%,transparent);
+}
+body[data-orar-theme] .classroom-panel-notice{
+  border-bottom:2px solid var(--accent)!important;
+}
+body[data-orar-theme] .classroom-link,
+body[data-orar-theme] .classroom-inline-link{
+  color:var(--accent-2)!important;
+  text-decoration-color:var(--accent)!important;
+}
+body[data-orar-theme] .classroom-attachments .classroom-link:hover{
+  border-color:color-mix(in srgb,var(--accent-2) 42%,transparent)!important;
+  background:color-mix(in srgb,var(--accent) 8%,transparent)!important;
+}
+
+/* Local document zoom controls; document cell colors remain sourced from the original workbook. */
+.classroom-viewer-zoom{display:flex;align-items:center;gap:5px}
+.classroom-viewer-zoom[hidden]{display:none!important}
+.classroom-viewer-zoom span{min-width:38px;text-align:center;font-size:10px;color:var(--muted,#aeb7c7);font-variant-numeric:tabular-nums}
+.classroom-viewer-zoom .hub-small-button{min-width:30px;padding:5px 7px;font-size:15px;line-height:1}
+.classroom-excel-scroll{overscroll-behavior:contain}
+.classroom-excel-table{transform-origin:top left}
+@media(max-width:640px){
+  .classroom-viewer-actions{gap:5px}
+  .classroom-viewer-zoom{gap:3px}
+  .classroom-viewer-zoom span{min-width:32px;font-size:9px}
+  .classroom-viewer-zoom .hub-small-button{min-width:27px;padding:4px 6px}
+}
