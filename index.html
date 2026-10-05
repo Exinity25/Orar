@@ -612,6 +612,7 @@
     @keyframes note-reveal{0%{opacity:0;transform:translateY(-9px) scaleY(.955)}55%{opacity:.78;transform:translateY(-2px) scaleY(.992)}100%{opacity:1;transform:translateY(0) scaleY(1)}}
     @media(prefers-reduced-motion:reduce){button,.day-tab,.class-card,.week-toggle svg{transition:none!important}.note-panel,.note-open-slot{animation:none!important}}
   </style>
+  <link rel="stylesheet" href="./student-hub.css">
 </head>
 <body class="mobile-day-0">
   <div class="app">
@@ -644,6 +645,7 @@
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+  <script src="./student-hub.js"></script>
   <script>
   (() => {
     'use strict';
@@ -1298,6 +1300,8 @@
 
 
     render();
+
+    if(window.OrarStudentHub) window.OrarStudentHub.init({getSchedule:()=>clone(data)});
 
     let pendingAppUpdate = false;
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
