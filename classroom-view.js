@@ -16,13 +16,12 @@
     const href=safeURL(/^www\./i.test(clean)?'https://'+clean:clean);
     return href?`<a class="classroom-inline-link" href="${esc(href)}" target="_blank" rel="noopener noreferrer">${esc(clean)}</a>${esc(trailing)}`:esc(part);
   }).join('');
-  const previewable = title => /\.(pdf|xlsx?|csv|docx|jpe?g|png|gif|webp|bmp|svg|avif|heic|heif|txt|md|json|xml|log|mp3|m4a|wav|ogg|mp4|m4v|mov|webm)$/i.test(String(title||'').trim());
+  const previewable = title => /\.(pdf|docx?|xlsx?|xlsm|csv|pptx?|odt|ods|odp|rtf|pages|numbers|key|zip|rar|7z|jpe?g|png|gif|webp|bmp|svg|avif|heic|heif|txt|md|json|xml|log|html?|css|js|ts|py|java|c|cpp|h|mp3|m4a|aac|flac|wav|ogg|mp4|m4v|mov|webm)$/i.test(String(title||'').trim());
   const previewButton = file => {
     const title=String(file?.title||'Fișier');
-    if(!file?.id || !previewable(title))return '';
+    if(!file?.id)return '';
     return `<button class="classroom-link classroom-preview-link" type="button" data-cr-preview="${esc(file.id)}" data-cr-preview-title="${esc(title)}">${esc(title)} <span aria-hidden="true">▣</span></button>`;
   };
-  const isIOS = () => /iPad|iPhone|iPod/i.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
   let gisPromise,xlsxPromise,pdfjsPromise,mammothPromise,purifyPromise;
   function loadScript(src,test,reset){
     if(test())return Promise.resolve();
@@ -126,6 +125,20 @@
         }
         const metadata=await metadataResponse.json();
         const exactDriveLink=safeURL(metadata?.webViewLink||'');if(exactDriveLink)viewer.querySelector('[data-cr-viewer-drive]').href=exactDriveLink;
+        const mime=String(metadata?.mimeType||'').toLowerCase();
+        const googleNative=mime.startsWith('application/vnd.google-apps.');
+        const officeDocument=/\.(docx?|xlsx?|xlsm|pptx?|odt|ods|odp|rtf|pages|numbers|key)$/i.test(name)
+          || /(?:msword|officedocument|ms-excel|ms-powerpoint|opendocument|rtf)/i.test(mime);
+        const archive=/\.(zip|rar|7z)$/i.test(name) || /(?:zip|rar|7z|compressed|archive)/i.test(mime);
+        const localSupported=/\.(pdf|csv|jpe?g|png|gif|webp|bmp|svg|avif|txt|md|json|xml|log|html?|css|js|ts|py|java|c|cpp|h|mp3|m4a|aac|flac|wav|ogg|mp4|m4v|mov|webm)$/i.test(name);
+        if(googleNative || officeDocument || archive || !localSupported){
+          const driveBox=viewer.querySelector('[data-cr-viewer-content]');
+          const frame=document.createElement('iframe');frame.className='classroom-drive-office-preview';frame.title='Previzualizare '+name;
+          frame.src='https://drive.google.com/file/d/'+encodeURIComponent(fileId)+'/preview';
+          frame.setAttribute('allow','clipboard-read; clipboard-write; fullscreen');frame.setAttribute('allowfullscreen','');
+          frame.setAttribute('referrerpolicy','no-referrer-when-downgrade');
+          driveBox.replaceChildren(frame);disableViewerZoom();return;
+        }
         if(metadata?.capabilities?.canDownload===false)throw Error('Fișierul poate fi văzut în Google Drive, dar proprietarul sau organizația a dezactivat descărcarea. Din acest motiv nu poate fi afișat local în site.');
         const response=await fetch(base+'?alt=media',{headers:{Authorization:'Bearer '+token},cache:'no-store',credentials:'omit'});
         if(generation!==viewerGeneration)return;
@@ -151,22 +164,20 @@
             const available=Math.max(280,Math.min(1100,box.clientWidth||window.innerWidth)-24);
             const scale=Math.min(2,available/base.width),viewport=page.getViewport({scale});
             const wrap=document.createElement('div');wrap.className='classroom-pdf-page';
-            const canvas=document.createElement('canvas'),ratio=Math.min(2,window.devicePixelRatio||1);
-            canvas.width=Math.floor(viewport.width*ratio);canvas.height=Math.floor(viewport.height*ratio);
+            const canvas=document.createElement('canvas'),dpr=Math.max(1,window.devicePixelRatio||1);
+            const preferredRatio=Math.min(4,Math.max(2.25,dpr)),maxPixels=16000000;
+            const safeRatio=Math.sqrt(maxPixels/Math.max(1,viewport.width*viewport.height));
+            const ratio=Math.max(1,Math.min(preferredRatio,safeRatio));
+            canvas.width=Math.max(1,Math.floor(viewport.width*ratio));canvas.height=Math.max(1,Math.floor(viewport.height*ratio));
             canvas.style.width=viewport.width+'px';canvas.style.height=viewport.height+'px';
             wrap.append(canvas);pages.append(wrap);
-            const ctx=canvas.getContext('2d',{alpha:false});
-            await page.render({canvasContext:ctx,viewport,transform:ratio===1?null:[ratio,0,0,ratio,0,0]}).promise;
+            const ctx=canvas.getContext('2d',{alpha:false,desynchronized:false});
+            if(ctx){ctx.imageSmoothingEnabled=true;if('imageSmoothingQuality' in ctx)ctx.imageSmoothingQuality='high';}
+            await page.render({canvasContext:ctx,viewport,transform:ratio===1?null:[ratio,0,0,ratio,0,0],intent:'display'}).promise;
           }
           enableViewerZoom(pages);return;
         }
-        if(/\.(xlsx?|csv)$/i.test(name)){
-          if(isIOS() && /\.xlsx?$/i.test(name)){
-            const driveBox=viewer.querySelector('[data-cr-viewer-content]');
-            const frame=document.createElement('iframe');frame.className='classroom-drive-office-preview';frame.title='Fișier Excel original';
-            frame.src='https://drive.google.com/file/d/'+encodeURIComponent(fileId)+'/preview';
-            frame.setAttribute('allow','clipboard-read; clipboard-write');driveBox.replaceChildren(frame);disableViewerZoom();return;
-          }
+        if(/\.(xlsx?|xlsm|csv)$/i.test(name)){
           const data=await response.arrayBuffer();if(generation!==viewerGeneration)return;
           const XLSX=await loadXlsx();if(generation!==viewerGeneration)return;
           const workbook=XLSX.read(data,{type:'array',cellStyles:true,cellDates:true,cellNF:true,cellFormula:true,cellHTML:true}),box=viewer.querySelector('[data-cr-viewer-content]');
@@ -301,12 +312,12 @@
           const img=document.createElement('img');img.className='classroom-image-preview';img.alt=name;img.src=viewerObjectUrl;
           stage.append(img);viewer.querySelector('[data-cr-viewer-content]').replaceChildren(stage);enableViewerZoom(stage);return;
         }
-        if(/\.(txt|md|json|xml|log)$/i.test(name)){
+        if(/\.(txt|md|json|xml|log|html?|css|js|ts|py|java|c|cpp|h)$/i.test(name)){
           const text=await response.text();if(generation!==viewerGeneration)return;
           const pre=document.createElement('pre');pre.className='classroom-text-preview';pre.textContent=text;
           viewer.querySelector('[data-cr-viewer-content]').replaceChildren(pre);disableViewerZoom();return;
         }
-        if(/\.(mp3|m4a|wav|ogg)$/i.test(name)){
+        if(/\.(mp3|m4a|aac|flac|wav|ogg)$/i.test(name)){
           const blob=await response.blob();if(generation!==viewerGeneration)return;
           viewerObjectUrl=URL.createObjectURL(blob);
           const wrap=document.createElement('div');wrap.className='classroom-media-stage';
