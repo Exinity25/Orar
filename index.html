@@ -786,7 +786,7 @@
     }
 
     const CARD_TONES=['default','red','green','blue','yellow','orange','violet'];
-    const CARD_TONE_LABELS={default:'Theme Default',red:'ROȘU',green:'VERDE',blue:'ALBASTRU',yellow:'GALBEN',orange:'PORTOCALIU',violet:'VIOLET'};
+    const CARD_TONE_LABELS={default:'Default',red:'ROȘU',green:'VERDE',blue:'ALBASTRU',yellow:'GALBEN',orange:'PORTOCALIU',violet:'VIOLET'};
     function cardTone(item){
       const value=String(item?.cardColor||'default').toLowerCase();
       return CARD_TONES.includes(value)?value:'default';
@@ -1154,7 +1154,7 @@
             <details class="card-color-picker">
               <summary class="card-color-trigger card-color-dot-${tone}" aria-label="Alege culoarea accentului. Culoarea actuală: ${CARD_TONE_LABELS[tone]}" title="Culoare: ${CARD_TONE_LABELS[tone]}"></summary>
               <div class="card-color-menu" role="menu" aria-label="Culoare accent card">
-                ${CARD_TONES.map(v=>`<button type="button" role="menuitemradio" aria-checked="${tone===v?'true':'false'}" data-card-color="${v}" data-key="${key}"><span class="card-color-swatch card-color-dot-${v}" aria-hidden="true"></span><span>${CARD_TONE_LABELS[v]}</span></button>`).join('')}
+                ${CARD_TONES.map(v=>v==='default'?`<button class="card-color-option card-color-option-default" type="button" role="menuitemradio" aria-label="Default" aria-checked="${tone===v?'true':'false'}" data-card-color="${v}" data-key="${key}"><span class="card-color-default-box">Default</span></button>`:`<button class="card-color-option" type="button" role="menuitemradio" aria-label="${CARD_TONE_LABELS[v]}" title="${CARD_TONE_LABELS[v]}" aria-checked="${tone===v?'true':'false'}" data-card-color="${v}" data-key="${key}"><span class="card-color-swatch card-color-dot-${v}" aria-hidden="true"></span></button>`).join('')}
               </div>
             </details>
             <input class="edit-input subject-input" data-field="subject" data-key="${key}" value="${escapeHtml(item.subject)}" aria-label="Materia">
