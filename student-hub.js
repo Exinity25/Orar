@@ -9,7 +9,7 @@
     calendar:svg('<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4m10-4v4M3 11h18m-13 4h2m4 0h2"/>'),
     book:svg('<path d="M12 5v15M3 4h5a4 4 0 0 1 4 2 4 4 0 0 1 4-2h5v15h-5a5 5 0 0 0-4 2 5 5 0 0 0-4-2H3Z"/>'),
     classroom:svg('<rect x="3" y="4" width="18" height="15" rx="2"/><circle cx="12" cy="10" r="2"/><path d="M8 16c0-4 8-4 8 0M7 22h10"/>'),
-    customize:svg('<path d="M12 3a9 9 0 1 0 0 18h1.2a2.3 2.3 0 0 0 0-4.6h-.7a1.6 1.6 0 0 1 0-3.2H15A6 6 0 0 0 15 3Z"/><circle cx="7.5" cy="10" r=".8"/><circle cx="9.5" cy="6.8" r=".8"/><circle cx="14" cy="6.5" r=".8"/>')
+    customize:svg('<path d="M12 3a9 9 0 1 0 0 18h1.35a2.25 2.25 0 0 0 0-4.5h-.8a1.7 1.7 0 0 1 0-3.4H15A6 6 0 0 0 15 3Z"/><circle cx="7.4" cy="9.8" r="1.05"/><circle cx="9.4" cy="6.6" r="1.05"/><circle cx="13.6" cy="6.3" r="1.05"/><circle cx="17" cy="8.7" r="1.05"/>')
   };
   let initialized = false;
   window.OrarStudentHub = {init({getSchedule}) {
@@ -40,7 +40,7 @@
             <button class="hub-nav-item" data-hub-view="schedule" aria-current="page" type="button"><span class="hub-icon">${icons.calendar}</span><span class="hub-nav-copy"><strong>Orar</strong><small>Programul săptămânii</small></span></button>
             <button class="hub-nav-item" data-hub-view="subjects" type="button"><span class="hub-icon">${icons.book}</span><span class="hub-nav-copy"><strong>Materii</strong><small>Teme și termene</small></span></button>
             <button class="hub-nav-item" id="hubClassroom" data-hub-view="classroom" type="button"><span class="hub-icon">${icons.classroom}</span><span class="hub-nav-copy"><strong>Classroom</strong><small>Clase și materiale</small></span></button>
-            <button class="hub-nav-item" data-hub-view="customize" type="button"><span class="hub-icon">${icons.customize}</span><span class="hub-nav-copy"><strong>Customize</strong><small>Temă și fundal</small></span></button>
+            <button class="hub-nav-item" data-hub-view="customize" type="button"><span class="hub-icon">${icons.customize}</span><span class="hub-nav-copy"><strong>Personalizare</strong><small>Temă și fundal</small></span></button>
           </nav>
         </aside>
       </div>
@@ -52,7 +52,7 @@
       </main>
       <main class="hub-page hub-hidden" id="hubCustomize" aria-labelledby="hubCustomizeHeading">
         <div class="hub-content">
-          <header class="hub-page-header"><h1 class="hub-heading" id="hubCustomizeHeading" tabindex="-1">Customize</h1><p class="hub-intro">Personalizează culorile și fundalul doar pe dispozitivul tău.</p></header>
+          <header class="hub-page-header"><h1 class="hub-heading" id="hubCustomizeHeading" tabindex="-1">Personalizare</h1><p class="hub-intro">Personalizează culorile și fundalul doar pe dispozitivul tău.</p></header>
           <section class="hub-custom-section" aria-labelledby="hubThemeHeading">
             <div class="hub-custom-section-head"><div><span class="hub-eyebrow">Aspect</span><h2 id="hubThemeHeading">Theme</h2></div><small>DEFAULT păstrează exact aspectul actual.</small></div>
             <div class="hub-theme-grid" id="hubThemeGrid">
