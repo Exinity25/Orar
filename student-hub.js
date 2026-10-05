@@ -103,36 +103,75 @@
 
     const subjectMotions = new WeakMap();
     function wireSubjectMotion(details){
-      const summary=details.querySelector('summary'), panel=details.querySelector('.hub-subject-body');
+      const summary=details.querySelector('summary');
+      const panel=details.querySelector('.hub-subject-body');
+      if(!summary || !panel)return;
+
       summary.addEventListener('click',e=>{
         e.preventDefault();
+
         const previous=subjectMotions.get(details);
         const opening=previous ? !previous.opening : !details.open;
-        const from=details.getBoundingClientRect().height;
-        const opacity=getComputedStyle(panel).opacity;
-        if(previous)previous.animations.forEach(a=>a.cancel());
-        const id=details.dataset.subjectId;
-        opening?openSubjects.add(id):openSubjects.delete(id);
         const reduce=window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        if(reduce || !details.animate){
-          subjectMotions.delete(details);details.style.height='';details.style.willChange='';details.open=opening;return;
+        const id=details.dataset.subjectId;
+
+        if(previous){
+          previous.animations.forEach(animation=>animation.cancel());
+          subjectMotions.delete(details);
         }
-        details.style.height='';details.open=true;
-        const border=parseFloat(getComputedStyle(details).borderTopWidth)+parseFloat(getComputedStyle(details).borderBottomWidth);
-        const to=opening ? details.scrollHeight+border : summary.getBoundingClientRect().height+border;
-        details.style.height=from+'px';details.style.willChange='height';
-        const height=details.animate([{height:from+'px'},{height:to+'px'}],
-          {duration:opening?240:220,easing:'cubic-bezier(.2,.8,.2,1)',fill:'forwards'});
-        const fade=panel.animate([
-          {opacity:previous?opacity:(opening?0:1),transform:opening?'translateY(-4px)':'translateY(0)'},
-          {opacity:opening?1:0,transform:opening?'translateY(0)':'translateY(-4px)'}
-        ],{duration:opening?180:150,easing:'ease-out',fill:'forwards'});
-        const state={opening,animations:[height,fade]};subjectMotions.set(details,state);
-        Promise.allSettled(state.animations.map(a=>a.finished)).then(()=>{
+
+        opening ? openSubjects.add(id) : openSubjects.delete(id);
+
+        if(reduce || !details.animate){
+          details.open=opening;
+          details.style.height='';
+          details.style.overflow='';
+          panel.style.opacity='';
+          panel.style.transform='';
+          return;
+        }
+
+        const fromHeight=details.getBoundingClientRect().height;
+        if(opening)details.open=true;
+
+        const summaryHeight=summary.getBoundingClientRect().height;
+        const borderTop=parseFloat(getComputedStyle(details).borderTopWidth)||0;
+        const borderBottom=parseFloat(getComputedStyle(details).borderBottomWidth)||0;
+        const targetHeight=opening
+          ? summaryHeight + panel.scrollHeight + borderTop + borderBottom
+          : summaryHeight + borderTop + borderBottom;
+
+        details.style.height=fromHeight+'px';
+        details.style.overflow='hidden';
+        details.style.willChange='height';
+        panel.style.willChange='opacity, transform';
+
+        const heightAnimation=details.animate(
+          [{height:fromHeight+'px'},{height:targetHeight+'px'}],
+          {duration:opening?220:190,easing:'cubic-bezier(.22,.75,.2,1)',fill:'forwards'}
+        );
+
+        const panelAnimation=panel.animate(
+          opening
+            ? [{opacity:0,transform:'translateY(-6px)'},{opacity:1,transform:'translateY(0)'}]
+            : [{opacity:1,transform:'translateY(0)'},{opacity:0,transform:'translateY(-5px)'}],
+          {duration:opening?180:145,easing:'ease-out',fill:'forwards'}
+        );
+
+        const state={opening,animations:[heightAnimation,panelAnimation]};
+        subjectMotions.set(details,state);
+
+        Promise.allSettled(state.animations.map(animation=>animation.finished)).then(()=>{
           if(subjectMotions.get(details)!==state)return;
-          subjectMotions.delete(details);details.open=opening;
-          details.style.height='';details.style.willChange='';
-          state.animations.forEach(a=>a.cancel());
+          subjectMotions.delete(details);
+          details.open=opening;
+          details.style.height='';
+          details.style.overflow='';
+          details.style.willChange='';
+          panel.style.willChange='';
+          panel.style.opacity='';
+          panel.style.transform='';
+          state.animations.forEach(animation=>animation.cancel());
         });
       });
     }
