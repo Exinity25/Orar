@@ -53,3 +53,21 @@
 .hub-subject summary:active{background:#ffffff05}
 .hub-subject-body{animation:none!important;opacity:1;transform:none}
 .hub-subject[open] .hub-chevron{transform:rotate(90deg)}
+
+
+/* Focus treatment requested for Materii: keep only a red glow, no pink outline. */
+.hub-search:focus-within{
+  border-color:#ffffff20;
+  box-shadow:0 0 14px #d9133b52,0 0 28px #d9133b22;
+}
+.hub-search input:focus,
+.hub-search input:focus-visible{
+  outline:none!important;
+  box-shadow:none!important;
+}
+.hub-form textarea:focus,
+.hub-form textarea:focus-visible{
+  outline:none!important;
+  border-color:#ffffff22;
+  box-shadow:0 0 14px #d9133b52,0 0 28px #d9133b22;
+}
