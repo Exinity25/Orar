@@ -45,3 +45,11 @@
 
 /* Panel motion is coordinated with the card height, like timetable notes. */
 .hub-subject-body{animation:none}
+
+
+/* Materii: aceeași senzație de expand/reveal ca notițele din orar. */
+.hub-subject{transform:translateZ(0)}
+.hub-subject summary{transition:background 160ms ease}
+.hub-subject summary:active{background:#ffffff05}
+.hub-subject-body{animation:none!important;opacity:1;transform:none}
+.hub-subject[open] .hub-chevron{transform:rotate(90deg)}
