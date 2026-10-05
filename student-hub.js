@@ -91,6 +91,15 @@
     const applyTheme=(name,save=true)=>{
       if(!THEMES.has(name))name='default';
       if(name==='default')delete document.body.dataset.orarTheme;else document.body.dataset.orarTheme=name;
+      const pageBg={
+        default:'#080b12',
+        ice:'#eaf3ff',
+        ocean:'#08131f',
+        forest:'#070c09',
+        violet:'#0b0711'
+      }[name]||'#080b12';
+      document.documentElement.style.backgroundColor=pageBg;
+      document.body.style.backgroundColor=pageBg;
       const meta=document.querySelector('meta[name="theme-color"]');if(meta)meta.setAttribute('content',themeMeta[name]||themeMeta.default);
       if(save){try{localStorage.setItem(THEME_KEY,name);}catch{}}
       updateThemeButtons();
