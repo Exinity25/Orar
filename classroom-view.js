@@ -191,6 +191,31 @@
             const ctx=canvas.getContext('2d',{alpha:false,desynchronized:false});
             if(ctx){ctx.imageSmoothingEnabled=true;if('imageSmoothingQuality' in ctx)ctx.imageSmoothingQuality='high';}
             await page.render({canvasContext:ctx,viewport,transform:ratio===1?null:[ratio,0,0,ratio,0,0],intent:'display'}).promise;
+            const annotations=await page.getAnnotations({intent:'display'});
+            if(annotations?.length){
+              const links=document.createElement('div');links.className='classroom-pdf-links';links.style.width=viewport.width+'px';links.style.height=viewport.height+'px';
+              for(const annotation of annotations){
+                if(annotation.subtype!=='Link' || !annotation.rect)continue;
+                let href=safeURL(annotation.url||annotation.unsafeUrl||'');
+                if(!href && annotation.dest){
+                  try{
+                    const dest=typeof annotation.dest==='string'?await pdf.getDestination(annotation.dest):annotation.dest;
+                    if(dest?.[0]){
+                      const ref=dest[0],index=await pdf.getPageIndex(ref);
+                      href='#pdf-page-'+(index+1);
+                    }
+                  }catch{}
+                }
+                if(!href)continue;
+                const rect=viewport.convertToViewportRectangle(annotation.rect),left=Math.min(rect[0],rect[2]),top=Math.min(rect[1],rect[3]),width=Math.abs(rect[0]-rect[2]),height=Math.abs(rect[1]-rect[3]);
+                const a=document.createElement('a');a.className='classroom-pdf-link';a.href=href;a.style.left=left+'px';a.style.top=top+'px';a.style.width=Math.max(8,width)+'px';a.style.height=Math.max(8,height)+'px';a.setAttribute('aria-label','Deschide linkul din PDF');
+                if(href.startsWith('#pdf-page-')){a.addEventListener('click',e=>{e.preventDefault();const target=pages.querySelector(href);if(target)target.scrollIntoView({behavior:'smooth',block:'start'});});}
+                else{a.target='_blank';a.rel='noopener noreferrer';}
+                links.append(a);
+              }
+              if(links.childElementCount)wrap.append(links);
+            }
+            wrap.id='pdf-page-'+pageNo;
           }
           enableViewerZoom(pages);return;
         }
@@ -319,7 +344,15 @@
           if(generation!==viewerGeneration)return;
           const doc=document.createElement('article');doc.className='classroom-docx-document';
           doc.innerHTML=purify.sanitize(result.value,{USE_PROFILES:{html:true}});
-          doc.querySelectorAll('a[href]').forEach(a=>{a.target='_blank';a.rel='noopener noreferrer';});
+          doc.querySelectorAll('a[href]').forEach(a=>{const href=safeURL(a.getAttribute('href'));if(href){a.href=href;a.target='_blank';a.rel='noopener noreferrer';}else a.removeAttribute('href');});
+          const walker=document.createTreeWalker(doc,NodeFilter.SHOW_TEXT);
+          const textNodes=[];while(walker.nextNode())if(!walker.currentNode.parentElement?.closest('a,script,style'))textNodes.push(walker.currentNode);
+          textNodes.forEach(node=>{
+            const value=node.nodeValue||'',re=/(https?:\/\/[^\s<>"']+|www\.[^\s<>"']+)/gi;if(!re.test(value))return;re.lastIndex=0;
+            const frag=document.createDocumentFragment();let last=0,match;
+            while((match=re.exec(value))){frag.append(document.createTextNode(value.slice(last,match.index)));const raw=match[0],href=safeURL(/^www\./i.test(raw)?'https://'+raw:raw);if(href){const a=document.createElement('a');a.href=href;a.target='_blank';a.rel='noopener noreferrer';a.textContent=raw;frag.append(a);}else frag.append(document.createTextNode(raw));last=match.index+raw.length;}
+            frag.append(document.createTextNode(value.slice(last)));node.replaceWith(frag);
+          });
           const box=viewer.querySelector('[data-cr-viewer-content]');box.replaceChildren(doc);enableViewerZoom(doc);return;
         }
         if(/\.(jpe?g|png|gif|webp|bmp|svg|avif|heic|heif)$/i.test(name)){
@@ -339,7 +372,10 @@
         }
         if(/\.(txt|md|json|xml|log|html?|css|js|ts|py|java|c|cpp|h)$/i.test(name)){
           const text=await response.text();if(generation!==viewerGeneration)return;
-          const pre=document.createElement('pre');pre.className='classroom-text-preview';pre.textContent=text;
+          const pre=document.createElement('pre');pre.className='classroom-text-preview';
+          const re=/(https?:\/\/[^\s<>"']+|www\.[^\s<>"']+)/gi;let last=0,match;
+          while((match=re.exec(text))){pre.append(document.createTextNode(text.slice(last,match.index)));const raw=match[0],href=safeURL(/^www\./i.test(raw)?'https://'+raw:raw);if(href){const a=document.createElement('a');a.href=href;a.target='_blank';a.rel='noopener noreferrer';a.textContent=raw;pre.append(a);}else pre.append(document.createTextNode(raw));last=match.index+raw.length;}
+          pre.append(document.createTextNode(text.slice(last)));
           viewer.querySelector('[data-cr-viewer-content]').replaceChildren(pre);disableViewerZoom();return;
         }
         if(/\.(mp3|m4a|aac|flac|wav|ogg)$/i.test(name)){
