@@ -786,7 +786,7 @@
     }
 
     const CARD_TONES=['default','red','green','blue','yellow','orange','violet'];
-    const CARD_TONE_LABELS={default:'THEME DEFAULT',red:'ROȘU',green:'VERDE',blue:'ALBASTRU',yellow:'GALBEN',orange:'PORTOCALIU',violet:'VIOLET'};
+    const CARD_TONE_LABELS={default:'Theme Default',red:'ROȘU',green:'VERDE',blue:'ALBASTRU',yellow:'GALBEN',orange:'PORTOCALIU',violet:'VIOLET'};
     function cardTone(item){
       const value=String(item?.cardColor||'default').toLowerCase();
       return CARD_TONES.includes(value)?value:'default';
