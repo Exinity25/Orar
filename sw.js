@@ -1,4 +1,4 @@
-const CACHE = 'orar-v37-max-viewers-desktop-notes';
+const CACHE = 'orar-v38-authenticated-office-viewers';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './student-hub.css', './student-hub.js', './classroom-config.js', './classroom-view.js'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
