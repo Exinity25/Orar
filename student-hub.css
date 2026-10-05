@@ -170,7 +170,9 @@ body[data-orar-theme="ice"] .hub-theme-card small,body[data-orar-theme="ice"] .h
 .class-card:not(.card-tone-default) .pair-tag,
 .class-card:not(.card-tone-default) .week-mark,
 .class-card:not(.card-tone-default) .type-icon{color:var(--card-custom)!important}
-body.editing .class-card:not(.card-tone-default) .edit-select{color:var(--card-custom)!important}
+body.editing .class-card:not(.card-tone-default) .edit-select,
+body.editing .class-card:not(.card-tone-default) .edit-input{color:var(--card-custom)!important}
+.classroom-excel-table tbody .excel-row-head{top:auto!important}
 
 /* Complete light timetable treatment for ICE */
 body[data-orar-theme="ice"] .app{color:#111827}
