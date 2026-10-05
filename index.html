@@ -106,6 +106,30 @@
       box-shadow:0 0 0 5px rgba(217,19,59,.13),0 10px 35px rgba(217,19,59,.34);
     }
     .edit-toggle svg{width:23px;height:23px}
+    .edit-toggle .save-icon{display:none}
+    .edit-toggle[aria-pressed="true"] .edit-icon{display:none}
+    .edit-toggle[aria-pressed="true"] .save-icon{display:block}
+    .undo-toggle{
+      position:fixed;
+      top:max(18px,env(safe-area-inset-top));
+      left:calc(max(18px,env(safe-area-inset-left)) + 66px);
+      z-index:10000;
+      width:54px;height:54px;
+      border-radius:50%;
+      border:1px solid rgba(255,255,255,.16);
+      background:rgba(7,10,17,.9);
+      color:#f8f0f3;
+      backdrop-filter:blur(16px);
+      -webkit-backdrop-filter:blur(16px);
+      display:grid;place-items:center;
+      box-shadow:0 12px 30px rgba(0,0,0,.34);
+      cursor:pointer;
+      transition:transform .2s ease,border-color .2s ease,opacity .2s ease;
+    }
+    .undo-toggle svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .undo-toggle:hover:not(:disabled){transform:translateY(-1px);border-color:rgba(255,255,255,.32)}
+    .undo-toggle:disabled{opacity:.34;cursor:default}
+    body[data-orar-theme="ice"] .undo-toggle{background:rgba(255,255,255,.94);color:#111827;border-color:#0f234126}
 
     .mobile-tabs{display:none;gap:7px;overflow:auto;padding:0 1px 12px;scrollbar-width:none}
     .mobile-tabs::-webkit-scrollbar{display:none}
@@ -406,6 +430,7 @@
       .edit-toggle{width:48px;height:48px;top:max(12px,env(safe-area-inset-top));right:max(12px,env(safe-area-inset-right))}
       .edit-toggle,.day-tab,.class-card,.add-class,.delete-class{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
       .edit-toggle{position:fixed;z-index:9999;pointer-events:auto}
+      .undo-toggle{width:48px;height:48px;top:max(12px,env(safe-area-inset-top));left:calc(max(12px,env(safe-area-inset-left)) + 58px)}
       .mobile-tabs{position:relative;z-index:20;pointer-events:auto}
       .schedule-shell,.schedule-grid,.slot-cell,.class-card{position:relative;z-index:2;pointer-events:auto}
       .mobile-tabs{display:flex;max-width:100%;margin:0 auto 4px;justify-content:flex-start}
@@ -660,9 +685,16 @@
 </head>
 <body class="mobile-day-0">
   <div class="app">
+    <button class="undo-toggle" id="undoToggle" type="button" aria-label="Nu există modificări de anulat" title="Undo" disabled>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7 4 12l5 5"/><path d="M5 12h8a6 6 0 0 1 6 6"/></svg>
+    </button>
+
     <button class="edit-toggle" id="editToggle" aria-label="Activează modul de editare" aria-pressed="false" title="Editează orarul">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <svg class="edit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+      </svg>
+      <svg class="save-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M5 3h12l2 2v16H5Z"/><path d="M8 3v6h8V3"/><path d="M8 21v-7h8v7"/>
       </svg>
     </button>
 
@@ -769,6 +801,35 @@
     let saveTimer;
 
     function clone(obj){ return JSON.parse(JSON.stringify(obj)); }
+
+    const undoToggle = document.getElementById('undoToggle');
+    const undoStack = [];
+    function updateUndoButton(){
+      undoToggle.disabled = undoStack.length === 0;
+      undoToggle.setAttribute('aria-label', undoStack.length ? 'Anulează ultima modificare' : 'Nu există modificări de anulat');
+    }
+    function recordUndo(){
+      const snapshot={data:clone(data),selectedWeek,selectedDay};
+      const signature=JSON.stringify(snapshot);
+      if(undoStack.length && undoStack[undoStack.length-1].signature===signature)return;
+      undoStack.push({snapshot,signature});
+      if(undoStack.length>30)undoStack.shift();
+      updateUndoButton();
+    }
+    function undoLastChange(){
+      const entry=undoStack.pop();
+      if(!entry)return;
+      data=clone(entry.snapshot.data);
+      selectedWeek=entry.snapshot.selectedWeek;
+      selectedDay=entry.snapshot.selectedDay;
+      expandedKey=null;
+      storageSet('c11_1_selected_week',selectedWeek);
+      storageSet('c11_1_selected_day',selectedDay);
+      saveData('Modificare anulată');
+      render();
+      updateUndoButton();
+      showToast('Ultima modificare a fost anulată');
+    }
 
     function loadData(){
       try{
@@ -1246,6 +1307,7 @@
 
       grid.querySelectorAll('[data-note]').forEach(area => {
         area.addEventListener('click', e=>e.stopPropagation());
+        area.addEventListener('focus',()=>{if(!area.dataset.undoCaptured){recordUndo();area.dataset.undoCaptured='1';}});
         area.addEventListener('input', e => {
           const key = e.target.dataset.note;
           const item = activeItem(key);
@@ -1262,6 +1324,7 @@
       grid.querySelectorAll('[data-deadline]').forEach(input => {
         input.addEventListener('click', e=>e.stopPropagation());
         input.addEventListener('change', e => {
+          recordUndo();
           const key = e.target.dataset.deadline;
           const item = activeItem(key);
           item.deadline = e.target.value || '';
@@ -1275,11 +1338,13 @@
       });
 
       grid.querySelectorAll('[data-field]').forEach(control => {
+        control.addEventListener('focus',()=>{if(!control.dataset.undoCaptured){recordUndo();control.dataset.undoCaptured='1';}});
         control.addEventListener('input', updateField);
         control.addEventListener('change', updateField);
       });
 
       grid.querySelectorAll('[data-time-row]').forEach(control => {
+        control.addEventListener('focus',()=>{if(!control.dataset.undoCaptured){recordUndo();control.dataset.undoCaptured='1';}});
         control.addEventListener('input', e => {
           const row = Number(e.target.dataset.timeRow);
           const part = Number(e.target.dataset.timePart);
@@ -1290,6 +1355,7 @@
 
       grid.querySelectorAll('[data-add]').forEach(btn => {
         btn.addEventListener('click', () => {
+          recordUndo();
           const key = btn.dataset.add;
           const existing = data.classes[key];
           const added = {type:'CURS',week:existing ? selectedWeek : 'MEREU',subject:'Materie nouă',professor:'Profesor',location:'Locație',note:'',deadline:'',cardColor:'default'};
@@ -1314,6 +1380,7 @@
         btn.addEventListener('click', e => {
           e.stopPropagation();
           const key=btn.dataset.key,item=activeItem(key);if(!item)return;
+          recordUndo();
           item.cardColor=btn.dataset.cardColor;
           saveData('Culoare salvată');
           render();
@@ -1322,6 +1389,7 @@
 
       grid.querySelectorAll('[data-delete]').forEach(btn => {
         btn.addEventListener('click', () => {
+          recordUndo();
           const key = btn.dataset.delete;
           const root = data.classes[key];
           if(activeItem(key) === root.alternate) delete root.alternate;
@@ -1360,27 +1428,32 @@
     };
     [scheduleTitle,scheduleSubtitle].forEach((element,index)=>{
       const field=index===0?'title':'subtitle';
+      element.addEventListener('focus',()=>{if(editing && !element.dataset.undoCaptured){recordUndo();element.dataset.undoCaptured='1';}});
       element.addEventListener('input',()=>saveHeaderField(element,field));
       element.addEventListener('blur',()=>{data[field]=(element.textContent||'').replace(/\n+/g,' ').trim();element.textContent=data[field];saveData('Antet salvat');});
       element.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();element.blur();}});
     });
 
     document.getElementById('weekToggle').addEventListener('click', () => selectWeek(oppositeWeek(selectedWeek)));
+    undoToggle.addEventListener('click', undoLastChange);
 
     editToggle.addEventListener('click', () => {
+      if(editing) saveData('Salvat');
       editing = !editing;
       expandedKey = null;
       document.body.classList.toggle('editing', editing);
       editToggle.setAttribute('aria-pressed', String(editing));
-      editToggle.setAttribute('aria-label', editing ? 'Oprește modul de editare' : 'Activează modul de editare');
+      editToggle.setAttribute('aria-label', editing ? 'Salvează și revino la modul vizualizare' : 'Activează modul de editare');
+      editToggle.title = editing ? 'Salvează' : 'Editează orarul';
       [scheduleTitle,scheduleSubtitle].forEach(el=>{
         el.contentEditable=editing?'true':'false';
         el.setAttribute('aria-label',el===scheduleTitle?'Titlul orarului':'Subtitlul orarului');
         el.spellcheck=false;
       });
+      if(!editing)[scheduleTitle,scheduleSubtitle].forEach(el=>delete el.dataset.undoCaptured);
       render();
       animateSchedule();
-      showToast(editing ? 'Mod editare activ' : 'Mod vizualizare activ');
+      showToast(editing ? 'Mod editare activ' : 'Orarul a fost salvat');
       if(!editing && pendingAppUpdate) location.reload();
     });
 
@@ -1396,6 +1469,7 @@
 
     scheduleTitle.textContent=data.title;
     scheduleSubtitle.textContent=data.subtitle;
+    updateUndoButton();
     render();
 
     if(window.OrarStudentHub) window.OrarStudentHub.init({getSchedule:()=>clone(data)});
