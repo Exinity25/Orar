@@ -1,4 +1,4 @@
-const CACHE = 'orar-v39-clickable-document-links';
+const CACHE = 'orar-v40-office-no-iframe-login';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './student-hub.css', './student-hub.js', './classroom-config.js', './classroom-view.js'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
