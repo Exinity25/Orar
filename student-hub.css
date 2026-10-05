@@ -233,3 +233,44 @@ body[data-orar-theme="ice"] .class-card.card-tone-orange{--card-custom:#c2410c}
   .card-color-edit{grid-template-columns:11px minmax(0,1fr);gap:3px}
   .card-color-dot{width:9px;height:9px}
 }
+
+
+/* Edit-mode cleanup, iPhone viewport fill, and theme consistency */
+html{min-height:100%;min-height:-webkit-fill-available}
+body{min-height:100vh;min-height:100dvh}
+.app,.hub-page{height:100dvh!important;min-height:100dvh}
+#scheduleTitle,#scheduleSubtitle{outline:none}
+body.editing #scheduleTitle,
+body.editing #scheduleSubtitle{cursor:text;border-radius:8px;transition:background .15s ease,box-shadow .15s ease}
+body.editing #scheduleTitle:hover,
+body.editing #scheduleSubtitle:hover,
+body.editing #scheduleTitle:focus,
+body.editing #scheduleSubtitle:focus{background:rgba(255,255,255,.08);box-shadow:0 0 0 1px rgba(255,255,255,.15)}
+body.editing #scheduleTitle:empty::before,
+body.editing #scheduleSubtitle:empty::before{content:attr(data-placeholder);opacity:.38}
+body.editing .class-card{border-left:0!important}
+body.editing .slot-cell.empty{padding:0!important}
+body.editing .slot-cell.empty .add-class{display:flex;align-items:center;justify-content:center;width:100%;height:100%;min-height:100%;margin:0!important;border-radius:inherit;box-sizing:border-box}
+.card-color-cycle{position:absolute;top:8px;right:38px;width:22px;height:22px;padding:0;border-radius:50%;border:2px solid rgba(255,255,255,.55);cursor:pointer;z-index:4;box-shadow:0 2px 8px rgba(0,0,0,.3),0 0 0 1px rgba(0,0,0,.15);transition:transform .14s ease,box-shadow .14s ease}
+.card-color-cycle:active{transform:scale(.9)}
+.card-color-cycle.card-color-dot-default{background:var(--accent)}
+.card-color-cycle.card-color-dot-red{background:#ef4444}.card-color-cycle.card-color-dot-green{background:#22c55e}.card-color-cycle.card-color-dot-blue{background:#3b82f6}.card-color-cycle.card-color-dot-yellow{background:#facc15}.card-color-cycle.card-color-dot-orange{background:#f97316}
+body[data-orar-theme="ice"] .card-color-cycle{border-color:#fff;box-shadow:0 2px 7px rgba(15,23,42,.2),0 0 0 1px rgba(15,23,42,.2)}
+body[data-orar-theme="ice"] .day-tab{background:#fff!important;color:#111827!important;border-color:#cbd5e1!important;box-shadow:none!important}
+body[data-orar-theme="ice"] .day-tab.active{background:#2563eb!important;color:#fff!important;border-color:#2563eb!important;box-shadow:0 7px 16px rgba(37,99,235,.22)!important}
+body[data-orar-theme="ice"] .mobile-tabs{background:transparent}
+body[data-orar-theme] .hub-subject-mark{color:var(--accent-2);background:color-mix(in srgb,var(--accent) 10%,transparent);border-color:color-mix(in srgb,var(--accent) 24%,transparent)}
+body[data-orar-theme="ice"] .hub-subject-mark{color:#2563eb;background:#eff6ff;border-color:#bfdbfe}
+body[data-orar-theme="ice"] .hub-chevron{color:#64748b}
+body[data-orar-theme="ice"] .hub-task{background:#f8fafc;border-color:#dbe3ee}
+body[data-orar-theme="ice"] .hub-task-text{color:#111827}
+body[data-orar-theme="ice"] .hub-due{color:#475569}
+body[data-orar-theme="ice"] .hub-form label{color:#475569}
+body[data-orar-theme="ice"] .hub-pill{background:#fff;border-color:#dbe3ee;color:#334155}
+body[data-orar-theme="ice"] .hub-subject summary:active{background:#f8fafc}
+@media(max-width:900px),(hover:none) and (pointer:coarse){
+  .app,.hub-page{height:100dvh!important;min-height:100dvh}
+}
+@media(max-width:900px) and (orientation:landscape), (max-width:960px) and (orientation:landscape) and (hover:none) and (pointer:coarse){
+  .card-color-cycle{top:5px;right:29px;width:17px;height:17px;border-width:1.5px}
+}
