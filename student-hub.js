@@ -66,11 +66,11 @@
           <section class="hub-custom-section" aria-labelledby="hubBackgroundHeading">
             <div class="hub-custom-section-head"><div><span class="hub-eyebrow">Imagine</span><h2 id="hubBackgroundHeading">Custom background</h2></div><small>Imaginea rămâne local pe dispozitivul tău.</small></div>
             <div class="hub-background-card">
-              <div class="hub-background-copy"><strong id="hubBackgroundStatus">Bleach · DEFAULT</strong><span>Poți încărca o fotografie proprie sau reveni oricând la fundalul original.</span></div>
+              <div class="hub-background-copy"><strong id="hubBackgroundStatus">DEFAULT</strong><span>Poți încărca o fotografie proprie sau reveni oricând la fundalul original.</span></div>
               <div class="hub-background-actions">
                 <label class="hub-primary hub-upload-label" for="hubBackgroundInput">Alege fotografie</label>
                 <input class="hub-custom-file" id="hubBackgroundInput" type="file" accept="image/*">
-                <button class="hub-small-button" id="hubBackgroundReset" type="button">Revino la Bleach</button>
+                <button class="hub-small-button" id="hubBackgroundReset" type="button">Revino la original</button>
               </div>
             </div>
           </section>
@@ -121,7 +121,7 @@
     const updateBackgroundStatus=()=>{
       const mode=(()=>{try{return localStorage.getItem(BG_MODE_KEY);}catch{return null;}})();
       const name=(()=>{try{return localStorage.getItem(BG_NAME_KEY)||'Fotografie personalizată';}catch{return 'Fotografie personalizată';}})();
-      const el=$('#hubBackgroundStatus');if(el)el.textContent=mode==='custom'?name:'Bleach · DEFAULT';
+      const el=$('#hubBackgroundStatus');if(el)el.textContent=mode==='custom'?name:'DEFAULT';
     };
     const applyStoredBackground=async()=>{
       let custom=false;try{custom=localStorage.getItem(BG_MODE_KEY)==='custom';}catch{}
