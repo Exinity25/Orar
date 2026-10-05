@@ -1,4 +1,4 @@
-const CACHE = 'orar-v19-student-hub';
+const CACHE = 'orar-v20-student-hub';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './student-hub.css', './student-hub.js'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
