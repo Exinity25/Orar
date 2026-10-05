@@ -104,16 +104,47 @@
         if(/\.xlsx?$/i.test(name)){
           const data=await response.arrayBuffer();if(generation!==viewerGeneration)return;
           const XLSX=await loadXlsx();if(generation!==viewerGeneration)return;
-          const workbook=XLSX.read(data,{type:'array'}),box=viewer.querySelector('[data-cr-viewer-content]');
+          const workbook=XLSX.read(data,{type:'array',cellStyles:true,cellDates:true}),box=viewer.querySelector('[data-cr-viewer-content]');
           if(!workbook.SheetNames.length)throw Error('Fișierul Excel nu conține foi care pot fi afișate.');
           const renderSheet=sheetName=>{
-            const rows=XLSX.utils.sheet_to_json(workbook.Sheets[sheetName],{header:1,defval:'',raw:false});
-            const limit=2500,shown=rows.slice(0,limit),table=document.createElement('table');table.className='classroom-excel-table';
-            const tbody=document.createElement('tbody');shown.forEach((row,rowIndex)=>{const tr=document.createElement('tr');(row.length?row:['']).forEach(value=>{const cell=document.createElement(rowIndex===0?'th':'td');cell.textContent=String(value??'');tr.append(cell);});tbody.append(tr);});table.append(tbody);
+            const sheet=workbook.Sheets[sheetName],ref=sheet?.['!ref'];
+            if(!ref){box.innerHTML='<div class="classroom-viewer-message">Foaia este goală.</div>';return;}
+            const range=XLSX.utils.decode_range(ref),maxRows=2500,maxCols=120,endRow=Math.min(range.e.r,range.s.r+2499),endCol=Math.min(range.e.c,range.s.c+119);
+            const starts=new Map(),skip=new Set();
+            (sheet['!merges']||[]).forEach(m=>{
+              if(m.s.r>=range.s.r&&m.s.r<=endRow&&m.s.c>=range.s.c&&m.s.c<=endCol)starts.set(m.s.r+':'+m.s.c,{rowspan:Math.min(m.e.r,endRow)-m.s.r+1,colspan:Math.min(m.e.c,endCol)-m.s.c+1});
+              for(let r=Math.max(m.s.r,range.s.r);r<=Math.min(m.e.r,endRow);r++)for(let col=Math.max(m.s.c,range.s.c);col<=Math.min(m.e.c,endCol);col++)if(r!==m.s.r||col!==m.s.c)skip.add(r+':'+col);
+            });
+            const table=document.createElement('table');table.className='classroom-excel-table';
+            const cg=document.createElement('colgroup'),rh=document.createElement('col');rh.className='excel-row-number-col';cg.append(rh);
+            for(let col=range.s.c;col<=endCol;col++){
+              const meta=sheet['!cols']?.[col],ce=document.createElement('col');let width=Number(meta?.wpx)||0;
+              if(!width&&Number(meta?.wch)>0)width=Math.round(Number(meta.wch)*8+18);
+              if(!width){let longest=8;for(let r=range.s.r;r<=Math.min(endRow,range.s.r+80);r++){const cell=sheet[XLSX.utils.encode_cell({r,c:col})];if(cell)longest=Math.max(longest,Math.min(28,String(cell.w??XLSX.utils.format_cell(cell)??'').length));}width=longest*8+20;}
+              ce.style.width=Math.max(88,Math.min(240,width))+'px';cg.append(ce);
+            }
+            table.append(cg);
+            const thead=document.createElement('thead'),hr=document.createElement('tr'),corner=document.createElement('th');corner.className='excel-corner';hr.append(corner);
+            for(let col=range.s.c;col<=endCol;col++){const th=document.createElement('th');th.className='excel-col-head';th.textContent=XLSX.utils.encode_col(col);hr.append(th);}thead.append(hr);table.append(thead);
+            const tbody=document.createElement('tbody');
+            for(let r=range.s.r;r<=endRow;r++){
+              const tr=document.createElement('tr'),rowMeta=sheet['!rows']?.[r];if(Number(rowMeta?.hpx)>0)tr.style.height=Math.max(20,Math.min(160,Number(rowMeta.hpx)))+'px';
+              const num=document.createElement('th');num.className='excel-row-head';num.textContent=String(r+1);tr.append(num);
+              for(let col=range.s.c;col<=endCol;col++){
+                const key=r+':'+col;if(skip.has(key))continue;
+                const td=document.createElement('td'),merge=starts.get(key),cell=sheet[XLSX.utils.encode_cell({r,c:col})];
+                if(merge){td.rowSpan=merge.rowspan;td.colSpan=merge.colspan;td.classList.add('is-merged');}
+                const value=cell?String(cell.w??XLSX.utils.format_cell(cell)??''):'';
+                if(cell?.l?.Target){const link=document.createElement('a');link.href=cell.l.Target;link.target='_blank';link.rel='noopener noreferrer';link.textContent=value;td.append(link);}else td.textContent=value;
+                if(cell?.f)td.title='='+cell.f;tr.append(td);
+              }
+              tbody.append(tr);
+            }
+            table.append(tbody);
             const wrap=document.createElement('div');wrap.className='classroom-excel-scroll';wrap.append(table);
             const fragment=document.createDocumentFragment();
-            if(workbook.SheetNames.length>1){const select=document.createElement('select');select.className='classroom-sheet-select';select.setAttribute('aria-label','Alege foaia Excel');workbook.SheetNames.forEach(n=>{const option=document.createElement('option');option.value=n;option.textContent=n;option.selected=n===sheetName;select.append(option);});select.addEventListener('change',()=>renderSheet(select.value));fragment.append(select);}
-            fragment.append(wrap);if(rows.length>limit){const note=document.createElement('p');note.className='classroom-viewer-limit';note.textContent='Sunt afișate primele '+limit+' de rânduri.';fragment.append(note);}box.replaceChildren(fragment);
+            if(workbook.SheetNames.length>1){const select=document.createElement('select');select.className='classroom-sheet-select';select.setAttribute('aria-label','Alege foaia Excel');workbook.SheetNames.forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;o.selected=n===sheetName;select.append(o);});select.addEventListener('change',()=>renderSheet(select.value));fragment.append(select);}
+            fragment.append(wrap);if(range.e.r>endRow||range.e.c>endCol){const note=document.createElement('p');note.className='classroom-viewer-limit';note.textContent='Fișier mare: sunt afișate maximum '+maxRows+' rânduri și '+maxCols+' coloane.';fragment.append(note);}box.replaceChildren(fragment);
           };
           renderSheet(workbook.SheetNames[0]);return;
         }
