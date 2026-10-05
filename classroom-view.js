@@ -43,7 +43,7 @@
     const page=document.createElement('main');page.id='hubClassroomPage';page.className='hub-page hub-hidden';page.setAttribute('aria-labelledby','classroomHeading');root.append(page);
     const profile=document.createElement('div');profile.className='classroom-profile hub-hidden';root.querySelector('.hub-drawer').append(profile);
     const viewer=document.createElement('div');viewer.className='classroom-viewer hub-hidden';viewer.setAttribute('role','dialog');viewer.setAttribute('aria-modal','true');viewer.setAttribute('aria-labelledby','classroomViewerTitle');
-    viewer.innerHTML=`<div class="classroom-viewer-backdrop" data-cr-viewer-close></div><section class="classroom-viewer-dialog"><header class="classroom-viewer-header"><div><span class="classroom-kind">Previzualizare locală</span><h2 id="classroomViewerTitle" data-cr-viewer-title>Fișier</h2></div><div class="classroom-viewer-actions"><a class="hub-small-button classroom-viewer-drive" data-cr-viewer-drive target="_blank" rel="noopener noreferrer">Deschide în Drive ↗</a><button class="hub-small-button classroom-viewer-close" type="button" data-cr-viewer-close aria-label="Închide previzualizarea">✕</button></div></header><div class="classroom-viewer-content" data-cr-viewer-content></div></section>`;root.append(viewer);
+    viewer.innerHTML=`<div class="classroom-viewer-backdrop" data-cr-viewer-close></div><section class="classroom-viewer-dialog"><header class="classroom-viewer-header"><h2 id="classroomViewerTitle" data-cr-viewer-title>Fișier</h2><div class="classroom-viewer-actions"><a class="hub-small-button classroom-viewer-drive" data-cr-viewer-drive target="_blank" rel="noopener noreferrer">Deschide în Drive ↗</a><button class="hub-small-button classroom-viewer-close" type="button" data-cr-viewer-close aria-label="Închide previzualizarea">✕</button></div></header><div class="classroom-viewer-content" data-cr-viewer-content></div></section>`;root.append(viewer);
     let viewerReturnFocus=null,viewerObjectUrl='',viewerGeneration=0;
     function resetViewerContent(){
       if(viewerObjectUrl){URL.revokeObjectURL(viewerObjectUrl);viewerObjectUrl='';}
@@ -83,6 +83,7 @@
           throw Error('Google Drive a refuzat accesul la fișier'+(reason?' ('+reason+')':'')+'.');
         }
         const metadata=await metadataResponse.json();
+        const exactDriveLink=safeURL(metadata?.webViewLink||'');if(exactDriveLink)viewer.querySelector('[data-cr-viewer-drive]').href=exactDriveLink;
         if(metadata?.capabilities?.canDownload===false)throw Error('Fișierul poate fi văzut în Google Drive, dar proprietarul sau organizația a dezactivat descărcarea. Din acest motiv nu poate fi afișat local în site.');
         const response=await fetch(base+'?alt=media',{headers:{Authorization:'Bearer '+token},cache:'no-store',credentials:'omit'});
         if(generation!==viewerGeneration)return;
@@ -104,36 +105,75 @@
         if(/\.xlsx?$/i.test(name)){
           const data=await response.arrayBuffer();if(generation!==viewerGeneration)return;
           const XLSX=await loadXlsx();if(generation!==viewerGeneration)return;
-          const workbook=XLSX.read(data,{type:'array',cellStyles:true,cellDates:true}),box=viewer.querySelector('[data-cr-viewer-content]');
+          const workbook=XLSX.read(data,{type:'array',cellStyles:true,cellDates:true,cellNF:true}),box=viewer.querySelector('[data-cr-viewer-content]');
           if(!workbook.SheetNames.length)throw Error('Fișierul Excel nu conține foi care pot fi afișate.');
           const renderSheet=sheetName=>{
             const sheet=workbook.Sheets[sheetName],ref=sheet?.['!ref'];
             if(!ref){box.innerHTML='<div class="classroom-viewer-message">Foaia este goală.</div>';return;}
             const range=XLSX.utils.decode_range(ref),maxRows=2500,maxCols=120,endRow=Math.min(range.e.r,range.s.r+2499),endCol=Math.min(range.e.c,range.s.c+119);
+            const indexedColors=['000000','FFFFFF','FF0000','00FF00','0000FF','FFFF00','FF00FF','00FFFF','000000','FFFFFF','FF0000','00FF00','0000FF','FFFF00','FF00FF','00FFFF','800000','008000','000080','808000','800080','008080','C0C0C0','808080'];
+            const normalizeColor=raw=>{
+              let value=String(raw||'').replace(/^#/,'').trim();
+              if(/^[0-9a-f]{8}$/i.test(value))value=value.slice(-6);
+              return /^[0-9a-f]{6}$/i.test(value)?'#'+value:'';
+            };
+            const themeOrder=['lt1','dk1','lt2','dk2','accent1','accent2','accent3','accent4','accent5','accent6','hlink','folHlink'];
+            const themeColor=index=>{
+              const scheme=workbook?.Themes?.themeElements?.clrScheme;
+              const node=scheme?.[themeOrder[index]] ?? scheme?.[index];
+              if(typeof node==='string')return normalizeColor(node);
+              return normalizeColor(node?.rgb || node?.val || node?.lastClr || node?.srgbClr?.val || node?.sysClr?.lastClr || node?.color);
+            };
+            const tintColor=(hex,tint)=>{
+              if(!hex || !Number.isFinite(tint) || tint===0)return hex;
+              const rgb=hex.slice(1).match(/../g).map(part=>parseInt(part,16));
+              const mixed=rgb.map(channel=>Math.max(0,Math.min(255,Math.round(tint<0?channel*(1+tint):channel+(255-channel)*tint))));
+              return '#'+mixed.map(channel=>channel.toString(16).padStart(2,'0')).join('');
+            };
             const excelColor=value=>{
-              const rgb=String(value?.rgb||'').replace(/^#|^FF/i,'');if(/^[0-9a-f]{6}$/i.test(rgb))return '#'+rgb;
-              return '';
+              if(!value)return '';
+              if(typeof value==='string')return normalizeColor(value);
+              let color=normalizeColor(value.rgb);
+              if(!color && Number.isInteger(value.indexed))color=normalizeColor(indexedColors[value.indexed]||'');
+              if(!color && value.theme!==undefined)color=themeColor(Number(value.theme));
+              const tint=Number(value.tint);
+              return color && Number.isFinite(tint) && tint!==0?tintColor(color,tint):color;
+            };
+            const resolvedStyle=cell=>{
+              const direct=cell?.s;
+              if(direct && typeof direct==='object')return direct;
+              if(!Number.isInteger(direct))return null;
+              const styles=workbook?.Styles,xf=styles?.CellXf?.[direct];
+              if(!xf)return null;
+              return {...xf,font:styles?.Fonts?.[xf.fontId],fill:styles?.Fills?.[xf.fillId],border:styles?.Borders?.[xf.borderId],alignment:xf.alignment};
+            };
+            const borderCss=side=>{
+              if(!side?.style)return '';
+              const color=excelColor(side.color)||'#9ca3af';
+              const widths={medium:2,thick:3,double:3};
+              const kinds={dotted:'dotted',dashed:'dashed',dashDot:'dashed',dashDotDot:'dashed',double:'double'};
+              return (widths[side.style]||1)+'px '+(kinds[side.style]||'solid')+' '+color;
             };
             const applyCellStyle=(td,cell)=>{
               if(!cell)return;
-              const style=cell.s;
-              if(style && typeof style==='object'){
-                const fill=excelColor(style.fill?.fgColor)||excelColor(style.fill?.bgColor);if(fill)td.style.backgroundColor=fill;
-                const fontColor=excelColor(style.font?.color);if(fontColor)td.style.color=fontColor;
-                if(style.font?.bold)td.style.fontWeight='700';
-                if(style.font?.italic)td.style.fontStyle='italic';
-                if(style.font?.underline)td.style.textDecoration='underline';
+              const style=resolvedStyle(cell);
+              if(style){
+                const fill=style.fill?.patternType==='none'?'':excelColor(style.fill?.fgColor)||excelColor(style.fill?.bgColor);if(fill)td.style.backgroundColor=fill;
+                const font=style.font||{},fontColor=excelColor(font.color);if(fontColor)td.style.color=fontColor;
+                if(font.bold)td.style.fontWeight='700';
+                if(font.italic)td.style.fontStyle='italic';
+                if(font.underline)td.style.textDecoration='underline';
+                if(font.strike)td.style.textDecoration=(td.style.textDecoration?td.style.textDecoration+' ':'')+'line-through';
+                if(Number(font.sz)>0)td.style.fontSize=Math.max(8,Math.min(32,Number(font.sz)*4/3))+'px';
+                if(font.name)td.style.fontFamily=String(font.name)+', system-ui, sans-serif';
                 const horizontal=style.alignment?.horizontal;
                 if(['left','center','right','justify'].includes(horizontal))td.style.textAlign=horizontal;
                 const vertical=style.alignment?.vertical;
                 if(['top','center','bottom'].includes(vertical))td.style.verticalAlign=vertical==='center'?'middle':vertical;
                 if(style.alignment?.wrapText){td.style.whiteSpace='normal';td.style.overflow='visible';td.style.textOverflow='clip';}
-                const border=style.border;
-                const borderColor=side=>excelColor(side?.color)||'#9ca3af';
-                if(border?.top?.style)td.style.borderTop='1px solid '+borderColor(border.top);
-                if(border?.right?.style)td.style.borderRight='1px solid '+borderColor(border.right);
-                if(border?.bottom?.style)td.style.borderBottom='1px solid '+borderColor(border.bottom);
-                if(border?.left?.style)td.style.borderLeft='1px solid '+borderColor(border.left);
+                if(Number(style.alignment?.indent)>0)td.style.paddingLeft=(8+Number(style.alignment.indent)*10)+'px';
+                const border=style.border,top=borderCss(border?.top),right=borderCss(border?.right),bottom=borderCss(border?.bottom),left=borderCss(border?.left);
+                if(top)td.style.borderTop=top;if(right)td.style.borderRight=right;if(bottom)td.style.borderBottom=bottom;if(left)td.style.borderLeft=left;
               }
               if(cell.t==='n' && !td.style.textAlign)td.style.textAlign='right';
               if(cell.t==='b' && !td.style.textAlign)td.style.textAlign='center';
@@ -149,14 +189,14 @@
               const meta=sheet['!cols']?.[col],ce=document.createElement('col');let width=Number(meta?.wpx)||0;
               if(!width&&Number(meta?.wch)>0)width=Math.round(Number(meta.wch)*8+18);
               if(!width){let longest=8;for(let r=range.s.r;r<=Math.min(endRow,range.s.r+80);r++){const cell=sheet[XLSX.utils.encode_cell({r,c:col})];if(cell)longest=Math.max(longest,Math.min(28,String(cell.w??XLSX.utils.format_cell(cell)??'').length));}width=longest*8+20;}
-              ce.style.width=Math.max(88,Math.min(240,width))+'px';cg.append(ce);
+              ce.style.width=Math.max(38,Math.min(420,width))+'px';cg.append(ce);
             }
             table.append(cg);
             const thead=document.createElement('thead'),hr=document.createElement('tr'),corner=document.createElement('th');corner.className='excel-corner';hr.append(corner);
             for(let col=range.s.c;col<=endCol;col++){const th=document.createElement('th');th.className='excel-col-head';th.textContent=XLSX.utils.encode_col(col);hr.append(th);}thead.append(hr);table.append(thead);
             const tbody=document.createElement('tbody');
             for(let r=range.s.r;r<=endRow;r++){
-              const tr=document.createElement('tr'),rowMeta=sheet['!rows']?.[r];if(Number(rowMeta?.hpx)>0)tr.style.height=Math.max(20,Math.min(160,Number(rowMeta.hpx)))+'px';
+              const tr=document.createElement('tr'),rowMeta=sheet['!rows']?.[r];if(Number(rowMeta?.hpx)>0)tr.style.height=Math.max(18,Math.min(320,Number(rowMeta.hpx)))+'px';
               const num=document.createElement('th');num.className='excel-row-head';num.textContent=String(r+1);tr.append(num);
               for(let col=range.s.c;col<=endCol;col++){
                 const key=r+':'+col;if(skip.has(key))continue;
@@ -185,6 +225,7 @@
     const SESSION_KEY='orar_classroom_session_v2',OLD_SESSION_KEY='orar_classroom_session_v1';
     const ACCOUNT_KEY='orar_classroom_account_v1';
     let token='',expires=0,grantedScopes='',client=null,courses=[],posts=[],selected=null,loading=false,message='',warning='',generation=0,session=0,expireTimer,visible=false,reauthenticating=false;
+    let courseToggleMotion=0;
     const configured=()=>/^[\w.-]+\.apps\.googleusercontent\.com$/.test(window.ORAR_CLASSROOM_CLIENT_ID||'');
     function rememberedAccount(){try{const value=JSON.parse(localStorage.getItem(ACCOUNT_KEY)||'null');return value&&value.email?value:null;}catch{return null;}}
     function renderProfile(account,connected=Boolean(token&&Date.now()<expires)){
@@ -240,9 +281,50 @@
       catch(e){if(g===generation)message=e.message;}
       finally{if(g===generation){loading=false;render();}}
     }
+    function findCourseCard(id){
+      const target=String(id);
+      return Array.from(page.querySelectorAll('[data-cr-course-card]')).find(card=>card.dataset.crCourseCard===target)||null;
+    }
+    const reduceCourseMotion=()=>Boolean(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    function animateCourseOpen(id,fromHeight,motion){
+      const card=findCourseCard(id),panel=card?.querySelector('.classroom-course-panel');
+      if(!card || !panel || !fromHeight || reduceCourseMotion() || !card.animate)return;
+      const targetHeight=Math.max(fromHeight,card.scrollHeight);
+      card.style.height=fromHeight+'px';card.style.overflow='hidden';card.style.willChange='height';
+      panel.style.animation='none';panel.style.opacity='0';panel.style.transform='translateY(-6px)';panel.style.willChange='opacity, transform';
+      requestAnimationFrame(()=>requestAnimationFrame(async()=>{
+        if(motion!==courseToggleMotion || !card.isConnected)return;
+        const animations=[
+          card.animate([{height:fromHeight+'px'},{height:targetHeight+'px'}],{duration:220,easing:'cubic-bezier(.22,.75,.2,1)',fill:'forwards'}),
+          panel.animate([{opacity:0,transform:'translateY(-6px)'},{opacity:1,transform:'translateY(0)'}],{duration:180,easing:'ease-out',fill:'forwards'})
+        ];
+        await Promise.allSettled(animations.map(animation=>animation.finished));
+        if(motion!==courseToggleMotion || !card.isConnected)return;
+        animations.forEach(animation=>animation.cancel());
+        card.style.height='';card.style.overflow='';card.style.willChange='';
+        panel.style.animation='';panel.style.opacity='';panel.style.transform='';panel.style.willChange='';
+      }));
+    }
+    async function closeCourse(id){
+      const card=findCourseCard(id),motion=++courseToggleMotion;
+      if(!card || reduceCourseMotion() || !card.animate){generation++;selected=null;posts=[];loading=false;warning='';message='';render();return;}
+      const panel=card.querySelector('.classroom-course-panel'),summary=card.querySelector('.classroom-course-summary');
+      const fromHeight=card.getBoundingClientRect().height,style=getComputedStyle(card);
+      const targetHeight=(summary?.getBoundingClientRect().height||0)+(parseFloat(style.borderTopWidth)||0)+(parseFloat(style.borderBottomWidth)||0);
+      card.style.height=fromHeight+'px';card.style.overflow='hidden';card.style.willChange='height';
+      if(panel){panel.style.animation='none';panel.style.willChange='opacity, transform';}
+      const animations=[card.animate([{height:fromHeight+'px'},{height:targetHeight+'px'}],{duration:190,easing:'cubic-bezier(.22,.75,.2,1)',fill:'forwards'})];
+      if(panel)animations.push(panel.animate([{opacity:1,transform:'translateY(0)'},{opacity:0,transform:'translateY(-5px)'}],{duration:145,easing:'ease-out',fill:'forwards'}));
+      await Promise.allSettled(animations.map(animation=>animation.finished));
+      if(motion!==courseToggleMotion)return;
+      animations.forEach(animation=>animation.cancel());
+      generation++;selected=null;posts=[];loading=false;warning='';message='';render();
+    }
     async function loadCourse(id){
       const course=courses.find(c=>c.id===id);if(!course)return;
+      const wasOpen=Boolean(selected?.id===id),fromHeight=wasOpen?0:(findCourseCard(id)?.getBoundingClientRect().height||0),motion=++courseToggleMotion;
       selected=course;posts=[];loading=true;message='';warning='';const g=++generation;render();
+      if(!wasOpen)animateCourseOpen(id,fromHeight,motion);
       const definitions=[['courseWorkMaterials','courseWorkMaterial','Material','Materiale'],['courseWork','courseWork','Temă','Teme'],['announcements','announcements','Anunț','Anunțuri']];
       const results=await Promise.allSettled(definitions.map(async([endpoint,field,kind,label])=>({label,items:(await listAll('courses/'+encodeURIComponent(id)+'/'+endpoint,field,g)).map(item=>({...item,kind}))})));
       if(g!==generation)return;
@@ -316,7 +398,7 @@
       if(e.target.closest('[data-cr-signin]') && client)requestAccess(Boolean(rememberedAccount()));
       if(e.target.closest('[data-cr-refresh]'))selected?loadCourse(selected.id):loadCourses();
       const course=e.target.closest('[data-cr-course]');if(course){
-        if(selected?.id===course.dataset.crCourse){generation++;selected=null;posts=[];loading=false;warning='';message='';render();}
+        if(selected?.id===course.dataset.crCourse)closeCourse(course.dataset.crCourse);
         else loadCourse(course.dataset.crCourse);
       }
     });
