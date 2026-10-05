@@ -200,21 +200,26 @@
               const links=document.createElement('div');links.className='classroom-pdf-links';links.style.width=viewport.width+'px';links.style.height=viewport.height+'px';
               for(const annotation of annotations){
                 if(annotation.subtype!=='Link' || !annotation.rect)continue;
-                let href=safeURL(annotation.url||annotation.unsafeUrl||'');
+                const rawUrl=annotation.url||annotation.unsafeUrl||annotation.action||'';
+                let href=safeURL(rawUrl);
                 if(!href && annotation.dest){
                   try{
                     const dest=typeof annotation.dest==='string'?await pdf.getDestination(annotation.dest):annotation.dest;
                     if(dest?.[0]){
-                      const ref=dest[0],index=await pdf.getPageIndex(ref);
+                      const ref=dest[0],index=typeof ref==='object'?await pdf.getPageIndex(ref):Math.max(0,Number(ref)||0);
                       href='#pdf-page-'+(index+1);
                     }
                   }catch{}
                 }
                 if(!href)continue;
                 const rect=viewport.convertToViewportRectangle(annotation.rect),left=Math.min(rect[0],rect[2]),top=Math.min(rect[1],rect[3]),width=Math.abs(rect[0]-rect[2]),height=Math.abs(rect[1]-rect[3]);
-                const a=document.createElement('a');a.className='classroom-pdf-link';a.href=href;a.style.left=left+'px';a.style.top=top+'px';a.style.width=Math.max(8,width)+'px';a.style.height=Math.max(8,height)+'px';a.setAttribute('aria-label','Deschide linkul din PDF');
-                if(href.startsWith('#pdf-page-')){a.addEventListener('click',e=>{e.preventDefault();const target=pages.querySelector(href);if(target)target.scrollIntoView({behavior:'smooth',block:'start'});});}
-                else{a.target='_blank';a.rel='noopener noreferrer';}
+                const a=document.createElement('a');a.className='classroom-pdf-link';a.href=href;a.style.left=left+'px';a.style.top=top+'px';a.style.width=Math.max(12,width)+'px';a.style.height=Math.max(12,height)+'px';a.setAttribute('aria-label','Deschide linkul din PDF');
+                a.addEventListener('pointerdown',e=>e.stopPropagation());
+                a.addEventListener('click',e=>{
+                  e.preventDefault();e.stopPropagation();
+                  if(href.startsWith('#pdf-page-')){const target=pages.querySelector(href);if(target)target.scrollIntoView({behavior:'smooth',block:'start'});}
+                  else window.open(href,'_blank','noopener,noreferrer');
+                });
                 links.append(a);
               }
               if(links.childElementCount)wrap.append(links);
@@ -372,7 +377,12 @@
           const fit=Math.min(1,availableW/naturalW,availableH/naturalH);
           img.style.width=naturalW+'px';img.style.maxWidth='none';img.style.height='auto';
           stage.style.width=Math.max(availableW,naturalW)+'px';stage.style.minHeight=Math.max(availableH,naturalH)+'px';
-          enableViewerZoom(stage,fit,fit);return;
+          enableViewerZoom(stage,fit,fit);
+          let imageTapMoved=false,imageTapX=0,imageTapY=0;
+          img.addEventListener('pointerdown',e=>{if(e.pointerType==='touch'){imageTapMoved=false;imageTapX=e.clientX;imageTapY=e.clientY;}});
+          img.addEventListener('pointermove',e=>{if(e.pointerType==='touch'&&Math.hypot(e.clientX-imageTapX,e.clientY-imageTapY)>8)imageTapMoved=true;});
+          img.addEventListener('click',e=>{if(imageTapMoved)return;e.preventDefault();e.stopPropagation();setViewerZoom(fit,e.clientX,e.clientY);});
+          return;
         }
         if(/\.(txt|md|json|xml|log|html?|css|js|ts|py|java|c|cpp|h)$/i.test(name)){
           const text=await response.text();if(generation!==viewerGeneration)return;
@@ -416,7 +426,7 @@
     viewerContent.addEventListener('touchmove',e=>{
       if(!viewerZoomTarget||e.touches.length!==2||!pinchStartDistance)return;
       e.preventDefault();
-      const distance=touchDistance(e.touches),center=touchCenter(e.touches),nextZoom=Math.max(1,Math.min(5,pinchStartZoom*(distance/pinchStartDistance)));
+      const distance=touchDistance(e.touches),center=touchCenter(e.touches),nextZoom=Math.max(viewerMinZoom,Math.min(6,pinchStartZoom*(distance/pinchStartDistance)));
       if(pinchFrame)cancelAnimationFrame(pinchFrame);
       pinchFrame=requestAnimationFrame(()=>{
         pinchFrame=0;if(!viewerZoomTarget)return;
