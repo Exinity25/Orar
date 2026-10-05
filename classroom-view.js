@@ -140,7 +140,9 @@
           || /(?:msword|officedocument|ms-excel|ms-powerpoint|opendocument|rtf)/i.test(mime);
         const archive=/\.(zip|rar|7z)$/i.test(name) || /(?:zip|rar|7z|compressed|archive)/i.test(mime);
         const localSupported=/\.(pdf|csv|jpe?g|png|gif|webp|bmp|svg|avif|txt|md|json|xml|log|html?|css|js|ts|py|java|c|cpp|h|mp3|m4a|aac|flac|wav|ogg|mp4|m4v|mov|webm)$/i.test(name);
-        if(googleNative || officeDocument || archive || !localSupported){
+        const nativeGoogleDoc=mime==='application/vnd.google-apps.document'||mime==='application/vnd.google-apps.spreadsheet'||mime==='application/vnd.google-apps.presentation';
+        const downloadableOffice=/\.(docx?|xlsx?|xlsm|csv)$/i.test(name);
+        if((googleNative && nativeGoogleDoc) || archive || (!localSupported && !downloadableOffice && !officeDocument)){
           const driveBox=viewer.querySelector('[data-cr-viewer-content]');
           const frame=document.createElement('iframe');frame.className='classroom-drive-office-preview';frame.title='Previzualizare '+name;
           const encodedId=encodeURIComponent(fileId);
