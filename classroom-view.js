@@ -5,7 +5,8 @@
     'https://www.googleapis.com/auth/classroom.courseworkmaterials.readonly',
     'https://www.googleapis.com/auth/classroom.coursework.me.readonly',
     'https://www.googleapis.com/auth/classroom.announcements.readonly',
-    'https://www.googleapis.com/auth/drive.readonly'];
+    'https://www.googleapis.com/auth/drive.readonly',
+    'https://www.googleapis.com/auth/drive.appdata'];
   const esc = (s='') => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const safeURL = value => {try{const u=new URL(value);return u.protocol==='https:'?u.href:'';}catch{return '';}};
   const link = (url,title,cls='classroom-link') => {const safe=safeURL(url);return safe?`<a class="${cls}" href="${esc(safe)}" target="_blank" rel="noopener noreferrer">${esc(title)} ↗</a>`:'';};
@@ -289,6 +290,35 @@
       profile.classList.remove('hub-hidden');
     }
     function saveSession(){try{localStorage.setItem(SESSION_KEY,JSON.stringify({token,expires,grantedScopes}));}catch{}}
+    const CLOUD_FILE='orar-sync.json',SYNC_KEYS=['c11_1_data','c11_1_selected_week','c11_1_selected_day','student_hub_data','student_hub_theme','student_hub_bg_mode','student_hub_bg_name'];
+    let cloudFileId='',cloudTimer=0,cloudApplying=false;
+    const cloudPayload=()=>{const values={};for(const key of SYNC_KEYS){const value=localStorage.getItem(key);if(value!==null)values[key]=value;}return {version:1,updatedAt:Date.now(),values};};
+    async function findCloudFile(){
+      if(cloudFileId)return cloudFileId;
+      const q=encodeURIComponent("name='"+CLOUD_FILE+"' and 'appDataFolder' in parents and trashed=false");
+      const r=await fetch('https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q='+q+'&fields=files(id,name,modifiedTime)&pageSize=1',{headers:{Authorization:'Bearer '+token},cache:'no-store'});
+      if(!r.ok)throw Error('Drive appData indisponibil.');const files=(await r.json()).files||[];cloudFileId=files[0]?.id||'';return cloudFileId;
+    }
+    async function uploadCloud(){
+      if(cloudApplying||!token||Date.now()>=expires||!grantedScopes.includes('drive.appdata'))return;
+      const body=JSON.stringify(cloudPayload()),id=await findCloudFile();
+      if(id){const r=await fetch('https://www.googleapis.com/upload/drive/v3/files/'+encodeURIComponent(id)+'?uploadType=media',{method:'PATCH',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body});if(!r.ok)throw Error('Nu s-a putut sincroniza orarul.');return;}
+      const boundary='orar_sync_boundary',meta=JSON.stringify({name:CLOUD_FILE,parents:['appDataFolder']});
+      const multipart='--'+boundary+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+meta+'\r\n--'+boundary+'\r\nContent-Type: application/json\r\n\r\n'+body+'\r\n--'+boundary+'--';
+      const r=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'multipart/related; boundary='+boundary},body:multipart});
+      if(!r.ok)throw Error('Nu s-a putut crea backup-ul orarului.');cloudFileId=(await r.json()).id||'';
+    }
+    function scheduleCloudUpload(){clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>uploadCloud().catch(()=>{}),700);}
+    async function restoreCloud(){
+      if(!token||!grantedScopes.includes('drive.appdata'))return;
+      const id=await findCloudFile();if(!id){scheduleCloudUpload();return;}
+      const r=await fetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(id)+'?alt=media',{headers:{Authorization:'Bearer '+token},cache:'no-store'});if(!r.ok)return;
+      const remote=await r.json();if(!remote?.values)return;
+      cloudApplying=true;let changed=false;
+      for(const key of SYNC_KEYS){if(Object.prototype.hasOwnProperty.call(remote.values,key)&&localStorage.getItem(key)!==String(remote.values[key])){localStorage.setItem(key,String(remote.values[key]));changed=true;}}
+      cloudApplying=false;if(changed)location.reload();
+    }
+    window.addEventListener('orar-local-change',scheduleCloudUpload);
     function forgetSession(){try{localStorage.removeItem(SESSION_KEY);}catch{}}
     function restoreSession(){
       try{localStorage.removeItem(OLD_SESSION_KEY);const saved=JSON.parse(localStorage.getItem(SESSION_KEY)||'null');if(saved?.token && Number(saved.expires)>Date.now()+5000){token=saved.token;expires=Number(saved.expires);grantedScopes=String(saved.grantedScopes||'');return true;}forgetSession();}catch{forgetSession();}
@@ -435,7 +465,7 @@
             loadCourses();
             try{const user=await api('https://openidconnect.googleapis.com/v1/userinfo');if(authSession!==session || !token)return;
               const account={name:user.name||'Cont Google',email:user.email||'',picture:safeURL(user.picture)||''};
-              if(account.email){try{localStorage.setItem(ACCOUNT_KEY,JSON.stringify(account));}catch{}renderProfile(account,true);}
+              if(account.email){try{localStorage.setItem(ACCOUNT_KEY,JSON.stringify(account));}catch{}renderProfile(account,true);} restoreCloud().catch(()=>{});
             }catch{renderProfile(rememberedAccount(),true);}
           },error_callback:()=>{reauthenticating=false;message='Reconectarea Google nu a putut fi făcută automat. Apasă din nou pe conectare.';render();}});
         render();
