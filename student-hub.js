@@ -1,0 +1,170 @@
+(() => {
+  'use strict';
+  const KEY = 'orar_subject_homework_v1';
+  const esc = (value='') => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const normalize = value => String(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().replace(/\s+/g,' ').toLocaleLowerCase('ro');
+  const svg = paths => `<svg viewBox="0 0 24 24" aria-hidden="true">${paths}</svg>`;
+  const icons = {
+    menu:svg('<path d="M4 6h16M4 12h16M4 18h16"/>'),
+    calendar:svg('<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4m10-4v4M3 11h18m-13 4h2m4 0h2"/>'),
+    book:svg('<path d="M12 5v15M3 4h5a4 4 0 0 1 4 2 4 4 0 0 1 4-2h5v15h-5a5 5 0 0 0-4 2 5 5 0 0 0-4-2H3Z"/>'),
+    classroom:svg('<rect x="3" y="4" width="18" height="15" rx="2"/><circle cx="12" cy="10" r="2"/><path d="M8 16c0-4 8-4 8 0M7 22h10"/>')
+  };
+  let initialized = false;
+  window.OrarStudentHub = {init({getSchedule}) {
+    if(initialized) return;
+    initialized = true;
+    const app = document.querySelector('.app');
+    let store = {subjects:{}};
+    let storageProblem = false;
+    try {
+      const raw = localStorage.getItem(KEY);
+      if(raw){
+        const parsed = JSON.parse(raw);
+        if(!parsed || !parsed.subjects || typeof parsed.subjects !== 'object' || Array.isArray(parsed.subjects)) throw Error('invalid');
+        store = parsed;
+      }
+    } catch(e){storageProblem = true;}
+    let view = 'schedule', search = '', serial = 0, statusTimer;
+    const openSubjects = new Set(), drafts = new Map();
+    let deletion = null;
+    const root = document.createElement('div');root.id='studentHub';
+    root.innerHTML = `
+      <button class="hub-menu-button" id="hubMenu" type="button" aria-label="Deschide meniul" aria-expanded="false" aria-controls="hubDrawer">${icons.menu}</button>
+      <div class="hub-layer" id="hubLayer" aria-hidden="true" inert>
+        <div class="hub-backdrop" id="hubBackdrop"></div>
+        <aside class="hub-drawer" id="hubDrawer" role="dialog" aria-modal="true" aria-label="Meniu principal">
+          <div class="hub-brand"><div><strong>Orar<span style="color:#f55677">.</span></strong><small>Spațiul tău pentru facultate</small></div><button class="hub-close" id="hubClose" type="button" aria-label="Închide meniul">✕</button></div>
+          <nav class="hub-nav" aria-label="Secțiuni">
+            <button class="hub-nav-item" data-hub-view="schedule" aria-current="page" type="button"><span class="hub-icon">${icons.calendar}</span><span class="hub-nav-copy"><strong>Orar</strong><small>Programul săptămânii</small></span></button>
+            <button class="hub-nav-item" data-hub-view="subjects" type="button"><span class="hub-icon">${icons.book}</span><span class="hub-nav-copy"><strong>Materii</strong><small>Teme și termene</small></span></button>
+            <a class="hub-nav-item" id="hubClassroom" href="https://classroom.google.com/" target="_blank" rel="noopener noreferrer"><span class="hub-icon">${icons.classroom}</span><span class="hub-nav-copy"><strong>Classroom</strong><small>Deschide Google Classroom</small></span><span class="hub-external" aria-hidden="true">↗</span></a>
+          </nav>
+        </aside>
+      </div>
+      <main class="hub-page hub-hidden" id="hubSubjects" aria-labelledby="hubHeading">
+        <div class="hub-content"><header class="hub-page-header"><span class="hub-eyebrow">Totul, pe materii</span><h1 class="hub-heading" id="hubHeading" tabindex="-1">Materii</h1><p class="hub-intro">Un singur loc pentru temele și termenele tale.</p><div class="hub-stats" id="hubStats"></div></header>
+        <label class="hub-search"><span aria-hidden="true">⌕</span><input id="hubSearch" type="search" placeholder="Caută o materie…" aria-label="Caută o materie" autocomplete="off"></label>
+        <div class="hub-subject-list" id="hubSubjectList"></div>
+        <p class="hub-local-note">Temele se salvează pe acest dispozitiv. Nu se sincronizează cu Google Classroom.</p></div>
+      </main>
+      <div class="hub-status" id="hubStatus" role="status" aria-live="polite"></div>`;
+    document.body.append(root);
+    const $ = selector => root.querySelector(selector);
+    const menu=$('#hubMenu'), layer=$('#hubLayer'), page=$('#hubSubjects'), list=$('#hubSubjectList');
+    layer.inert = true;
+    const tell = message => {clearTimeout(statusTimer);$('#hubStatus').textContent=message;$('#hubStatus').classList.add('is-visible');statusTimer=setTimeout(()=>$('#hubStatus').classList.remove('is-visible'),2600);};
+    const today = () => {const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
+    const validDate = value => typeof value==='string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : '';
+    const dateLabel = value => value ? value.split('-').reverse().join('.') : 'Fără termen';
+    const savedSubject = id => Object.prototype.hasOwnProperty.call(store.subjects,id) ? store.subjects[id] : null;
+    const tasksFor = id => Array.isArray(savedSubject(id)?.tasks) ? savedSubject(id).tasks : [];
+    const collectSubjects = () => {
+      const subjects=new Map();
+      const add = item => {
+        const name=String(item?.subject || '').trim();if(!name)return;
+        const id=normalize(name);if(!subjects.has(id))subjects.set(id,{id,name,count:0,current:true});subjects.get(id).count++;
+      };
+      Object.values(getSchedule()?.classes || {}).forEach(item=>{add(item);if(item?.alternate)add(item.alternate);});
+      Object.entries(store.subjects).forEach(([id,value])=>{
+        if(!subjects.has(id) && Array.isArray(value?.tasks) && value.tasks.length) subjects.set(id,{id,name:String(value.name||id),count:0,current:false});
+      });
+      return [...subjects.values()].sort((a,b)=>a.name.localeCompare(b.name,'ro'));
+    };
+    const persist = next => {
+      if(storageProblem){tell('Salvarea locală nu este disponibilă. Temele existente nu au fost suprascrise.');return false;}
+      try {localStorage.setItem(KEY,JSON.stringify(next));store=next;return true;}
+      catch(e){tell('Nu am putut salva. Verifică spațiul disponibil și accesul la stocare.');return false;}
+    };
+    const mutate = (id,name,fn) => {
+      const next=JSON.parse(JSON.stringify(store));
+      if(!Object.prototype.hasOwnProperty.call(next.subjects,id))Object.defineProperty(next.subjects,id,{value:{name,tasks:[]},enumerable:true,writable:true,configurable:true});
+      if(!Array.isArray(next.subjects[id].tasks))next.subjects[id].tasks=[];
+      fn(next.subjects[id].tasks);next.subjects[id].name=name;
+      return persist(next);
+    };
+    const draftFor = id => drafts.get(id) || {text:'',deadline:'',editing:null};
+    const taskMarkup = (task,id) => {
+      const due=validDate(task.deadline), overdue=!task.done && due && due<today(), isToday=!task.done && due===today();
+      return `<li class="hub-task ${task.done?'is-done':''}" data-task-id="${esc(task.id)}"><div class="hub-task-main"><input class="hub-task-check" type="checkbox" data-task-done ${task.done?'checked':''} aria-label="Marchează tema ca ${task.done?'nefinalizată':'finalizată'}"><span class="hub-task-text">${esc(task.text)}</span></div><div class="hub-task-meta"><span class="hub-due ${overdue?'is-overdue':isToday?'is-today':''}">${task.done?'Finalizată':overdue?'Termen depășit · '+dateLabel(due):isToday?'Termen astăzi':dateLabel(due)}</span><div class="hub-task-actions"><button class="hub-small-button" type="button" data-task-edit>Editează</button><button class="hub-small-button is-danger" type="button" data-task-delete>${deletion===id+':'+task.id?'Confirmă ștergerea':'Șterge'}</button></div></div></li>`;
+    };
+    const renderSubjects = () => {
+      const subjects=collectSubjects(), all=subjects.flatMap(s=>tasksFor(s.id));
+      $('#hubStats').innerHTML=`<span class="hub-pill">${subjects.length} materii</span><span class="hub-pill">${all.filter(t=>!t.done).length} teme de făcut</span><span class="hub-pill">${all.filter(t=>!t.done && validDate(t.deadline) && t.deadline<today()).length} cu termen depășit</span>`;
+      const visible=subjects.filter(s=>normalize(s.name).includes(normalize(search)));
+      list.innerHTML=visible.map((subject,index)=>{
+        const {id,name,count,current}=subject, tasks=tasksFor(id), draft=draftFor(id), pending=tasks.filter(t=>!t.done).length;
+        const sorted=[...tasks].sort((a,b)=>Number(Boolean(a.done))-Number(Boolean(b.done)) || (validDate(a.deadline)||'9999').localeCompare(validDate(b.deadline)||'9999'));
+        return `<details class="hub-subject" data-subject-id="${esc(id)}" ${openSubjects.has(id)?'open':''}><summary><span class="hub-icon hub-subject-mark">${icons.book}</span><span class="hub-subject-name"><strong>${esc(name)}</strong><small>${current?count+' activități în orar':'Păstrată dintr-un orar anterior'} · ${pending?pending+' teme de făcut':'Nicio temă în așteptare'}</small></span><span class="hub-chevron" aria-hidden="true">›</span></summary><div class="hub-subject-body"><ul class="hub-tasks">${sorted.map(task=>taskMarkup(task,id)).join('')}</ul>${tasks.length?'':'<p class="hub-empty">Adaugă prima temă pentru această materie.</p>'}<form class="hub-form"><label for="hubTaskText${index}">${draft.editing?'Editează tema':'Temă nouă'}<textarea id="hubTaskText${index}" name="text" placeholder="Ce ai de pregătit?" required maxlength="5000">${esc(draft.text)}</textarea></label><div class="hub-form-footer"><label for="hubTaskDate${index}">Termen (opțional)<input id="hubTaskDate${index}" type="date" name="deadline" value="${esc(draft.deadline)}"></label><button class="hub-primary" type="submit">${draft.editing?'Salvează':'Adaugă tema'}</button>${draft.editing?'<button class="hub-small-button" type="button" data-task-cancel>Anulează</button>':''}</div></form></div></details>`;
+      }).join('') || '<p class="hub-empty">'+(search?'Nu am găsit această materie.':'Adaugă materiile în orar, iar ele vor apărea aici.')+'</p>';
+      list.querySelectorAll('details').forEach(el=>el.addEventListener('toggle',()=>{if(!el.isConnected)return;el.open?openSubjects.add(el.dataset.subjectId):openSubjects.delete(el.dataset.subjectId);}));
+    };
+    const closeMenu = (restore=true) => {
+      layer.classList.remove('is-open');layer.setAttribute('aria-hidden','true');layer.inert=true;
+      menu.setAttribute('aria-expanded','false');app.inert=false;page.inert=false;menu.inert=false;
+      if(restore)menu.focus({preventScroll:true});
+    };
+    const openMenu = () => {
+      layer.inert=false;layer.setAttribute('aria-hidden','false');layer.classList.add('is-open');menu.setAttribute('aria-expanded','true');
+      app.inert=true;page.inert=true;menu.inert=true;$('#hubClose').focus({preventScroll:true});
+    };
+    const changeView = next => {
+      view=next;closeMenu(false);
+      app.classList.toggle('hub-hidden',view!=='schedule');page.classList.toggle('hub-hidden',view!=='subjects');
+      root.querySelectorAll('[data-hub-view]').forEach(el=>el.dataset.hubView===view?el.setAttribute('aria-current','page'):el.removeAttribute('aria-current'));
+      if(view==='subjects'){
+        renderSubjects();page.classList.remove('is-entering');void page.offsetWidth;page.classList.add('is-entering');$('#hubHeading').focus({preventScroll:true});
+      } else menu.focus({preventScroll:true});
+    };
+    menu.addEventListener('click',openMenu);$('#hubClose').addEventListener('click',()=>closeMenu());$('#hubBackdrop').addEventListener('click',()=>closeMenu());
+    root.querySelectorAll('[data-hub-view]').forEach(el=>el.addEventListener('click',()=>changeView(el.dataset.hubView)));
+    $('#hubClassroom').addEventListener('click',()=>closeMenu());
+    layer.addEventListener('keydown',e=>{
+      if(e.key==='Escape'){e.preventDefault();closeMenu();}
+      if(e.key==='Tab'){
+        const focusable=[...layer.querySelectorAll('button,a[href]')],first=focusable[0],last=focusable.at(-1);
+        if(e.shiftKey && document.activeElement===first){e.preventDefault();last.focus();}
+        else if(!e.shiftKey && document.activeElement===last){e.preventDefault();first.focus();}
+      }
+    });
+    $('#hubSearch').addEventListener('input',e=>{search=e.target.value;renderSubjects();});
+    list.addEventListener('input',e=>{
+      const details=e.target.closest('[data-subject-id]');if(!details || !e.target.closest('form'))return;
+      const form=e.target.closest('form'),id=details.dataset.subjectId;
+      drafts.set(id,{...draftFor(id),text:form.elements.text.value,deadline:form.elements.deadline.value});
+    });
+    list.addEventListener('submit',e=>{
+      e.preventDefault();const form=e.target, details=form.closest('[data-subject-id]');if(!details)return;
+      const id=details.dataset.subjectId, subject=collectSubjects().find(s=>s.id===id), text=form.elements.text.value.trim(),deadline=validDate(form.elements.deadline.value),draft=draftFor(id);
+      if(!text){form.elements.text.focus();return;}
+      const success=mutate(id,subject.name,tasks=>{
+        const found=draft.editing && tasks.find(t=>t.id===draft.editing);
+        if(found){found.text=text;found.deadline=deadline;}
+        else tasks.push({id:crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+'-'+(++serial),text,deadline,done:false});
+      });
+      if(success){drafts.delete(id);openSubjects.add(id);renderSubjects();tell(draft.editing?'Tema a fost actualizată.':'Tema a fost salvată.');}
+    });
+    list.addEventListener('change',e=>{
+      if(!e.target.matches('[data-task-done]'))return;
+      const details=e.target.closest('[data-subject-id]'),id=details.dataset.subjectId,taskId=e.target.closest('[data-task-id]').dataset.taskId,subject=collectSubjects().find(s=>s.id===id);
+      if(mutate(id,subject.name,tasks=>{const task=tasks.find(t=>t.id===taskId);if(task)task.done=e.target.checked;})){openSubjects.add(id);renderSubjects();}else e.target.checked=!e.target.checked;
+    });
+    list.addEventListener('click',e=>{
+      const details=e.target.closest('[data-subject-id]');if(!details)return;const id=details.dataset.subjectId;
+      if(e.target.closest('[data-task-cancel]')){drafts.delete(id);openSubjects.add(id);renderSubjects();return;}
+      const row=e.target.closest('[data-task-id]');if(!row)return;
+      const task=tasksFor(id).find(t=>t.id===row.dataset.taskId);if(!task)return;
+      if(e.target.closest('[data-task-edit]')){
+        drafts.set(id,{text:task.text,deadline:validDate(task.deadline),editing:task.id});openSubjects.add(id);renderSubjects();
+        const section=[...list.querySelectorAll('[data-subject-id]')].find(el=>el.dataset.subjectId===id);section.querySelector('textarea').focus();
+      }
+      if(e.target.closest('[data-task-delete]')){
+        if(deletion!==id+':'+task.id){deletion=id+':'+task.id;e.target.textContent='Confirmă ștergerea';return;}
+        const subject=collectSubjects().find(s=>s.id===id);
+        if(mutate(id,subject.name,tasks=>{const index=tasks.findIndex(t=>t.id===task.id);if(index>=0)tasks.splice(index,1);})){deletion=null;if(draftFor(id).editing===task.id)drafts.delete(id);openSubjects.add(id);renderSubjects();tell('Tema a fost ștearsă.');}
+      }
+    });
+    window.addEventListener('storage',e=>{if(e.key!==KEY)return;try{const next=JSON.parse(e.newValue||'{"subjects":{}}');if(next?.subjects && typeof next.subjects==='object'){store=next;if(view==='subjects')renderSubjects();}}catch{}});
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible' && view==='subjects')renderSubjects();});
+  }};
+})();
