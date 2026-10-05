@@ -896,3 +896,44 @@ body[data-orar-theme] .hub-brand-dot{color:var(--accent-2)!important}
 .classroom-profile-google{background:#fff;color:#1f2937;font-family:Arial,Helvetica,sans-serif;font-weight:800}
 .classroom-profile-signin-arrow{flex-shrink:0;color:#ff8aa2;font-size:18px;line-height:1}
 .classroom-profile-reconnect{width:100%;min-height:34px}
+
+
+/* Gallery-like pinch zoom for local PDF/image viewers. */
+.classroom-viewer-content{
+  touch-action:pan-x pan-y pinch-zoom!important;
+  scroll-behavior:auto;
+  overflow-anchor:none;
+}
+.classroom-zoom-target{
+  transform-origin:0 0!important;
+  will-change:transform;
+  backface-visibility:hidden;
+  -webkit-backface-visibility:hidden;
+}
+.classroom-pdf-pages.classroom-zoom-target,
+.classroom-image-stage.classroom-zoom-target{
+  width:max-content;
+  min-width:calc(100% / var(--viewer-zoom,1));
+  min-height:calc(100% / var(--viewer-zoom,1));
+}
+.classroom-image-stage.classroom-zoom-target{
+  justify-content:flex-start;
+}
+.classroom-image-stage.classroom-zoom-target .classroom-image-preview{
+  margin-inline:auto;
+  image-rendering:auto;
+  -webkit-user-drag:none;
+  user-select:none;
+}
+.classroom-pdf-page canvas{
+  image-rendering:auto!important;
+  backface-visibility:hidden;
+  -webkit-backface-visibility:hidden;
+}
+@media(max-width:900px){
+  .classroom-image-preview{
+    max-width:100%;
+    width:auto;
+    height:auto;
+  }
+}
