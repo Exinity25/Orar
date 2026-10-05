@@ -8,6 +8,12 @@
   const esc = (s='') => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const safeURL = value => {try{const u=new URL(value);return u.protocol==='https:'?u.href:'';}catch{return '';}};
   const link = (url,title,cls='classroom-link') => {const safe=safeURL(url);return safe?`<a class="${cls}" href="${esc(safe)}" target="_blank" rel="noopener noreferrer">${esc(title)} ↗</a>`:'';};
+  const previewable = title => /\.(pdf|xlsx?)$/i.test(String(title||'').trim());
+  const previewButton = file => {
+    const title=String(file?.title||'Fișier');
+    if(!file?.id || !previewable(title))return '';
+    return `<button class="classroom-link classroom-preview-link" type="button" data-cr-preview="${esc(file.id)}" data-cr-preview-title="${esc(title)}">${esc(title)} <span aria-hidden="true">▣</span></button>`;
+  };
   let gisPromise;
   function loadGoogle(){
     if(window.google?.accounts?.oauth2)return Promise.resolve();
@@ -20,10 +26,28 @@
   window.OrarClassroom={mount(root){
     const page=document.createElement('main');page.id='hubClassroomPage';page.className='hub-page hub-hidden';page.setAttribute('aria-labelledby','classroomHeading');root.append(page);
     const profile=document.createElement('div');profile.className='classroom-profile hub-hidden';root.querySelector('.hub-drawer').append(profile);
+    const viewer=document.createElement('div');viewer.className='classroom-viewer hub-hidden';viewer.setAttribute('role','dialog');viewer.setAttribute('aria-modal','true');viewer.setAttribute('aria-labelledby','classroomViewerTitle');
+    viewer.innerHTML=`<div class="classroom-viewer-backdrop" data-cr-viewer-close></div><section class="classroom-viewer-dialog"><header class="classroom-viewer-header"><div><span class="classroom-kind">Previzualizare</span><h2 id="classroomViewerTitle" data-cr-viewer-title>Fișier</h2></div><div class="classroom-viewer-actions"><a class="hub-small-button classroom-viewer-drive" data-cr-viewer-drive target="_blank" rel="noopener noreferrer">Deschide în Drive ↗</a><button class="hub-small-button classroom-viewer-close" type="button" data-cr-viewer-close aria-label="Închide previzualizarea">✕</button></div></header><iframe data-cr-viewer-frame title="Previzualizare fișier" referrerpolicy="no-referrer" allowfullscreen></iframe></section>`;root.append(viewer);
+    let viewerReturnFocus=null;
+    function closeViewer(restore=true){
+      if(viewer.classList.contains('hub-hidden'))return;
+      viewer.classList.add('hub-hidden');viewer.querySelector('[data-cr-viewer-frame]').src='about:blank';document.body.classList.remove('classroom-viewer-open');
+      if(restore && viewerReturnFocus?.isConnected)viewerReturnFocus.focus({preventScroll:true});viewerReturnFocus=null;
+    }
+    function openViewer(id,title){
+      const fileId=String(id||'');if(!/^[A-Za-z0-9_-]+$/.test(fileId))return;
+      viewerReturnFocus=document.activeElement instanceof HTMLElement?document.activeElement:null;
+      viewer.querySelector('[data-cr-viewer-title]').textContent=title||'Fișier';
+      viewer.querySelector('[data-cr-viewer-frame]').src='https://drive.google.com/file/d/'+encodeURIComponent(fileId)+'/preview';
+      viewer.querySelector('[data-cr-viewer-drive]').href='https://drive.google.com/file/d/'+encodeURIComponent(fileId)+'/view';
+      viewer.classList.remove('hub-hidden');document.body.classList.add('classroom-viewer-open');viewer.querySelector('.classroom-viewer-close').focus({preventScroll:true});
+    }
+    viewer.addEventListener('click',e=>{if(e.target.closest('[data-cr-viewer-close]'))closeViewer();});
+    viewer.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();closeViewer();}});
     let token='',expires=0,client=null,courses=[],posts=[],selected=null,loading=false,message='',warning='',generation=0,session=0,expireTimer,visible=false;
     const configured=()=>/^[\w.-]+\.apps\.googleusercontent\.com$/.test(window.ORAR_CLASSROOM_CLIENT_ID||'');
     function clearSession(text=''){
-      generation++;session++;clearTimeout(expireTimer);token='';expires=0;courses=[];posts=[];selected=null;loading=false;message=text;warning='';profile.replaceChildren();profile.classList.add('hub-hidden');render();
+      closeViewer(false);generation++;session++;clearTimeout(expireTimer);token='';expires=0;courses=[];posts=[];selected=null;loading=false;message=text;warning='';profile.replaceChildren();profile.classList.add('hub-hidden');render();
     }
     async function api(url){
       if(!token || Date.now()>=expires){clearSession('Sesiunea a expirat. Conectează-te din nou.');throw Error('Sesiunea a expirat. Conectează-te din nou.');}
@@ -60,7 +84,7 @@
     }
     function attachments(post){
       return (post.materials||[]).map(m=>{
-        if(m.driveFile?.driveFile){const f=m.driveFile.driveFile;return link(f.alternateLink || (f.id?'https://drive.google.com/file/d/'+encodeURIComponent(f.id)+'/view':''),f.title||'Fișier Google Drive');}
+        if(m.driveFile?.driveFile){const f=m.driveFile.driveFile;return previewButton(f) || link(f.alternateLink || (f.id?'https://drive.google.com/file/d/'+encodeURIComponent(f.id)+'/view':''),f.title||'Fișier Google Drive');}
         if(m.link)return link(m.link.url,m.link.title||'Deschide linkul');
         if(m.youtubeVideo)return link(m.youtubeVideo.alternateLink || (m.youtubeVideo.id?'https://www.youtube.com/watch?v='+encodeURIComponent(m.youtubeVideo.id):''),m.youtubeVideo.title||'Video');
         if(m.form)return link(m.form.formUrl,m.form.title||'Formular');
@@ -97,6 +121,7 @@
       }catch(e){message=e.message;render();}
     }
     page.addEventListener('click',e=>{
+      const preview=e.target.closest('[data-cr-preview]');if(preview){openViewer(preview.dataset.crPreview,preview.dataset.crPreviewTitle);return;}
       if(e.target.closest('[data-cr-signin]') && client)client.requestAccessToken({prompt:'select_account'});
       if(e.target.closest('[data-cr-refresh]'))selected?loadCourse(selected.id):loadCourses();
       if(e.target.closest('[data-cr-back]')){generation++;selected=null;posts=[];loading=false;warning='';message='';render();}
