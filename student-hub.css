@@ -416,3 +416,128 @@ body::before{min-height:calc(100dvh + env(safe-area-inset-bottom))}
   .card-color-menu button{min-height:39px!important}
   .card-color-swatch{width:17px!important;height:17px!important;flex-basis:17px!important}
 }
+
+
+/* Requested polish: bottom blend, liquid glass, ICE details, compact color grid. */
+
+/* Soften the hand-off into the iPhone's black bottom area without touching the existing top fade. */
+@media (max-width:900px), (hover:none) and (pointer:coarse){
+  body{background:#020409!important}
+  body::before{
+    border-radius:0 0 26px 26px;
+    -webkit-mask-image:linear-gradient(to bottom,#000 0%,#000 calc(100% - 72px),rgba(0,0,0,.94) calc(100% - 52px),rgba(0,0,0,.52) calc(100% - 24px),transparent 100%);
+    mask-image:linear-gradient(to bottom,#000 0%,#000 calc(100% - 72px),rgba(0,0,0,.94) calc(100% - 52px),rgba(0,0,0,.52) calc(100% - 24px),transparent 100%);
+  }
+  .app,.hub-page{border-radius:0 0 26px 26px}
+}
+
+/* Apple-like liquid glass for Subjects and Classroom cards. */
+.hub-subject,
+.classroom-course,
+.classroom-welcome,
+.classroom-post{
+  background:linear-gradient(135deg,rgba(18,24,37,.74),rgba(7,11,19,.60))!important;
+  border-color:rgba(255,255,255,.16)!important;
+  -webkit-backdrop-filter:blur(20px) saturate(145%);
+  backdrop-filter:blur(20px) saturate(145%);
+  box-shadow:0 14px 38px rgba(0,0,0,.18),inset 0 1px 0 rgba(255,255,255,.10),inset 0 -1px 0 rgba(255,255,255,.025);
+  background-clip:padding-box;
+}
+body[data-orar-theme="ice"] .hub-subject,
+body[data-orar-theme="ice"] .classroom-course,
+body[data-orar-theme="ice"] .classroom-welcome,
+body[data-orar-theme="ice"] .classroom-post{
+  background:linear-gradient(135deg,rgba(255,255,255,.78),rgba(239,246,255,.58))!important;
+  border-color:rgba(15,35,65,.15)!important;
+  box-shadow:0 14px 34px rgba(37,99,235,.08),inset 0 1px 0 rgba(255,255,255,.95),inset 0 -1px 0 rgba(37,99,235,.035);
+}
+body[data-orar-theme="ice"] .classroom-course.is-open{border-color:#2563eb!important}
+
+/* ICE: keep the selected menu item purely blue (no dark strip/tap artifact). */
+body[data-orar-theme="ice"] .hub-nav-item{
+  -webkit-tap-highlight-color:transparent;
+  background-clip:padding-box;
+}
+body[data-orar-theme="ice"] .hub-nav-item[aria-current="page"]{
+  color:#fff!important;
+  background:linear-gradient(110deg,#2563eb,#60a5fa)!important;
+  border-color:rgba(37,99,235,.18)!important;
+  box-shadow:0 8px 24px rgba(37,99,235,.20)!important;
+  outline:0!important;
+  overflow:hidden;
+}
+body[data-orar-theme="ice"] .hub-nav-item[aria-current="page"]::before,
+body[data-orar-theme="ice"] .hub-nav-item[aria-current="page"]::after{display:none!important}
+
+/* ICE Classroom links and loading statuses use the theme blue, including the underline. */
+body[data-orar-theme="ice"] .classroom-link,
+body[data-orar-theme="ice"] .classroom-inline-link{
+  color:#2563eb!important;
+  text-decoration-color:rgba(37,99,235,.55)!important;
+}
+body[data-orar-theme="ice"] .classroom-link:hover,
+body[data-orar-theme="ice"] .classroom-inline-link:hover{
+  color:#1d4ed8!important;
+  text-decoration-color:currentColor!important;
+}
+body[data-orar-theme="ice"] .classroom-notice[role="status"]{
+  color:#2563eb!important;
+  background:rgba(37,99,235,.07)!important;
+}
+
+/* Compact timetable accent picker: one Default tile plus color-only swatches. */
+.card-color-menu{
+  grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  width:176px!important;
+  gap:8px!important;
+  padding:9px!important;
+}
+.card-color-menu .card-color-option{
+  min-width:0!important;
+  min-height:42px!important;
+  padding:3px!important;
+  display:grid!important;
+  place-items:center!important;
+  border-radius:9px!important;
+}
+.card-color-menu .card-color-swatch{
+  width:25px!important;
+  height:25px!important;
+  flex:0 0 25px!important;
+}
+.card-color-default-box{
+  width:36px;
+  height:32px;
+  display:grid;
+  place-items:center;
+  border-radius:8px;
+  border:1px solid rgba(255,255,255,.24);
+  background:#6b7280;
+  color:#fff!important;
+  font-size:8px!important;
+  font-weight:800;
+  line-height:1!important;
+  letter-spacing:.01em;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.18);
+}
+.card-color-option-default[aria-checked="true"] .card-color-default-box{
+  box-shadow:0 0 0 2px var(--accent),0 0 0 4px rgba(255,255,255,.12),inset 0 1px 0 rgba(255,255,255,.18);
+}
+body[data-orar-theme="ice"] .card-color-option-default[aria-checked="true"] .card-color-default-box{
+  box-shadow:0 0 0 2px #2563eb,0 0 0 4px #dbeafe,inset 0 1px 0 rgba(255,255,255,.35);
+}
+@media (max-width:900px) and (orientation:landscape), (max-width:960px) and (orientation:landscape) and (hover:none) and (pointer:coarse){
+  .card-color-menu{width:154px!important;gap:6px!important;padding:7px!important}
+  .card-color-menu .card-color-option{min-height:36px!important}
+  .card-color-menu .card-color-swatch{width:20px!important;height:20px!important;flex-basis:20px!important}
+  .card-color-default-box{width:31px;height:27px;font-size:7px!important}
+}
+
+/* Local viewer header: title and actions share one baseline after removing the eyebrow. */
+.classroom-viewer-header{align-items:center}
+.classroom-viewer-header>h2{flex:1;min-width:0;margin:0!important}
+.classroom-viewer-actions{align-self:center;transform:translateY(1px)}
+@media(max-width:640px){
+  .classroom-viewer-header>h2{max-width:none}
+  .classroom-viewer-actions{gap:7px}
+}
