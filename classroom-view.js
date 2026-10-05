@@ -110,6 +110,34 @@
             const sheet=workbook.Sheets[sheetName],ref=sheet?.['!ref'];
             if(!ref){box.innerHTML='<div class="classroom-viewer-message">Foaia este goală.</div>';return;}
             const range=XLSX.utils.decode_range(ref),maxRows=2500,maxCols=120,endRow=Math.min(range.e.r,range.s.r+2499),endCol=Math.min(range.e.c,range.s.c+119);
+            const excelColor=value=>{
+              const rgb=String(value?.rgb||'').replace(/^#|^FF/i,'');if(/^[0-9a-f]{6}$/i.test(rgb))return '#'+rgb;
+              return '';
+            };
+            const applyCellStyle=(td,cell)=>{
+              if(!cell)return;
+              const style=cell.s;
+              if(style && typeof style==='object'){
+                const fill=excelColor(style.fill?.fgColor)||excelColor(style.fill?.bgColor);if(fill)td.style.backgroundColor=fill;
+                const fontColor=excelColor(style.font?.color);if(fontColor)td.style.color=fontColor;
+                if(style.font?.bold)td.style.fontWeight='700';
+                if(style.font?.italic)td.style.fontStyle='italic';
+                if(style.font?.underline)td.style.textDecoration='underline';
+                const horizontal=style.alignment?.horizontal;
+                if(['left','center','right','justify'].includes(horizontal))td.style.textAlign=horizontal;
+                const vertical=style.alignment?.vertical;
+                if(['top','center','bottom'].includes(vertical))td.style.verticalAlign=vertical==='center'?'middle':vertical;
+                if(style.alignment?.wrapText){td.style.whiteSpace='normal';td.style.overflow='visible';td.style.textOverflow='clip';}
+                const border=style.border;
+                const borderColor=side=>excelColor(side?.color)||'#9ca3af';
+                if(border?.top?.style)td.style.borderTop='1px solid '+borderColor(border.top);
+                if(border?.right?.style)td.style.borderRight='1px solid '+borderColor(border.right);
+                if(border?.bottom?.style)td.style.borderBottom='1px solid '+borderColor(border.bottom);
+                if(border?.left?.style)td.style.borderLeft='1px solid '+borderColor(border.left);
+              }
+              if(cell.t==='n' && !td.style.textAlign)td.style.textAlign='right';
+              if(cell.t==='b' && !td.style.textAlign)td.style.textAlign='center';
+            };
             const starts=new Map(),skip=new Set();
             (sheet['!merges']||[]).forEach(m=>{
               if(m.s.r>=range.s.r&&m.s.r<=endRow&&m.s.c>=range.s.c&&m.s.c<=endCol)starts.set(m.s.r+':'+m.s.c,{rowspan:Math.min(m.e.r,endRow)-m.s.r+1,colspan:Math.min(m.e.c,endCol)-m.s.c+1});
@@ -136,6 +164,7 @@
                 if(merge){td.rowSpan=merge.rowspan;td.colSpan=merge.colspan;td.classList.add('is-merged');}
                 const value=cell?String(cell.w??XLSX.utils.format_cell(cell)??''):'';
                 if(cell?.l?.Target){const link=document.createElement('a');link.href=cell.l.Target;link.target='_blank';link.rel='noopener noreferrer';link.textContent=value;td.append(link);}else td.textContent=value;
+                applyCellStyle(td,cell);
                 if(cell?.f)td.title='='+cell.f;tr.append(td);
               }
               tbody.append(tr);
