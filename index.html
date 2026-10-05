@@ -741,7 +741,7 @@
     }
 
     function storageSet(key,value){
-      try{localStorage.setItem(key,value);return true;}catch(e){return false;}
+      try{localStorage.setItem(key,value);window.dispatchEvent(new CustomEvent('orar-local-change',{detail:{key}}));return true;}catch(e){return false;}
     }
 
     let data = loadData();

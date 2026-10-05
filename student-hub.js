@@ -174,7 +174,7 @@
     };
     const persist = next => {
       if(storageProblem){tell('Salvarea locală nu este disponibilă. Temele existente nu au fost suprascrise.');return false;}
-      try {localStorage.setItem(KEY,JSON.stringify(next));store=next;return true;}
+      try {localStorage.setItem(KEY,JSON.stringify(next));window.dispatchEvent(new CustomEvent('orar-local-change',{detail:{key:KEY}}));store=next;return true;}
       catch(e){tell('Nu am putut salva. Verifică spațiul disponibil și accesul la stocare.');return false;}
     };
     const mutate = (id,name,fn) => {
