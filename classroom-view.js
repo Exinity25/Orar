@@ -465,6 +465,10 @@
     },{passive:false});
     viewerContent.addEventListener('touchend',e=>{if(e.touches.length<2){pinchStartDistance=0;if(pinchFrame){cancelAnimationFrame(pinchFrame);pinchFrame=0;}}},{passive:true});
     viewerContent.addEventListener('touchcancel',()=>{pinchStartDistance=0;if(pinchFrame){cancelAnimationFrame(pinchFrame);pinchFrame=0;}},{passive:true});
+    ['gesturestart','gesturechange','gestureend'].forEach(type=>viewerContent.addEventListener(type,e=>{
+      if(viewerZoomTarget?.classList?.contains('classroom-image-stage'))e.preventDefault();
+    },{passive:false}));
+    viewerContent.addEventListener('dblclick',e=>{if(e.target.closest('.classroom-image-preview,.classroom-image-stage'))e.preventDefault();},{passive:false});
     viewer.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();closeViewer();}});
     const SESSION_KEY='orar_classroom_session_v2',OLD_SESSION_KEY='orar_classroom_session_v1';
     const ACCOUNT_KEY='orar_classroom_account_v1';
