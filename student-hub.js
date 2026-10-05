@@ -35,7 +35,7 @@
       <div class="hub-layer" id="hubLayer" aria-hidden="true" inert>
         <div class="hub-backdrop" id="hubBackdrop"></div>
         <aside class="hub-drawer" id="hubDrawer" role="dialog" aria-modal="true" aria-label="Meniu principal">
-          <div class="hub-brand"><div><strong>Orar<span style="color:#f55677">.</span></strong><small>Spațiul tău pentru facultate</small></div><button class="hub-close" id="hubClose" type="button" aria-label="Închide meniul">✕</button></div>
+          <div class="hub-brand"><div><strong>Orar<span class="hub-brand-dot">.</span></strong><small>Spațiul tău pentru facultate</small></div><button class="hub-close" id="hubClose" type="button" aria-label="Închide meniul">✕</button></div>
           <nav class="hub-nav" aria-label="Secțiuni">
             <button class="hub-nav-item" data-hub-view="schedule" aria-current="page" type="button"><span class="hub-icon">${icons.calendar}</span><span class="hub-nav-copy"><strong>Orar</strong><small>Programul săptămânii</small></span></button>
             <button class="hub-nav-item" data-hub-view="subjects" type="button"><span class="hub-icon">${icons.book}</span><span class="hub-nav-copy"><strong>Materii</strong><small>Teme și termene</small></span></button>
