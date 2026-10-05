@@ -274,3 +274,14 @@ body[data-orar-theme="ice"] .hub-subject summary:active{background:#f8fafc}
 @media(max-width:900px) and (orientation:landscape), (max-width:960px) and (orientation:landscape) and (hover:none) and (pointer:coarse){
   .card-color-cycle{top:5px;right:29px;width:17px;height:17px;border-width:1.5px}
 }
+
+
+/* ICE form controls and editable header polish */
+body[data-orar-theme="ice"] .hub-form input,
+body[data-orar-theme="ice"] .hub-form textarea{color-scheme:light}
+body[data-orar-theme="ice"].editing #scheduleTitle:hover,
+body[data-orar-theme="ice"].editing #scheduleSubtitle:hover,
+body[data-orar-theme="ice"].editing #scheduleTitle:focus,
+body[data-orar-theme="ice"].editing #scheduleSubtitle:focus{background:rgba(37,99,235,.07);box-shadow:0 0 0 1px rgba(37,99,235,.24)}
+body[data-orar-theme="ice"].editing #scheduleTitle:empty::before,
+body[data-orar-theme="ice"].editing #scheduleSubtitle:empty::before{color:#64748b}
