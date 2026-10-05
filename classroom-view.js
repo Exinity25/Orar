@@ -73,12 +73,12 @@
     const profile=document.createElement('div');profile.className='classroom-profile hub-hidden';root.querySelector('.hub-drawer').append(profile);
     const viewer=document.createElement('div');viewer.className='classroom-viewer hub-hidden';viewer.setAttribute('role','dialog');viewer.setAttribute('aria-modal','true');viewer.setAttribute('aria-labelledby','classroomViewerTitle');
     viewer.innerHTML=`<div class="classroom-viewer-backdrop" data-cr-viewer-close></div><section class="classroom-viewer-dialog"><header class="classroom-viewer-header"><h2 id="classroomViewerTitle" data-cr-viewer-title>Fișier</h2><div class="classroom-viewer-actions"><a class="hub-small-button classroom-viewer-drive" data-cr-viewer-drive target="_blank" rel="noopener noreferrer">Deschide în Drive ↗</a><button class="hub-small-button classroom-viewer-close" type="button" data-cr-viewer-close aria-label="Închide previzualizarea">✕</button></div></header><div class="classroom-viewer-content" data-cr-viewer-content></div></section>`;root.append(viewer);
-    let viewerReturnFocus=null,viewerObjectUrl='',viewerGeneration=0,viewerZoom=1,viewerZoomTarget=null;
+    let viewerReturnFocus=null,viewerObjectUrl='',viewerGeneration=0,viewerZoom=1,viewerZoomTarget=null,viewerMinZoom=1;
     let pinchStartDistance=0,pinchStartZoom=1,pinchWorldX=0,pinchWorldY=0,pinchFrame=0;
     function setViewerZoom(next,focusX=null,focusY=null){
       if(!viewerZoomTarget)return;
       const box=viewer.querySelector('[data-cr-viewer-content]'),oldZoom=viewerZoom;
-      const nextZoom=Math.max(1,Math.min(5,Number(next)||1));
+      const nextZoom=Math.max(viewerMinZoom,Math.min(6,Number(next)||1));
       const rect=box.getBoundingClientRect();
       const localX=focusX==null?box.clientWidth/2:focusX-rect.left;
       const localY=focusY==null?box.clientHeight/2:focusY-rect.top;
@@ -91,9 +91,9 @@
       box.scrollLeft=Math.max(0,worldX*viewerZoom-localX);
       box.scrollTop=Math.max(0,worldY*viewerZoom-localY);
     }
-    function enableViewerZoom(target){viewerZoomTarget=target;viewerZoom=1;target.classList.add('classroom-zoom-target');target.style.transform='scale(1)';target.style.transformOrigin='0 0';target.style.setProperty('--viewer-zoom','1');}
+    function enableViewerZoom(target,minZoom=1,initialZoom=1){viewerZoomTarget=target;viewerMinZoom=Math.max(.1,Math.min(1,Number(minZoom)||1));viewerZoom=Math.max(viewerMinZoom,Number(initialZoom)||1);target.classList.add('classroom-zoom-target');target.style.transform='scale('+viewerZoom+')';target.style.transformOrigin='0 0';target.style.setProperty('--viewer-zoom',String(viewerZoom));}
     function enableFramePinch(frame){disableViewerZoom();}
-    function disableViewerZoom(){if(pinchFrame)cancelAnimationFrame(pinchFrame);pinchFrame=0;viewerZoomTarget=null;viewerZoom=1;pinchStartDistance=0;pinchWorldX=pinchWorldY=0;}
+    function disableViewerZoom(){if(pinchFrame)cancelAnimationFrame(pinchFrame);pinchFrame=0;viewerZoomTarget=null;viewerZoom=1;viewerMinZoom=1;pinchStartDistance=0;pinchWorldX=pinchWorldY=0;}
     function resetViewerContent(){
       disableViewerZoom();
       if(viewerObjectUrl){URL.revokeObjectURL(viewerObjectUrl);viewerObjectUrl='';}
@@ -180,7 +180,7 @@
             const wrap=document.createElement('div');wrap.className='classroom-pdf-page';
             const canvas=document.createElement('canvas'),dpr=Math.max(1,window.devicePixelRatio||1);
             const android=/Android/i.test(navigator.userAgent);
-            const preferredRatio=Math.min(android?5:4,Math.max(android?3.25:2.5,dpr*(android?1.35:1.15))),maxPixels=android?24000000:18000000;
+            const preferredRatio=Math.min(android?6:5,Math.max(android?3.75:3,dpr*(android?1.5:1.3))),maxPixels=android?32000000:26000000;
             const safeRatio=Math.sqrt(maxPixels/Math.max(1,viewport.width*viewport.height));
             const ratio=Math.max(1,Math.min(preferredRatio,safeRatio));
             canvas.width=Math.max(1,Math.floor(viewport.width*ratio));canvas.height=Math.max(1,Math.floor(viewport.height*ratio));
@@ -324,8 +324,16 @@
           const blob=await response.blob();if(generation!==viewerGeneration)return;
           viewerObjectUrl=URL.createObjectURL(blob);
           const stage=document.createElement('div');stage.className='classroom-image-stage';
-          const img=document.createElement('img');img.className='classroom-image-preview';img.alt=name;img.src=viewerObjectUrl;
-          stage.append(img);viewer.querySelector('[data-cr-viewer-content]').replaceChildren(stage);enableViewerZoom(stage);return;
+          const img=document.createElement('img');img.className='classroom-image-preview';img.alt=name;img.src=viewerObjectUrl;img.draggable=false;
+          stage.append(img);const box=viewer.querySelector('[data-cr-viewer-content]');box.replaceChildren(stage);
+          try{await img.decode();}catch{}
+          if(generation!==viewerGeneration)return;
+          const availableW=Math.max(1,box.clientWidth-16),availableH=Math.max(1,box.clientHeight-16);
+          const naturalW=Math.max(1,img.naturalWidth||availableW),naturalH=Math.max(1,img.naturalHeight||availableH);
+          const fit=Math.min(1,availableW/naturalW,availableH/naturalH);
+          img.style.width=naturalW+'px';img.style.maxWidth='none';img.style.height='auto';
+          stage.style.width=Math.max(availableW,naturalW)+'px';stage.style.minHeight=Math.max(availableH,naturalH)+'px';
+          enableViewerZoom(stage,fit,fit);return;
         }
         if(/\.(txt|md|json|xml|log|html?|css|js|ts|py|java|c|cpp|h)$/i.test(name)){
           const text=await response.text();if(generation!==viewerGeneration)return;
