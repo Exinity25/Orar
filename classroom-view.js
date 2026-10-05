@@ -66,11 +66,36 @@
       viewer.classList.remove('hub-hidden');document.body.classList.add('classroom-viewer-open');viewerMessage('Se încarcă fișierul…');viewer.querySelector('.classroom-viewer-close').focus({preventScroll:true});
       if(!token || Date.now()>=expires){viewerMessage('Sesiunea Google a expirat. Închide viewerul și reconectează contul.','alert');return;}
       try{
-        const response=await fetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(fileId)+'?alt=media',{headers:{Authorization:'Bearer '+token},cache:'no-store',credentials:'omit'});
+        const driveScope='https://www.googleapis.com/auth/drive.readonly';
+        if(grantedScopes && !grantedScopes.split(/\s+/).includes(driveScope))throw Error('Tokenul Google actual nu include permisiunea Drive read-only. Deconectează-te și conectează-te din nou; dacă Google nu îți oferă această permisiune, contul de facultate o poate bloca.');
+        const base='https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(fileId);
+        const metadataResponse=await fetch(base+'?fields=id,name,mimeType,capabilities(canDownload),webViewLink',{headers:{Authorization:'Bearer '+token},cache:'no-store',credentials:'omit'});
+        if(generation!==viewerGeneration)return;
+        if(metadataResponse.status===401)throw Error('Sesiunea Google a expirat. Reconectează contul.');
+        if(!metadataResponse.ok){
+          let payload=null;try{payload=await metadataResponse.clone().json();}catch{}
+          const reason=String(payload?.error?.errors?.[0]?.reason || payload?.error?.status || '');
+          const server=String(payload?.error?.message||'');
+          const hay=(reason+' '+server).toLowerCase();
+          if(hay.includes('insufficient') || hay.includes('scope'))throw Error('Contul este conectat, dar tokenul nu are permisiunea Drive read-only. Deconectează-te și conectează-te din nou, apoi acceptă accesul la Google Drive.');
+          if(hay.includes('accessnotconfigured') || hay.includes('api has not been used') || hay.includes('service disabled'))throw Error('Google Drive API nu este activ pentru proiectul OAuth. Activează Google Drive API în proiectul Orar-Classroom.');
+          if(hay.includes('domainpolicy') || hay.includes('admin') || hay.includes('policy'))throw Error('Administratorul contului Google Workspace pare să blocheze accesul acestei aplicații la Drive. Este necesară aprobarea administratorului facultății.');
+          throw Error('Google Drive a refuzat accesul la fișier'+(reason?' ('+reason+')':'')+'.');
+        }
+        const metadata=await metadataResponse.json();
+        if(metadata?.capabilities?.canDownload===false)throw Error('Fișierul poate fi văzut în Google Drive, dar proprietarul sau organizația a dezactivat descărcarea. Din acest motiv nu poate fi afișat local în site.');
+        const response=await fetch(base+'?alt=media',{headers:{Authorization:'Bearer '+token},cache:'no-store',credentials:'omit'});
         if(generation!==viewerGeneration)return;
         if(response.status===401)throw Error('Sesiunea Google a expirat. Reconectează contul.');
-        if(response.status===403)throw Error('Google Drive nu a permis citirea fișierului. Activează Google Drive API și reconectează contul pentru permisiunea Drive read-only.');
-        if(!response.ok)throw Error('Fișierul nu a putut fi descărcat din Google Drive.');
+        if(!response.ok){
+          let payload=null;try{payload=await response.clone().json();}catch{}
+          const reason=String(payload?.error?.errors?.[0]?.reason || payload?.error?.status || '');
+          const server=String(payload?.error?.message||'');
+          const hay=(reason+' '+server).toLowerCase();
+          if(hay.includes('download') || hay.includes('cannotdownload'))throw Error('Google permite vizualizarea fișierului, dar nu permite descărcarea lui pentru acest cont. Viewerul local nu poate ocoli această restricție.');
+          if(hay.includes('insufficient') || hay.includes('scope'))throw Error('Tokenul Google nu are permisiunea Drive read-only. Deconectează-te și conectează-te din nou.');
+          throw Error('Fișierul nu a putut fi descărcat din Google Drive'+(reason?' ('+reason+')':'')+'.');
+        }
         if(/\.pdf$/i.test(name)){
           const blob=await response.blob();if(generation!==viewerGeneration)return;
           viewerObjectUrl=URL.createObjectURL(blob.type==='application/pdf'?blob:new Blob([blob],{type:'application/pdf'}));
@@ -99,7 +124,7 @@
     viewer.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();closeViewer();}});
     const SESSION_KEY='orar_classroom_session_v2',OLD_SESSION_KEY='orar_classroom_session_v1';
     const ACCOUNT_KEY='orar_classroom_account_v1';
-    let token='',expires=0,client=null,courses=[],posts=[],selected=null,loading=false,message='',warning='',generation=0,session=0,expireTimer,visible=false,reauthenticating=false;
+    let token='',expires=0,grantedScopes='',client=null,courses=[],posts=[],selected=null,loading=false,message='',warning='',generation=0,session=0,expireTimer,visible=false,reauthenticating=false;
     const configured=()=>/^[\w.-]+\.apps\.googleusercontent\.com$/.test(window.ORAR_CLASSROOM_CLIENT_ID||'');
     function rememberedAccount(){try{const value=JSON.parse(localStorage.getItem(ACCOUNT_KEY)||'null');return value&&value.email?value:null;}catch{return null;}}
     function renderProfile(account,connected=Boolean(token&&Date.now()<expires)){
@@ -108,15 +133,15 @@
       profile.innerHTML=`<button class="classroom-profile-summary" type="button" data-cr-profile-toggle aria-expanded="false">${picture?`<img src="${esc(picture)}" alt="" referrerpolicy="no-referrer">`:'<span class="classroom-profile-avatar" aria-hidden="true">G</span>'}<span class="classroom-profile-copy"><strong>${esc(account.name||'Cont Google')}</strong><span>${esc(account.email)}</span></span><span class="classroom-profile-chevron" aria-hidden="true">›</span></button><div class="classroom-profile-menu"><div class="classroom-profile-details"><strong>${connected?'Cont Google conectat':'Cont Google memorat'}</strong><span>${esc(account.email)}</span></div><button class="hub-small-button classroom-profile-logout" type="button" data-cr-logout>Deconectează</button></div>`;
       profile.classList.remove('hub-hidden');
     }
-    function saveSession(){try{localStorage.setItem(SESSION_KEY,JSON.stringify({token,expires}));}catch{}}
+    function saveSession(){try{localStorage.setItem(SESSION_KEY,JSON.stringify({token,expires,grantedScopes}));}catch{}}
     function forgetSession(){try{localStorage.removeItem(SESSION_KEY);}catch{}}
     function restoreSession(){
-      try{localStorage.removeItem(OLD_SESSION_KEY);const saved=JSON.parse(localStorage.getItem(SESSION_KEY)||'null');if(saved?.token && Number(saved.expires)>Date.now()+5000){token=saved.token;expires=Number(saved.expires);return true;}forgetSession();}catch{forgetSession();}
+      try{localStorage.removeItem(OLD_SESSION_KEY);const saved=JSON.parse(localStorage.getItem(SESSION_KEY)||'null');if(saved?.token && Number(saved.expires)>Date.now()+5000){token=saved.token;expires=Number(saved.expires);grantedScopes=String(saved.grantedScopes||'');return true;}forgetSession();}catch{forgetSession();}
       return false;
     }
     function scheduleExpiry(){clearTimeout(expireTimer);if(token&&expires>Date.now())expireTimer=setTimeout(()=>clearSession('Sesiunea Google trebuie reînnoită.',false),Math.max(0,expires-Date.now()));}
     function clearSession(text='',forgetAccount=false){
-      closeViewer(false);generation++;session++;clearTimeout(expireTimer);token='';expires=0;forgetSession();courses=[];posts=[];selected=null;loading=false;message=text;warning='';reauthenticating=false;
+      closeViewer(false);generation++;session++;clearTimeout(expireTimer);token='';expires=0;grantedScopes='';forgetSession();courses=[];posts=[];selected=null;loading=false;message=text;warning='';reauthenticating=false;
       if(forgetAccount){try{localStorage.removeItem(ACCOUNT_KEY);}catch{}profile.replaceChildren();profile.classList.add('hub-hidden');}
       else renderProfile(rememberedAccount(),false);
       render();
@@ -131,7 +156,13 @@
       if(!token || Date.now()>=expires){clearSession('Sesiunea Google trebuie reînnoită.',false);throw Error('Sesiunea Google trebuie reînnoită.');}
       const response=await fetch(url,{headers:{Authorization:'Bearer '+token},cache:'no-store',credentials:'omit'});
       if(response.status===401){clearSession('Sesiunea Google trebuie reînnoită.',false);throw Error('Sesiunea Google trebuie reînnoită.');}
-      if(!response.ok)throw Error(response.status===403?'Google nu a permis accesul. Verifică permisiunile acordate și accesul contului la această clasă.':'Nu am putut încărca datele din Classroom. Încearcă din nou.');
+      if(!response.ok){
+        let payload=null;try{payload=await response.clone().json();}catch{}
+        const reason=payload?.error?.errors?.[0]?.reason || payload?.error?.status || '';
+        const serverMessage=payload?.error?.message || '';
+        const error=Error(response.status===403?'Google nu a permis accesul la această secțiune.':'Nu am putut încărca datele din Classroom.');
+        error.status=response.status;error.googleReason=String(reason);error.googleMessage=String(serverMessage);throw error;
+      }
       return response.json();
     }
     async function listAll(path,field,currentGeneration){
@@ -152,12 +183,16 @@
     async function loadCourse(id){
       const course=courses.find(c=>c.id===id);if(!course)return;
       selected=course;posts=[];loading=true;message='';warning='';const g=++generation;render();
-      const definitions=[['courseWorkMaterials','courseWorkMaterial','Material'],['courseWork','courseWork','Temă'],['announcements','announcements','Anunț']];
-      const results=await Promise.allSettled(definitions.map(async([endpoint,field,kind])=>(await listAll('courses/'+encodeURIComponent(id)+'/'+endpoint,field,g)).map(item=>({...item,kind}))));
+      const definitions=[['courseWorkMaterials','courseWorkMaterial','Material','Materiale'],['courseWork','courseWork','Temă','Teme'],['announcements','announcements','Anunț','Anunțuri']];
+      const results=await Promise.allSettled(definitions.map(async([endpoint,field,kind,label])=>({label,items:(await listAll('courses/'+encodeURIComponent(id)+'/'+endpoint,field,g)).map(item=>({...item,kind}))})));
       if(g!==generation)return;
-      const successful=results.filter(r=>r.status==='fulfilled');posts=successful.flatMap(r=>r.value).sort((a,b)=>(b.updateTime||b.creationTime||'').localeCompare(a.updateTime||a.creationTime||''));
-      const errors=results.filter(r=>r.status==='rejected');
-      if(errors.length)warning=successful.length?'Unele secțiuni nu au putut fi încărcate. Poți reîncerca sau deschide clasa în Google Classroom.':errors[0].reason.message;
+      const successful=results.filter(r=>r.status==='fulfilled');posts=successful.flatMap(r=>r.value.items).sort((a,b)=>(b.updateTime||b.creationTime||'').localeCompare(a.updateTime||a.creationTime||''));
+      const failed=results.map((r,i)=>({result:r,label:definitions[i][3]})).filter(x=>x.result.status==='rejected');
+      if(failed.length){
+        const names=failed.map(x=>x.label).join(', '),reasons=[...new Set(failed.map(x=>x.result.reason?.googleReason||'').filter(Boolean))];
+        const detail=reasons.length?' ('+reasons.join(', ')+')':'';
+        warning='Nu s-au putut încărca: '+names+detail+'. Restul datelor clasei sunt afișate normal.';
+      }
       loading=false;render();
     }
     function attachments(post){
@@ -200,7 +235,7 @@
         client=window.google.accounts.oauth2.initTokenClient({client_id:window.ORAR_CLASSROOM_CLIENT_ID,scope:scopes.join(' '),include_granted_scopes:true,
           callback:async response=>{
             if(response.error || !response.access_token){reauthenticating=false;message='Conectarea nu a fost finalizată. Poți încerca din nou.';render();return;}
-            reauthenticating=false;token=response.access_token;expires=Date.now()+Number(response.expires_in||3600)*1000;saveSession();scheduleExpiry();const authSession=++session;
+            reauthenticating=false;token=response.access_token;expires=Date.now()+Number(response.expires_in||3600)*1000;grantedScopes=String(response.scope||'');saveSession();scheduleExpiry();const authSession=++session;
             loadCourses();
             try{const user=await api('https://openidconnect.googleapis.com/v1/userinfo');if(authSession!==session || !token)return;
               const account={name:user.name||'Cont Google',email:user.email||'',picture:safeURL(user.picture)||''};
