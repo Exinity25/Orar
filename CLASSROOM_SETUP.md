@@ -19,7 +19,7 @@ Interfața este pregătită, dar autentificarea nu funcționează până când e
 
 Toate listele sunt paginate până la capăt. Materialele se deschid în Google Drive, Docs, YouTube sau adresa publicată, într-un tab separat; accesul la fișiere rămâne supus permisiunilor contului Google. Nu se pot ocoli aceste permisiuni. O clasă fără permisiuni sau o secțiune inaccesibilă afișează un mesaj, nu materiale inventate.
 
-Tokenul rămâne doar în memoria tabului. Datele Classroom și profilul nu se scriu în localStorage sau în cache-ul service worker-ului. La reîncărcare/expirare poate fi necesară reconectarea. Deconectarea golește interfața și revocă tokenul. Temele locale din Materii sunt separate.
+Tokenul de acces este păstrat numai pentru sesiunea curentă a aplicației (sessionStorage), astfel încât un refresh să nu te deconecteze, și nu este pus în cache-ul service worker-ului. Aplicația memorează local doar datele minime ale contului (nume, e-mail și URL-ul pozei) ca să poată încerca reconectarea cu același cont, fără selectorul de cont, cât timp sesiunea Google este încă activă. Tokenurile Google expiră periodic; la expirare aplicația cere automat un token nou atunci când reintri în Classroom, iar dacă Google nu permite reconectarea fără interacțiune va afișa butonul de continuare. Deconectarea șterge sesiunea și contul memorat și revocă tokenul curent. Temele locale din Materii sunt separate.
 
 ## Validare
 
