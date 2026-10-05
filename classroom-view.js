@@ -51,6 +51,10 @@
       if(viewerZoomTarget){viewerZoomTarget.style.transform='scale('+viewerZoom+')';viewerZoomTarget.style.transformOrigin='top left';}
     }
     function enableViewerZoom(target){viewerZoomTarget=target;viewerZoom=1;setViewerZoom(1);}
+    function enableFramePinch(frame){
+      viewerZoomTarget=frame;viewerZoom=1;
+      frame.style.width='100%';frame.style.height='100%';frame.style.transformOrigin='top left';
+    }
     function disableViewerZoom(){viewerZoomTarget=null;viewerZoom=1;pinchStartDistance=0;}
     function resetViewerContent(){
       disableViewerZoom();
@@ -108,7 +112,7 @@
         if(/\.pdf$/i.test(name)){
           const blob=await response.blob();if(generation!==viewerGeneration)return;
           viewerObjectUrl=URL.createObjectURL(blob.type==='application/pdf'?blob:new Blob([blob],{type:'application/pdf'}));
-          const frame=document.createElement('iframe');frame.className='classroom-local-pdf';frame.title='Previzualizare PDF';frame.src=viewerObjectUrl+'#zoom=page-width';viewer.querySelector('[data-cr-viewer-content]').replaceChildren(frame);return;
+          const frame=document.createElement('iframe');frame.className='classroom-local-pdf';frame.title='Previzualizare PDF';frame.src=viewerObjectUrl+'#zoom=page-width';viewer.querySelector('[data-cr-viewer-content]').replaceChildren(frame);enableFramePinch(frame);return;
         }
         if(/\.xlsx?$/i.test(name)){
           const data=await response.arrayBuffer();if(generation!==viewerGeneration)return;

@@ -644,3 +644,57 @@ body[data-orar-theme] .hub-brand-dot{color:var(--accent-2)!important}
   box-shadow:none!important;
   filter:none!important;
 }
+
+
+/* Floating liquid-glass file controls: document stays unobstructed underneath. */
+.classroom-viewer-dialog{
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+  overflow:visible!important;
+}
+.classroom-viewer-header{
+  position:absolute!important;
+  top:max(12px,env(safe-area-inset-top))!important;
+  left:50%!important;
+  right:auto!important;
+  width:min(760px,calc(100% - 28px))!important;
+  min-height:0!important;
+  z-index:20!important;
+  transform:translateX(-50%)!important;
+  padding:8px 9px 8px 14px!important;
+  border:1px solid rgba(255,255,255,.18)!important;
+  border-radius:22px!important;
+  background:rgba(10,14,23,.68)!important;
+  -webkit-backdrop-filter:blur(18px) saturate(160%)!important;
+  backdrop-filter:blur(18px) saturate(160%)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 10px 30px rgba(0,0,0,.24)!important;
+}
+.classroom-viewer-header>h2{font-size:12px!important;padding-left:2px}
+.classroom-viewer-actions .hub-small-button{
+  background:rgba(255,255,255,.06)!important;
+  -webkit-backdrop-filter:none!important;
+  backdrop-filter:none!important;
+  filter:none!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08)!important;
+}
+.classroom-viewer-content{
+  width:100%!important;
+  height:100%!important;
+  flex:1!important;
+  border-radius:16px!important;
+  overflow:auto!important;
+  touch-action:pan-x pan-y!important;
+}
+.classroom-local-pdf{transform-origin:top left!important}
+@media(max-width:640px){
+  .classroom-viewer-header{
+    top:max(10px,env(safe-area-inset-top))!important;
+    width:calc(100% - 20px)!important;
+    padding:7px 7px 7px 12px!important;
+    border-radius:20px!important;
+  }
+  .classroom-viewer-header>h2{max-width:38vw!important;font-size:11px!important}
+  .classroom-viewer-drive{white-space:nowrap!important}
+  .classroom-viewer-content{border-radius:0!important}
+}
