@@ -134,7 +134,12 @@
         if(googleNative || officeDocument || archive || !localSupported){
           const driveBox=viewer.querySelector('[data-cr-viewer-content]');
           const frame=document.createElement('iframe');frame.className='classroom-drive-office-preview';frame.title='Previzualizare '+name;
-          frame.src='https://drive.google.com/file/d/'+encodeURIComponent(fileId)+'/preview';
+          const encodedId=encodeURIComponent(fileId);
+          const googlePreview=mime==='application/vnd.google-apps.document'?'https://docs.google.com/document/d/'+encodedId+'/preview'
+            :mime==='application/vnd.google-apps.spreadsheet'?'https://docs.google.com/spreadsheets/d/'+encodedId+'/preview'
+            :mime==='application/vnd.google-apps.presentation'?'https://docs.google.com/presentation/d/'+encodedId+'/preview'
+            :'https://drive.google.com/file/d/'+encodedId+'/preview';
+          frame.src=googlePreview;
           frame.setAttribute('allow','clipboard-read; clipboard-write; fullscreen');frame.setAttribute('allowfullscreen','');
           frame.setAttribute('referrerpolicy','no-referrer-when-downgrade');
           driveBox.replaceChildren(frame);disableViewerZoom();return;
