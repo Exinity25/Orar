@@ -937,3 +937,32 @@ body[data-orar-theme] .hub-brand-dot{color:var(--accent-2)!important}
     height:auto;
   }
 }
+
+
+/* Maximum-quality immersive document viewer. Desktop is true viewport fullscreen too. */
+.classroom-viewer{padding:0!important;place-items:stretch!important}
+.classroom-viewer-dialog{
+  position:fixed!important;
+  inset:0!important;
+  width:100vw!important;
+  height:100dvh!important;
+  max-width:none!important;
+  max-height:none!important;
+  border-radius:0!important;
+  padding-top:96px!important;
+}
+.classroom-viewer-content{border-radius:0!important}
+.classroom-pdf-page canvas,
+.classroom-image-preview{
+  image-rendering:auto!important;
+  transform:translateZ(0);
+}
+.classroom-image-stage{background:#0b0d12}
+.classroom-image-preview{
+  max-width:none!important;
+  max-height:none!important;
+  object-fit:contain;
+}
+@media(max-width:640px){
+  .classroom-viewer-dialog{padding-top:132px!important}
+}
