@@ -74,17 +74,26 @@
     const viewer=document.createElement('div');viewer.className='classroom-viewer hub-hidden';viewer.setAttribute('role','dialog');viewer.setAttribute('aria-modal','true');viewer.setAttribute('aria-labelledby','classroomViewerTitle');
     viewer.innerHTML=`<div class="classroom-viewer-backdrop" data-cr-viewer-close></div><section class="classroom-viewer-dialog"><header class="classroom-viewer-header"><h2 id="classroomViewerTitle" data-cr-viewer-title>Fișier</h2><div class="classroom-viewer-actions"><a class="hub-small-button classroom-viewer-drive" data-cr-viewer-drive target="_blank" rel="noopener noreferrer">Deschide în Drive ↗</a><button class="hub-small-button classroom-viewer-close" type="button" data-cr-viewer-close aria-label="Închide previzualizarea">✕</button></div></header><div class="classroom-viewer-content" data-cr-viewer-content></div></section>`;root.append(viewer);
     let viewerReturnFocus=null,viewerObjectUrl='',viewerGeneration=0,viewerZoom=1,viewerZoomTarget=null;
-    let pinchStartDistance=0,pinchStartZoom=1;
-    function setViewerZoom(next){
-      viewerZoom=Math.max(.5,Math.min(2.5,Math.round(next*10)/10));
-      if(viewerZoomTarget){viewerZoomTarget.style.transform='scale('+viewerZoom+')';viewerZoomTarget.style.transformOrigin='top left';}
+    let pinchStartDistance=0,pinchStartZoom=1,pinchWorldX=0,pinchWorldY=0,pinchFrame=0;
+    function setViewerZoom(next,focusX=null,focusY=null){
+      if(!viewerZoomTarget)return;
+      const box=viewer.querySelector('[data-cr-viewer-content]'),oldZoom=viewerZoom;
+      const nextZoom=Math.max(1,Math.min(5,Number(next)||1));
+      const rect=box.getBoundingClientRect();
+      const localX=focusX==null?box.clientWidth/2:focusX-rect.left;
+      const localY=focusY==null?box.clientHeight/2:focusY-rect.top;
+      const worldX=(box.scrollLeft+localX)/Math.max(.001,oldZoom);
+      const worldY=(box.scrollTop+localY)/Math.max(.001,oldZoom);
+      viewerZoom=nextZoom;
+      viewerZoomTarget.style.transform='scale('+viewerZoom+')';
+      viewerZoomTarget.style.transformOrigin='0 0';
+      viewerZoomTarget.style.setProperty('--viewer-zoom',String(viewerZoom));
+      box.scrollLeft=Math.max(0,worldX*viewerZoom-localX);
+      box.scrollTop=Math.max(0,worldY*viewerZoom-localY);
     }
-    function enableViewerZoom(target){viewerZoomTarget=target;viewerZoom=1;setViewerZoom(1);}
-    function enableFramePinch(frame){
-      viewerZoomTarget=frame;viewerZoom=1;
-      frame.style.width='100%';frame.style.height='100%';frame.style.transformOrigin='top left';
-    }
-    function disableViewerZoom(){viewerZoomTarget=null;viewerZoom=1;pinchStartDistance=0;}
+    function enableViewerZoom(target){viewerZoomTarget=target;viewerZoom=1;target.classList.add('classroom-zoom-target');target.style.transform='scale(1)';target.style.transformOrigin='0 0';target.style.setProperty('--viewer-zoom','1');}
+    function enableFramePinch(frame){disableViewerZoom();}
+    function disableViewerZoom(){if(pinchFrame)cancelAnimationFrame(pinchFrame);pinchFrame=0;viewerZoomTarget=null;viewerZoom=1;pinchStartDistance=0;pinchWorldX=pinchWorldY=0;}
     function resetViewerContent(){
       disableViewerZoom();
       if(viewerObjectUrl){URL.revokeObjectURL(viewerObjectUrl);viewerObjectUrl='';}
@@ -170,7 +179,8 @@
             const scale=Math.min(2,available/base.width),viewport=page.getViewport({scale});
             const wrap=document.createElement('div');wrap.className='classroom-pdf-page';
             const canvas=document.createElement('canvas'),dpr=Math.max(1,window.devicePixelRatio||1);
-            const preferredRatio=Math.min(4,Math.max(2.25,dpr)),maxPixels=16000000;
+            const android=/Android/i.test(navigator.userAgent);
+            const preferredRatio=Math.min(android?5:4,Math.max(android?3.25:2.5,dpr*(android?1.35:1.15))),maxPixels=android?24000000:18000000;
             const safeRatio=Math.sqrt(maxPixels/Math.max(1,viewport.width*viewport.height));
             const ratio=Math.max(1,Math.min(preferredRatio,safeRatio));
             canvas.width=Math.max(1,Math.floor(viewport.width*ratio));canvas.height=Math.max(1,Math.floor(viewport.height*ratio));
@@ -344,15 +354,30 @@
     });
     const viewerContent=viewer.querySelector('[data-cr-viewer-content]');
     const touchDistance=touches=>Math.hypot(touches[0].clientX-touches[1].clientX,touches[0].clientY-touches[1].clientY);
+    const touchCenter=touches=>({x:(touches[0].clientX+touches[1].clientX)/2,y:(touches[0].clientY+touches[1].clientY)/2});
     viewerContent.addEventListener('touchstart',e=>{
       if(!viewerZoomTarget||e.touches.length!==2)return;
-      pinchStartDistance=touchDistance(e.touches);pinchStartZoom=viewerZoom;
+      if(pinchFrame)cancelAnimationFrame(pinchFrame);
+      pinchStartDistance=Math.max(1,touchDistance(e.touches));pinchStartZoom=viewerZoom;
+      const center=touchCenter(e.touches),rect=viewerContent.getBoundingClientRect();
+      pinchWorldX=(viewerContent.scrollLeft+center.x-rect.left)/viewerZoom;
+      pinchWorldY=(viewerContent.scrollTop+center.y-rect.top)/viewerZoom;
     },{passive:true});
     viewerContent.addEventListener('touchmove',e=>{
       if(!viewerZoomTarget||e.touches.length!==2||!pinchStartDistance)return;
-      e.preventDefault();setViewerZoom(pinchStartZoom*(touchDistance(e.touches)/pinchStartDistance));
+      e.preventDefault();
+      const distance=touchDistance(e.touches),center=touchCenter(e.touches),nextZoom=Math.max(1,Math.min(5,pinchStartZoom*(distance/pinchStartDistance)));
+      if(pinchFrame)cancelAnimationFrame(pinchFrame);
+      pinchFrame=requestAnimationFrame(()=>{
+        pinchFrame=0;if(!viewerZoomTarget)return;
+        const rect=viewerContent.getBoundingClientRect(),localX=center.x-rect.left,localY=center.y-rect.top;
+        viewerZoom=nextZoom;viewerZoomTarget.style.transform='scale('+viewerZoom+')';viewerZoomTarget.style.transformOrigin='0 0';viewerZoomTarget.style.setProperty('--viewer-zoom',String(viewerZoom));
+        viewerContent.scrollLeft=Math.max(0,pinchWorldX*viewerZoom-localX);
+        viewerContent.scrollTop=Math.max(0,pinchWorldY*viewerZoom-localY);
+      });
     },{passive:false});
-    viewerContent.addEventListener('touchend',e=>{if(e.touches.length<2)pinchStartDistance=0;},{passive:true});
+    viewerContent.addEventListener('touchend',e=>{if(e.touches.length<2){pinchStartDistance=0;if(pinchFrame){cancelAnimationFrame(pinchFrame);pinchFrame=0;}}},{passive:true});
+    viewerContent.addEventListener('touchcancel',()=>{pinchStartDistance=0;if(pinchFrame){cancelAnimationFrame(pinchFrame);pinchFrame=0;}},{passive:true});
     viewer.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();closeViewer();}});
     const SESSION_KEY='orar_classroom_session_v2',OLD_SESSION_KEY='orar_classroom_session_v1';
     const ACCOUNT_KEY='orar_classroom_account_v1';
