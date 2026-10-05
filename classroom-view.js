@@ -50,21 +50,40 @@
     }
     viewer.addEventListener('click',e=>{if(e.target.closest('[data-cr-viewer-close]'))closeViewer();});
     viewer.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();closeViewer();}});
-    function logout(){const old=token;clearSession();if(old && window.google?.accounts?.oauth2)window.google.accounts.oauth2.revoke(old,()=>{});}
+    const SESSION_KEY='orar_classroom_session_v1';
+    const ACCOUNT_KEY='orar_classroom_account_v1';
+    let token='',expires=0,client=null,courses=[],posts=[],selected=null,loading=false,message='',warning='',generation=0,session=0,expireTimer,visible=false,reauthenticating=false;
+    const configured=()=>/^[\w.-]+\.apps\.googleusercontent\.com$/.test(window.ORAR_CLASSROOM_CLIENT_ID||'');
+    function rememberedAccount(){try{const value=JSON.parse(localStorage.getItem(ACCOUNT_KEY)||'null');return value&&value.email?value:null;}catch{return null;}}
+    function renderProfile(account,connected=Boolean(token&&Date.now()<expires)){
+      if(!account?.email){profile.replaceChildren();profile.classList.add('hub-hidden');return;}
+      const picture=safeURL(account.picture||'');
+      profile.innerHTML=`<button class="classroom-profile-summary" type="button" data-cr-profile-toggle aria-expanded="false">${picture?`<img src="${esc(picture)}" alt="" referrerpolicy="no-referrer">`:'<span class="classroom-profile-avatar" aria-hidden="true">G</span>'}<span class="classroom-profile-copy"><strong>${esc(account.name||'Cont Google')}</strong><span>${esc(account.email)}</span></span><span class="classroom-profile-chevron" aria-hidden="true">›</span></button><div class="classroom-profile-menu"><div class="classroom-profile-details"><strong>${connected?'Cont Google conectat':'Cont Google memorat'}</strong><span>${esc(account.email)}</span></div><button class="hub-small-button classroom-profile-logout" type="button" data-cr-logout>Deconectează</button></div>`;
+      profile.classList.remove('hub-hidden');
+    }
+    function saveSession(){try{sessionStorage.setItem(SESSION_KEY,JSON.stringify({token,expires}));}catch{}}
+    function forgetSession(){try{sessionStorage.removeItem(SESSION_KEY);}catch{}}
+    function restoreSession(){
+      try{const saved=JSON.parse(sessionStorage.getItem(SESSION_KEY)||'null');if(saved?.token && Number(saved.expires)>Date.now()+5000){token=saved.token;expires=Number(saved.expires);return true;}forgetSession();}catch{forgetSession();}
+      return false;
+    }
+    function scheduleExpiry(){clearTimeout(expireTimer);if(token&&expires>Date.now())expireTimer=setTimeout(()=>clearSession('Sesiunea Google trebuie reînnoită.',false),Math.max(0,expires-Date.now()));}
+    function clearSession(text='',forgetAccount=false){
+      closeViewer(false);generation++;session++;clearTimeout(expireTimer);token='';expires=0;forgetSession();courses=[];posts=[];selected=null;loading=false;message=text;warning='';reauthenticating=false;
+      if(forgetAccount){try{localStorage.removeItem(ACCOUNT_KEY);}catch{}profile.replaceChildren();profile.classList.add('hub-hidden');}
+      else renderProfile(rememberedAccount(),false);
+      render();
+    }
+    function logout(){const old=token;clearSession('',true);if(old && window.google?.accounts?.oauth2)window.google.accounts.oauth2.revoke(old,()=>{});}
     profile.addEventListener('click',e=>{
       const toggle=e.target.closest('[data-cr-profile-toggle]');
       if(toggle){const open=profile.classList.toggle('is-open');toggle.setAttribute('aria-expanded',String(open));return;}
       if(e.target.closest('[data-cr-logout]'))logout();
     });
-    let token='',expires=0,client=null,courses=[],posts=[],selected=null,loading=false,message='',warning='',generation=0,session=0,expireTimer,visible=false;
-    const configured=()=>/^[\w.-]+\.apps\.googleusercontent\.com$/.test(window.ORAR_CLASSROOM_CLIENT_ID||'');
-    function clearSession(text=''){
-      closeViewer(false);generation++;session++;clearTimeout(expireTimer);token='';expires=0;courses=[];posts=[];selected=null;loading=false;message=text;warning='';profile.replaceChildren();profile.classList.add('hub-hidden');render();
-    }
     async function api(url){
-      if(!token || Date.now()>=expires){clearSession('Sesiunea a expirat. Conectează-te din nou.');throw Error('Sesiunea a expirat. Conectează-te din nou.');}
+      if(!token || Date.now()>=expires){clearSession('Sesiunea Google trebuie reînnoită.',false);throw Error('Sesiunea Google trebuie reînnoită.');}
       const response=await fetch(url,{headers:{Authorization:'Bearer '+token},cache:'no-store',credentials:'omit'});
-      if(response.status===401){clearSession('Sesiunea a expirat. Conectează-te din nou.');throw Error('Sesiunea a expirat. Conectează-te din nou.');}
+      if(response.status===401){clearSession('Sesiunea Google trebuie reînnoită.',false);throw Error('Sesiunea Google trebuie reînnoită.');}
       if(!response.ok)throw Error(response.status===403?'Google nu a permis accesul. Verifică permisiunile acordate și accesul contului la această clasă.':'Nu am putut încărca datele din Classroom. Încearcă din nou.');
       return response.json();
     }
@@ -120,9 +139,9 @@
       </section>`;
     }
     function render(){
-      const signed=Boolean(token && Date.now()<expires);
+      const signed=Boolean(token && Date.now()<expires),remembered=rememberedAccount();
       page.innerHTML=`<div class="hub-content"><header class="hub-page-header"><h1 class="hub-heading" id="classroomHeading" tabindex="-1">Classroom</h1><p class="hub-intro">Clasele și materialele tale, într-un singur loc.</p></header>
-        <div class="classroom-actions">${signed?'<button class="hub-small-button" data-cr-refresh>Actualizează</button>':`<button class="hub-primary" data-cr-signin ${!configured()||!client?'disabled':''}>Conectează contul Google</button>`}${link('https://classroom.google.com/','Deschide Google Classroom')}</div>
+        <div class="classroom-actions">${signed?'<button class="hub-small-button" data-cr-refresh>Actualizează</button>':`<button class="hub-primary" data-cr-signin ${!configured()||!client||reauthenticating?'disabled':''}>${reauthenticating?'Se reconectează…':remembered?'Continuă cu contul Google':'Conectează contul Google'}</button>`}${link('https://classroom.google.com/','Deschide Google Classroom')}</div>
         ${message?`<p class="classroom-notice" role="alert">${esc(message)}</p>`:''}
         ${!configured()?'<div class="classroom-welcome"><h2>Conectarea Google nu este activată încă</h2><p>După activare, aici vei vedea clasele și materialele contului tău.</p></div>':!signed?'<div class="classroom-welcome"><h2>Materialele tale, aproape</h2><p>Conectează-te pentru a vedea clasele, documentele și materialele publicate. Nimic nu va fi modificat în Classroom.</p></div>':''}
         ${signed?`<div class="classroom-courses">${courses.map(courseMarkup).join('')||(!loading?'<p class="hub-empty">Nu există clase vizibile pentru acest cont.</p>':'')}${loading&&!selected?'<p class="classroom-notice" role="status">Se încarcă clasele…</p>':''}</div>`:''}</div>`;
@@ -133,27 +152,39 @@
         await loadGoogle();
         client=window.google.accounts.oauth2.initTokenClient({client_id:window.ORAR_CLASSROOM_CLIENT_ID,scope:scopes.join(' '),include_granted_scopes:true,
           callback:async response=>{
-            if(response.error || !response.access_token){message='Conectarea nu a fost finalizată. Poți încerca din nou.';render();return;}
-            token=response.access_token;expires=Date.now()+Number(response.expires_in||3600)*1000;const authSession=++session;
-            clearTimeout(expireTimer);expireTimer=setTimeout(()=>clearSession('Sesiunea a expirat. Conectează-te din nou.'),Math.max(0,expires-Date.now()));
+            if(response.error || !response.access_token){reauthenticating=false;message='Conectarea nu a fost finalizată. Poți încerca din nou.';render();return;}
+            reauthenticating=false;token=response.access_token;expires=Date.now()+Number(response.expires_in||3600)*1000;saveSession();scheduleExpiry();const authSession=++session;
             loadCourses();
             try{const user=await api('https://openidconnect.googleapis.com/v1/userinfo');if(authSession!==session || !token)return;
-              profile.innerHTML=`<button class="classroom-profile-summary" type="button" data-cr-profile-toggle aria-expanded="false">${safeURL(user.picture)?`<img src="${esc(safeURL(user.picture))}" alt="" referrerpolicy="no-referrer">`:'<span class="classroom-profile-avatar" aria-hidden="true">G</span>'}<span class="classroom-profile-copy"><strong>${esc(user.name||'Cont Google')}</strong><span>${esc(user.email||'')}</span></span><span class="classroom-profile-chevron" aria-hidden="true">›</span></button><div class="classroom-profile-menu"><div class="classroom-profile-details"><strong>Cont Google conectat</strong><span>${esc(user.email||'')}</span></div><button class="hub-small-button classroom-profile-logout" type="button" data-cr-logout>Deconectează</button></div>`;profile.classList.remove('hub-hidden');
-            }catch{/* Profile is optional; course access can still work. */}
-          },error_callback:()=>{message='Fereastra Google a fost închisă sau blocată. Apasă din nou pe conectare.';render();}});
+              const account={name:user.name||'Cont Google',email:user.email||'',picture:safeURL(user.picture)||''};
+              if(account.email){try{localStorage.setItem(ACCOUNT_KEY,JSON.stringify(account));}catch{}renderProfile(account,true);}
+            }catch{renderProfile(rememberedAccount(),true);}
+          },error_callback:()=>{reauthenticating=false;message='Reconectarea Google nu a putut fi făcută automat. Apasă din nou pe conectare.';render();}});
         render();
       }catch(e){message=e.message;render();}
     }
+    function requestAccess(preferRemembered=false){
+      if(!client || reauthenticating)return;
+      const remembered=rememberedAccount();reauthenticating=true;message='';render();
+      const options=preferRemembered&&remembered?{prompt:'',login_hint:remembered.email}:{prompt:'select_account'};
+      try{client.requestAccessToken(options);}catch{reauthenticating=false;render();}
+    }
     page.addEventListener('click',e=>{
       const preview=e.target.closest('[data-cr-preview]');if(preview){openViewer(preview.dataset.crPreview,preview.dataset.crPreviewTitle);return;}
-      if(e.target.closest('[data-cr-signin]') && client)client.requestAccessToken({prompt:'select_account'});
+      if(e.target.closest('[data-cr-signin]') && client)requestAccess(Boolean(rememberedAccount()));
       if(e.target.closest('[data-cr-refresh]'))selected?loadCourse(selected.id):loadCourses();
       const course=e.target.closest('[data-cr-course]');if(course){
         if(selected?.id===course.dataset.crCourse){generation++;selected=null;posts=[];loading=false;warning='';message='';render();}
         else loadCourse(course.dataset.crCourse);
       }
     });
-    render();
-    return {element:page,show(){visible=true;render();prepareSignIn();page.classList.remove('is-entering');void page.offsetWidth;page.classList.add('is-entering');page.querySelector('h1').focus({preventScroll:true});}};
+    const restored=restoreSession();renderProfile(rememberedAccount(),restored);if(restored)scheduleExpiry();
+    render();prepareSignIn();
+    return {element:page,show(){
+      visible=true;render();prepareSignIn();
+      if(token && Date.now()<expires){if(!courses.length&&!loading)loadCourses();}
+      else if(client && rememberedAccount())requestAccess(true);
+      page.classList.remove('is-entering');void page.offsetWidth;page.classList.add('is-entering');page.querySelector('h1').focus({preventScroll:true});
+    }};
   }};
 })();
