@@ -66,7 +66,7 @@
 
     .topbar{
       position:relative;
-      min-height:94px;
+      min-height:132px;
       display:flex;
       align-items:flex-start;
       justify-content:center;
@@ -78,6 +78,14 @@
     }
     h1{margin:0;font-size:clamp(31px,3vw,48px);letter-spacing:.015em;line-height:1;font-weight:900}
     .subtitle{margin-top:12px;font-size:clamp(14px,1.4vw,19px);letter-spacing:.03em;color:#edf0f6}
+    .cloud-sync-button{
+      margin-top:12px;padding:7px 13px;border-radius:999px;border:1px solid rgba(255,255,255,.16);
+      background:rgba(7,10,17,.82);color:#f2f4f8;font-size:11px;font-weight:800;letter-spacing:.035em;
+      box-shadow:0 8px 20px rgba(0,0,0,.24);cursor:pointer;transition:.18s ease;
+    }
+    .cloud-sync-button:hover:not(:disabled){transform:translateY(-1px);border-color:rgba(255,255,255,.3)}
+    .cloud-sync-button:disabled{opacity:.55;cursor:default}
+    body[data-orar-theme="ice"] .cloud-sync-button{background:rgba(255,255,255,.94);color:#111827;border-color:#0f234126}
     .save-state{display:none}
 
     .footer-mark{display:flex;justify-content:center;align-items:center;margin-top:18px;margin-bottom:4px;user-select:none;pointer-events:none}
@@ -425,9 +433,9 @@
 
     @media (max-width:900px), (hover:none) and (pointer:coarse){
       .app{height:100svh;padding:calc(12px + env(safe-area-inset-top)) 10px calc(28px + env(safe-area-inset-bottom));width:100%;overflow-y:auto;overflow-x:hidden}
-      .topbar{min-height:150px;align-items:flex-start}
+      .topbar{min-height:184px;align-items:flex-start}
       .title-wrap{padding:56px 56px 0;max-width:100%}
-      h1{font-size:32px}.subtitle{font-size:13px;margin-top:8px}.save-state{font-size:9px}
+      h1{font-size:32px}.subtitle{font-size:13px;margin-top:8px}.cloud-sync-button{margin-top:10px;padding:6px 12px;font-size:10px}.save-state{font-size:9px}
       .edit-toggle{width:48px;height:48px;top:max(12px,env(safe-area-inset-top));right:max(12px,env(safe-area-inset-right))}
       .edit-toggle,.day-tab,.class-card,.add-class,.delete-class{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
       .edit-toggle{position:fixed;z-index:9999;pointer-events:auto}
@@ -711,6 +719,7 @@
       <div class="title-wrap">
         <h1 id="scheduleTitle" data-placeholder="Titlu orar">C_11/1</h1>
         <div class="subtitle" id="scheduleSubtitle" data-placeholder="Subtitlu opțional">Facultatea de Inginerie</div>
+        <button class="cloud-sync-button" id="cloudSyncButton" type="button">Cloud sync</button>
         <div class="save-state" id="saveState" aria-hidden="true"></div>
       </div>
     </header>
@@ -798,6 +807,7 @@
     const grid = document.getElementById('scheduleGrid');
     const scheduleTitle = document.getElementById('scheduleTitle');
     const scheduleSubtitle = document.getElementById('scheduleSubtitle');
+    const cloudSyncButton = document.getElementById('cloudSyncButton');
     const editToggle = document.getElementById('editToggle');
     const saveState = document.getElementById('saveState');
     const mobileTabs = document.getElementById('mobileTabs');
@@ -1460,6 +1470,23 @@
     document.getElementById('weekToggle').addEventListener('click', () => selectWeek(oppositeWeek(selectedWeek)));
     undoToggle.addEventListener('click', undoLastChange);
     redoToggle.addEventListener('click', redoLastChange);
+    cloudSyncButton.addEventListener('click',()=>{
+      if(cloudSyncButton.disabled)return;
+      cloudSyncButton.disabled=true;
+      cloudSyncButton.textContent='Se sincronizează…';
+      window.dispatchEvent(new CustomEvent('orar-cloud-sync-request'));
+      setTimeout(()=>{
+        if(!cloudSyncButton.disabled)return;
+        cloudSyncButton.disabled=false;
+        cloudSyncButton.textContent='Cloud sync';
+      },8000);
+    });
+    window.addEventListener('orar-cloud-sync-result',event=>{
+      cloudSyncButton.disabled=false;
+      cloudSyncButton.textContent='Cloud sync';
+      const detail=event.detail||{};
+      showToast(detail.message||(detail.ok?'Sincronizare finalizată':'Sincronizarea nu a reușit'));
+    });
 
     editToggle.addEventListener('click', () => {
       if(editing) saveData('Salvat');
