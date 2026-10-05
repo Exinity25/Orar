@@ -1,4 +1,4 @@
-const CACHE = 'orar-v41-pdf-links-image-fit';
+const CACHE = 'orar-v42-local-office-stable-images';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './student-hub.css', './student-hub.js', './classroom-config.js', './classroom-view.js'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
