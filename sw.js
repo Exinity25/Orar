@@ -1,4 +1,4 @@
-const CACHE = 'orar-v25-classroom-accordion-landscape';
+const CACHE = 'orar-v26-classroom-session';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './student-hub.css', './student-hub.js', './classroom-config.js', './classroom-view.js'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
