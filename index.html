@@ -624,6 +624,37 @@
     .note-panel{animation:note-reveal 300ms cubic-bezier(.22,1,.36,1) both;transform-origin:top;will-change:transform,opacity}
     @keyframes note-reveal{0%{opacity:0;transform:translateY(-9px) scaleY(.955)}55%{opacity:.78;transform:translateY(-2px) scaleY(.992)}100%{opacity:1;transform:translateY(0) scaleY(1)}}
     @media(prefers-reduced-motion:reduce){button,.day-tab,.class-card,.week-toggle svg{transition:none!important}.note-panel,.note-open-slot{animation:none!important}}
+  
+    /* Theme accents follow the selected app theme across timetable controls. */
+    body[data-orar-theme] .type-row,
+    body[data-orar-theme] .pair-tag,
+    body[data-orar-theme] .week-tag,
+    body[data-orar-theme] .week-mark,
+    body[data-orar-theme] .meta-icon,
+    body[data-orar-theme] .edit-select{color:var(--accent-2)!important}
+    body[data-orar-theme] .edit-input:focus,
+    body[data-orar-theme] .edit-select:focus{border-color:var(--accent-2)!important;box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent)!important}
+    body[data-orar-theme] .edit-toggle{background:linear-gradient(145deg,var(--accent),var(--accent-2))!important;box-shadow:0 0 18px color-mix(in srgb,var(--accent) 46%,transparent),0 10px 28px rgba(0,0,0,.3)!important}
+    body[data-orar-theme] .add-class:hover{border-color:var(--accent-2)!important;background:color-mix(in srgb,var(--accent) 10%,transparent)!important}
+    body[data-orar-theme] .toast{border-color:color-mix(in srgb,var(--accent-2) 34%,rgba(255,255,255,.12))!important;box-shadow:0 10px 30px rgba(0,0,0,.3),0 0 20px color-mix(in srgb,var(--accent) 18%,transparent)!important}
+    body[data-orar-theme="ice"] .type-row,
+    body[data-orar-theme="ice"] .pair-tag,
+    body[data-orar-theme="ice"] .week-tag,
+    body[data-orar-theme="ice"] .week-mark,
+    body[data-orar-theme="ice"] .meta-icon,
+    body[data-orar-theme="ice"] .edit-select{color:#2563eb!important}
+
+    /* Landscape edit mode: use the card width while reserving a safe rail for X + color picker. */
+    @media (max-width:960px) and (orientation:landscape){
+      body.editing .class-card{padding-right:34px}
+      body.editing .edit-fields{padding-right:0!important}
+      body.editing .edit-input,
+      body.editing .edit-select{width:100%!important;max-width:none!important}
+      body.editing .card-color-picker{right:7px}
+      body.editing .delete-class{right:7px}
+      body.editing .card-color-picker[open] .card-color-menu{right:0}
+    }
+
   </style>
   <link rel="stylesheet" href="./student-hub.css">
 </head>
@@ -1154,7 +1185,7 @@
             <details class="card-color-picker">
               <summary class="card-color-trigger card-color-dot-${tone}" aria-label="Alege culoarea accentului. Culoarea actuală: ${CARD_TONE_LABELS[tone]}" title="Culoare: ${CARD_TONE_LABELS[tone]}"></summary>
               <div class="card-color-menu" role="menu" aria-label="Culoare accent card">
-                ${CARD_TONES.map(v=>v==='default'?`<button class="card-color-option card-color-option-default" type="button" role="menuitemradio" aria-label="Default" aria-checked="${tone===v?'true':'false'}" data-card-color="${v}" data-key="${key}"><span class="card-color-default-box">Default</span></button>`:`<button class="card-color-option" type="button" role="menuitemradio" aria-label="${CARD_TONE_LABELS[v]}" title="${CARD_TONE_LABELS[v]}" aria-checked="${tone===v?'true':'false'}" data-card-color="${v}" data-key="${key}"><span class="card-color-swatch card-color-dot-${v}" aria-hidden="true"></span></button>`).join('')}
+                ${CARD_TONES.map(v=>v==='default'?`<button class="card-color-option card-color-option-default" type="button" role="menuitemradio" aria-label="Fără culoare personalizată" aria-checked="${tone===v?'true':'false'}" data-card-color="${v}" data-key="${key}"><span class="card-color-default-box" aria-hidden="true">×</span></button>`:`<button class="card-color-option" type="button" role="menuitemradio" aria-label="${CARD_TONE_LABELS[v]}" title="${CARD_TONE_LABELS[v]}" aria-checked="${tone===v?'true':'false'}" data-card-color="${v}" data-key="${key}"><span class="card-color-swatch card-color-dot-${v}" aria-hidden="true"></span></button>`).join('')}
               </div>
             </details>
             <input class="edit-input subject-input" data-field="subject" data-key="${key}" value="${escapeHtml(item.subject)}" aria-label="Materia">
