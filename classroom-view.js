@@ -43,9 +43,18 @@
     const page=document.createElement('main');page.id='hubClassroomPage';page.className='hub-page hub-hidden';page.setAttribute('aria-labelledby','classroomHeading');root.append(page);
     const profile=document.createElement('div');profile.className='classroom-profile hub-hidden';root.querySelector('.hub-drawer').append(profile);
     const viewer=document.createElement('div');viewer.className='classroom-viewer hub-hidden';viewer.setAttribute('role','dialog');viewer.setAttribute('aria-modal','true');viewer.setAttribute('aria-labelledby','classroomViewerTitle');
-    viewer.innerHTML=`<div class="classroom-viewer-backdrop" data-cr-viewer-close></div><section class="classroom-viewer-dialog"><header class="classroom-viewer-header"><h2 id="classroomViewerTitle" data-cr-viewer-title>Fișier</h2><div class="classroom-viewer-actions"><a class="hub-small-button classroom-viewer-drive" data-cr-viewer-drive target="_blank" rel="noopener noreferrer">Deschide în Drive ↗</a><button class="hub-small-button classroom-viewer-close" type="button" data-cr-viewer-close aria-label="Închide previzualizarea">✕</button></div></header><div class="classroom-viewer-content" data-cr-viewer-content></div></section>`;root.append(viewer);
-    let viewerReturnFocus=null,viewerObjectUrl='',viewerGeneration=0;
+    viewer.innerHTML=`<div class="classroom-viewer-backdrop" data-cr-viewer-close></div><section class="classroom-viewer-dialog"><header class="classroom-viewer-header"><h2 id="classroomViewerTitle" data-cr-viewer-title>Fișier</h2><div class="classroom-viewer-actions"><div class="classroom-viewer-zoom" data-cr-viewer-zoom hidden><button class="hub-small-button" type="button" data-cr-zoom-out aria-label="Micșorează">−</button><span data-cr-zoom-label>100%</span><button class="hub-small-button" type="button" data-cr-zoom-in aria-label="Mărește">+</button></div><a class="hub-small-button classroom-viewer-drive" data-cr-viewer-drive target="_blank" rel="noopener noreferrer">Deschide în Drive ↗</a><button class="hub-small-button classroom-viewer-close" type="button" data-cr-viewer-close aria-label="Închide previzualizarea">✕</button></div></header><div class="classroom-viewer-content" data-cr-viewer-content></div></section>`;root.append(viewer);
+    let viewerReturnFocus=null,viewerObjectUrl='',viewerGeneration=0,viewerZoom=1,viewerZoomTarget=null;
+    const zoomBox=viewer.querySelector('[data-cr-viewer-zoom]'),zoomLabel=viewer.querySelector('[data-cr-zoom-label]');
+    function setViewerZoom(next){
+      viewerZoom=Math.max(.5,Math.min(2.5,Math.round(next*10)/10));
+      if(viewerZoomTarget){viewerZoomTarget.style.transform='scale('+viewerZoom+')';viewerZoomTarget.style.transformOrigin='top left';}
+      if(zoomLabel)zoomLabel.textContent=Math.round(viewerZoom*100)+'%';
+    }
+    function enableViewerZoom(target){viewerZoomTarget=target;viewerZoom=1;zoomBox.hidden=false;setViewerZoom(1);}
+    function disableViewerZoom(){viewerZoomTarget=null;viewerZoom=1;zoomBox.hidden=true;if(zoomLabel)zoomLabel.textContent='100%';}
     function resetViewerContent(){
+      disableViewerZoom();
       if(viewerObjectUrl){URL.revokeObjectURL(viewerObjectUrl);viewerObjectUrl='';}
       viewer.querySelector('[data-cr-viewer-content]').replaceChildren();
     }
@@ -100,7 +109,7 @@
         if(/\.pdf$/i.test(name)){
           const blob=await response.blob();if(generation!==viewerGeneration)return;
           viewerObjectUrl=URL.createObjectURL(blob.type==='application/pdf'?blob:new Blob([blob],{type:'application/pdf'}));
-          const frame=document.createElement('iframe');frame.className='classroom-local-pdf';frame.title='Previzualizare PDF';frame.src=viewerObjectUrl;viewer.querySelector('[data-cr-viewer-content]').replaceChildren(frame);return;
+          const frame=document.createElement('iframe');frame.className='classroom-local-pdf';frame.title='Previzualizare PDF';frame.src=viewerObjectUrl+'#zoom=page-width';viewer.querySelector('[data-cr-viewer-content]').replaceChildren(frame);return;
         }
         if(/\.xlsx?$/i.test(name)){
           const data=await response.arrayBuffer();if(generation!==viewerGeneration)return;
@@ -213,14 +222,18 @@
             const wrap=document.createElement('div');wrap.className='classroom-excel-scroll';wrap.append(table);
             const fragment=document.createDocumentFragment();
             if(workbook.SheetNames.length>1){const select=document.createElement('select');select.className='classroom-sheet-select';select.setAttribute('aria-label','Alege foaia Excel');workbook.SheetNames.forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;o.selected=n===sheetName;select.append(o);});select.addEventListener('change',()=>renderSheet(select.value));fragment.append(select);}
-            fragment.append(wrap);if(range.e.r>endRow||range.e.c>endCol){const note=document.createElement('p');note.className='classroom-viewer-limit';note.textContent='Fișier mare: sunt afișate maximum '+maxRows+' rânduri și '+maxCols+' coloane.';fragment.append(note);}box.replaceChildren(fragment);
+            fragment.append(wrap);if(range.e.r>endRow||range.e.c>endCol){const note=document.createElement('p');note.className='classroom-viewer-limit';note.textContent='Fișier mare: sunt afișate maximum '+maxRows+' rânduri și '+maxCols+' coloane.';fragment.append(note);}box.replaceChildren(fragment);enableViewerZoom(table);
           };
           renderSheet(workbook.SheetNames[0]);return;
         }
         throw Error('Acest tip de fișier nu are viewer local.');
       }catch(error){if(generation===viewerGeneration)viewerMessage(error?.message||'Nu am putut afișa fișierul.','alert');}
     }
-    viewer.addEventListener('click',e=>{if(e.target.closest('[data-cr-viewer-close]'))closeViewer();});
+    viewer.addEventListener('click',e=>{
+      if(e.target.closest('[data-cr-viewer-close]')){closeViewer();return;}
+      if(e.target.closest('[data-cr-zoom-in]')){setViewerZoom(viewerZoom+.1);return;}
+      if(e.target.closest('[data-cr-zoom-out]')){setViewerZoom(viewerZoom-.1);return;}
+    });
     viewer.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();closeViewer();}});
     const SESSION_KEY='orar_classroom_session_v2',OLD_SESSION_KEY='orar_classroom_session_v1';
     const ACCOUNT_KEY='orar_classroom_account_v1';
