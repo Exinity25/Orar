@@ -98,8 +98,45 @@
         const sorted=[...tasks].sort((a,b)=>Number(Boolean(a.done))-Number(Boolean(b.done)) || (validDate(a.deadline)||'9999').localeCompare(validDate(b.deadline)||'9999'));
         return `<details class="hub-subject" data-subject-id="${esc(id)}" ${openSubjects.has(id)?'open':''}><summary><span class="hub-icon hub-subject-mark">${icons.book}</span><span class="hub-subject-name"><strong>${esc(name)}</strong><small>${current?count+(count===1?' activitate în orar':' activități în orar'):'Păstrată dintr-un orar anterior'} · ${pending?pending+(pending===1?' temă de făcut':' teme de făcut'):'Nicio temă în așteptare'}</small></span><span class="hub-chevron" aria-hidden="true">›</span></summary><div class="hub-subject-body"><ul class="hub-tasks">${sorted.map(task=>taskMarkup(task,id)).join('')}</ul>${tasks.length?'':'<p class="hub-empty">Adaugă prima temă pentru această materie.</p>'}<form class="hub-form"><label for="hubTaskText${index}">${draft.editing?'Editează tema':'Temă nouă'}<textarea id="hubTaskText${index}" name="text" placeholder="Ce ai de pregătit?" required maxlength="5000">${esc(draft.text)}</textarea></label><div class="hub-form-footer"><label for="hubTaskDate${index}">Termen<input id="hubTaskDate${index}" type="date" name="deadline" value="${esc(draft.deadline)}"></label><button class="hub-primary" type="submit">${draft.editing?'Salvează':'Adaugă tema'}</button>${draft.editing?'<button class="hub-small-button" type="button" data-task-cancel>Anulează</button>':''}</div></form></div></details>`;
       }).join('') || '<p class="hub-empty">'+(search?'Nu am găsit această materie.':'Adaugă materiile în orar, iar ele vor apărea aici.')+'</p>';
-      list.querySelectorAll('details').forEach(el=>el.addEventListener('toggle',()=>{if(!el.isConnected)return;el.open?openSubjects.add(el.dataset.subjectId):openSubjects.delete(el.dataset.subjectId);}));
+      list.querySelectorAll('details').forEach(el=>{wireSubjectMotion(el);el.addEventListener('toggle',()=>{if(!el.isConnected || subjectMotions.has(el))return;el.open?openSubjects.add(el.dataset.subjectId):openSubjects.delete(el.dataset.subjectId);});});
     };
+
+    const subjectMotions = new WeakMap();
+    function wireSubjectMotion(details){
+      const summary=details.querySelector('summary'), panel=details.querySelector('.hub-subject-body');
+      summary.addEventListener('click',e=>{
+        e.preventDefault();
+        const previous=subjectMotions.get(details);
+        const opening=previous ? !previous.opening : !details.open;
+        const from=details.getBoundingClientRect().height;
+        const opacity=getComputedStyle(panel).opacity;
+        if(previous)previous.animations.forEach(a=>a.cancel());
+        const id=details.dataset.subjectId;
+        opening?openSubjects.add(id):openSubjects.delete(id);
+        const reduce=window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if(reduce || !details.animate){
+          subjectMotions.delete(details);details.style.height='';details.style.willChange='';details.open=opening;return;
+        }
+        details.style.height='';details.open=true;
+        const border=parseFloat(getComputedStyle(details).borderTopWidth)+parseFloat(getComputedStyle(details).borderBottomWidth);
+        const to=opening ? details.scrollHeight+border : summary.getBoundingClientRect().height+border;
+        details.style.height=from+'px';details.style.willChange='height';
+        const height=details.animate([{height:from+'px'},{height:to+'px'}],
+          {duration:opening?240:220,easing:'cubic-bezier(.2,.8,.2,1)',fill:'forwards'});
+        const fade=panel.animate([
+          {opacity:previous?opacity:(opening?0:1),transform:opening?'translateY(-4px)':'translateY(0)'},
+          {opacity:opening?1:0,transform:opening?'translateY(0)':'translateY(-4px)'}
+        ],{duration:opening?180:150,easing:'ease-out',fill:'forwards'});
+        const state={opening,animations:[height,fade]};subjectMotions.set(details,state);
+        Promise.allSettled(state.animations.map(a=>a.finished)).then(()=>{
+          if(subjectMotions.get(details)!==state)return;
+          subjectMotions.delete(details);details.open=opening;
+          details.style.height='';details.style.willChange='';
+          state.animations.forEach(a=>a.cancel());
+        });
+      });
+    }
+
     const closeMenu = (restore=true) => {
       layer.classList.remove('is-open');layer.setAttribute('aria-hidden','true');layer.inert=true;
       menu.setAttribute('aria-expanded','false');app.inert=false;page.inert=false;classroom.element.inert=false;menu.inert=false;
