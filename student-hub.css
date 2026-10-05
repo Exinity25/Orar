@@ -988,3 +988,10 @@ body[data-orar-theme] .hub-brand-dot{color:var(--accent-2)!important}
   text-underline-offset:2px;
   cursor:pointer;
 }
+
+
+/* Keep PDF annotation hit targets above the rendered canvas at every zoom level. */
+.classroom-pdf-page{isolation:isolate}
+.classroom-pdf-page canvas{position:relative;z-index:1}
+.classroom-pdf-links{z-index:4!important}
+.classroom-pdf-link{-webkit-tap-highlight-color:rgba(59,130,246,.18);touch-action:manipulation}
