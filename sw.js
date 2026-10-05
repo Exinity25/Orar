@@ -1,4 +1,4 @@
-const CACHE = 'orar-v35-profile-google-login';
+const CACHE = 'orar-v36-smooth-hq-viewers';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './student-hub.css', './student-hub.js', './classroom-config.js', './classroom-view.js'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
