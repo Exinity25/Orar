@@ -785,8 +785,8 @@
       return ICONS.course;
     }
 
-    const CARD_TONES=['default','red','green','blue','yellow','orange'];
-    const CARD_TONE_LABELS={default:'DEFAULT',red:'ROȘU',green:'VERDE',blue:'ALBASTRU',yellow:'GALBEN',orange:'PORTOCALIU'};
+    const CARD_TONES=['default','red','green','blue','yellow','orange','violet'];
+    const CARD_TONE_LABELS={default:'THEME DEFAULT',red:'ROȘU',green:'VERDE',blue:'ALBASTRU',yellow:'GALBEN',orange:'PORTOCALIU',violet:'VIOLET'};
     function cardTone(item){
       const value=String(item?.cardColor||'default').toLowerCase();
       return CARD_TONES.includes(value)?value:'default';
@@ -1151,7 +1151,12 @@
                 ${['MEREU','PARĂ','IMPARĂ'].map(v=>`<option ${data.classes[key].alternate && v==='MEREU'?'disabled':''} value="${v}" ${(item.week || (item.pair?'PARĂ':'MEREU'))===v?'selected':''}>${v}</option>`).join('')}
               </select>
             </div>
-            <button class="card-color-cycle card-color-dot-${tone}" type="button" data-card-color-cycle="${key}" aria-label="Culoare card: ${CARD_TONE_LABELS[tone]}. Apasă pentru următoarea culoare." title="Culoare: ${CARD_TONE_LABELS[tone]}"></button>
+            <details class="card-color-picker">
+              <summary class="card-color-trigger card-color-dot-${tone}" aria-label="Alege culoarea accentului. Culoarea actuală: ${CARD_TONE_LABELS[tone]}" title="Culoare: ${CARD_TONE_LABELS[tone]}"></summary>
+              <div class="card-color-menu" role="menu" aria-label="Culoare accent card">
+                ${CARD_TONES.map(v=>`<button type="button" role="menuitemradio" aria-checked="${tone===v?'true':'false'}" data-card-color="${v}" data-key="${key}"><span class="card-color-swatch card-color-dot-${v}" aria-hidden="true"></span><span>${CARD_TONE_LABELS[v]}</span></button>`).join('')}
+              </div>
+            </details>
             <input class="edit-input subject-input" data-field="subject" data-key="${key}" value="${escapeHtml(item.subject)}" aria-label="Materia">
             <div class="edit-meta">
               <span class="meta-icon">${ICONS.person}</span>
@@ -1183,7 +1188,7 @@
     function renderNotePanel(item,key){
       return `<div class="note-panel" data-note-panel="${key}">
         <div class="note-top">
-          <span class="note-label">De făcut</span>
+          <span class="note-label"><span class="note-label-default">De făcut</span><span class="note-label-landscape">Termen</span></span>
           <label class="deadline-wrap">
             <span class="deadline-label">Termen</span>
             <input class="deadline-input" type="date" data-deadline="${key}" value="${escapeHtml(item.deadline || '')}" aria-label="Data limită">
@@ -1268,12 +1273,19 @@
         });
       });
 
-      grid.querySelectorAll('[data-card-color-cycle]').forEach(btn => {
+      grid.querySelectorAll('.card-color-picker').forEach(picker => {
+        picker.addEventListener('toggle',()=>{
+          if(!picker.open)return;
+          grid.querySelectorAll('.card-color-picker[open]').forEach(other=>{if(other!==picker)other.open=false;});
+        });
+      });
+      grid.querySelectorAll('[data-card-color]').forEach(btn => {
         btn.addEventListener('click', e => {
           e.stopPropagation();
-          const key=btn.dataset.cardColorCycle,item=activeItem(key);if(!item)return;
-          const current=cardTone(item),next=CARD_TONES[(CARD_TONES.indexOf(current)+1)%CARD_TONES.length];
-          item.cardColor=next;saveData('Culoare salvată');render();
+          const key=btn.dataset.key,item=activeItem(key);if(!item)return;
+          item.cardColor=btn.dataset.cardColor;
+          saveData('Culoare salvată');
+          render();
         });
       });
 
