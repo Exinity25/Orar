@@ -9,7 +9,7 @@
     calendar:svg('<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4m10-4v4M3 11h18m-13 4h2m4 0h2"/>'),
     book:svg('<path d="M12 5v15M3 4h5a4 4 0 0 1 4 2 4 4 0 0 1 4-2h5v15h-5a5 5 0 0 0-4 2 5 5 0 0 0-4-2H3Z"/>'),
     classroom:svg('<rect x="3" y="4" width="18" height="15" rx="2"/><circle cx="12" cy="10" r="2"/><path d="M8 16c0-4 8-4 8 0M7 22h10"/>'),
-    customize:svg('<path d="m14.5 4.5 5 5"/><path d="M13.2 5.8 4.8 14.2c-1.1 1.1-1.3 2.4-1.3 4.3 1.9 0 3.2-.2 4.3-1.3l8.4-8.4"/><path d="M3.5 18.5c1.2.1 2.2.6 2.8 1.5"/>')
+    customize:svg('<path d="M4 20h4l11-11-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/><path d="M4 16l4 4"/>')
   };
   let initialized = false;
   window.OrarStudentHub = {init({getSchedule}) {
