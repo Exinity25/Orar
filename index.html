@@ -659,6 +659,24 @@
     .note-panel{animation:note-reveal 300ms cubic-bezier(.22,1,.36,1) both;transform-origin:top;will-change:transform,opacity}
     @keyframes note-reveal{0%{opacity:0;transform:translateY(-9px) scaleY(.955)}55%{opacity:.78;transform:translateY(-2px) scaleY(.992)}100%{opacity:1;transform:translateY(0) scaleY(1)}}
     @media(prefers-reduced-motion:reduce){button,.day-tab,.class-card,.week-toggle svg{transition:none!important}.note-panel,.note-open-slot{animation:none!important}}
+
+    /* Desktop notes: animate only the clicked timetable cell, never the whole CSS-grid row. */
+    @media(min-width:901px) and (hover:hover) and (pointer:fine){
+      .schedule-grid{align-items:start}
+      .schedule-grid .time-cell,
+      .schedule-grid .slot-cell{align-self:start}
+      .schedule-grid .note-open-slot,
+      .schedule-grid .slot-cell:has(.class-card[aria-expanded="true"]){
+        min-height:var(--row-height)!important;
+        height:auto;
+        overflow:visible;
+        animation:none!important;
+      }
+      .schedule-grid .class-card[aria-expanded="true"]{
+        min-height:var(--row-height);
+        height:auto;
+      }
+    }
   
     /* Theme accents follow the selected app theme across timetable controls. */
     body[data-orar-theme] .type-row,
