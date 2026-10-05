@@ -966,3 +966,25 @@ body[data-orar-theme] .hub-brand-dot{color:var(--accent-2)!important}
 @media(max-width:640px){
   .classroom-viewer-dialog{padding-top:132px!important}
 }
+
+
+/* Interactive links inside local document viewers. */
+.classroom-pdf-page{position:relative}
+.classroom-pdf-links{position:absolute;inset:0;pointer-events:none}
+.classroom-pdf-link{
+  position:absolute;
+  display:block;
+  pointer-events:auto;
+  cursor:pointer;
+  border-radius:3px;
+  background:transparent;
+  outline:none;
+}
+.classroom-pdf-link:hover{background:rgba(64,128,255,.12);box-shadow:inset 0 0 0 1px rgba(80,145,255,.28)}
+.classroom-pdf-link:focus-visible{background:rgba(64,128,255,.16);box-shadow:inset 0 0 0 2px rgba(90,155,255,.7)}
+.classroom-docx-document a,.classroom-text-preview a,.classroom-excel-table a{
+  color:#3b82f6;
+  text-decoration:underline;
+  text-underline-offset:2px;
+  cursor:pointer;
+}
