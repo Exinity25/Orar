@@ -1000,10 +1000,13 @@ body[data-orar-theme] .hub-brand-dot{color:var(--accent-2)!important}
 /* Stable image interaction: pinch is handled by the viewer; taps/double-taps never trigger browser zoom. */
 .classroom-image-stage,
 .classroom-image-preview{
-  touch-action:manipulation!important;
+  touch-action:pan-x pan-y!important;
   -webkit-touch-callout:none!important;
   user-select:none!important;
 }
 .classroom-image-preview{
   cursor:default!important;
 }
+
+.classroom-image-zoom-controls{display:flex;gap:4px;align-items:center}
+.classroom-viewer-content.has-local-zoom{touch-action:pan-x pan-y!important}

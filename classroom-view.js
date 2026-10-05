@@ -91,11 +91,12 @@
       box.scrollLeft=Math.max(0,worldX*viewerZoom-localX);
       box.scrollTop=Math.max(0,worldY*viewerZoom-localY);
     }
-    function enableViewerZoom(target,minZoom=1,initialZoom=1){viewerZoomTarget=target;viewerMinZoom=Math.max(.1,Math.min(1,Number(minZoom)||1));viewerZoom=Math.max(viewerMinZoom,Number(initialZoom)||1);target.classList.add('classroom-zoom-target');target.style.transform='scale('+viewerZoom+')';target.style.transformOrigin='0 0';target.style.setProperty('--viewer-zoom',String(viewerZoom));}
+    function enableViewerZoom(target,minZoom=1,initialZoom=1){viewer.querySelector('[data-cr-viewer-content]').classList.add('has-local-zoom');viewerZoomTarget=target;viewerMinZoom=Math.max(.1,Math.min(1,Number(minZoom)||1));viewerZoom=Math.max(viewerMinZoom,Number(initialZoom)||1);target.classList.add('classroom-zoom-target');target.style.transform='scale('+viewerZoom+')';target.style.transformOrigin='0 0';target.style.setProperty('--viewer-zoom',String(viewerZoom));}
     function enableFramePinch(frame){disableViewerZoom();}
-    function disableViewerZoom(){if(pinchFrame)cancelAnimationFrame(pinchFrame);pinchFrame=0;viewerZoomTarget=null;viewerZoom=1;viewerMinZoom=1;pinchStartDistance=0;pinchWorldX=pinchWorldY=0;}
+    function disableViewerZoom(){viewer.querySelector('[data-cr-viewer-content]').classList.remove('has-local-zoom');if(pinchFrame)cancelAnimationFrame(pinchFrame);pinchFrame=0;viewerZoomTarget=null;viewerZoom=1;viewerMinZoom=1;pinchStartDistance=0;pinchWorldX=pinchWorldY=0;}
     function resetViewerContent(){
       disableViewerZoom();
+      viewer.querySelector('.classroom-image-zoom-controls')?.remove();
       if(viewerObjectUrl){URL.revokeObjectURL(viewerObjectUrl);viewerObjectUrl='';}
       viewer.querySelector('[data-cr-viewer-content]').replaceChildren();
     }
@@ -133,10 +134,10 @@
           throw Error('Google Drive a refuzat accesul la fișier'+(reason?' ('+reason+')':'')+'.');
         }
         const metadata=await metadataResponse.json();
-        const driveName=String(metadata?.name||name||'Fișier');
+        const driveName=String(metadata?.name||name||'Fișier').trim();
         viewer.querySelector('[data-cr-viewer-title]').textContent=driveName;
         const exactDriveLink=safeURL(metadata?.webViewLink||'');if(exactDriveLink)viewer.querySelector('[data-cr-viewer-drive]').href=exactDriveLink;
-        const mime=String(metadata?.mimeType||'').toLowerCase();
+        const mime=String(metadata?.mimeType||'').split(';')[0].trim().toLowerCase();
         const googleNative=mime.startsWith('application/vnd.google-apps.');
         const officeDocument=/\.(docx?|xlsx?|xlsm|pptx?|odt|ods|odp|rtf|pages|numbers|key)$/i.test(driveName)
           || /(?:msword|officedocument|ms-excel|ms-powerpoint|opendocument|rtf)/i.test(mime);
@@ -156,7 +157,7 @@
           renderName=/\.[a-z0-9]{2,6}$/i.test(driveName)?driveName.replace(/\.[a-z0-9]{2,6}$/i,target.ext):driveName+target.ext;
           response=await fetch(base+'/export?mimeType='+encodeURIComponent(target.mime),{headers:{Authorization:'Bearer '+token},cache:'no-store',credentials:'omit'});
         }else{
-          if(archive || (!localSupported && !downloadableOffice && !officeDocument)){
+          if((archive && !downloadableOffice) || (!localSupported && !downloadableOffice && !officeDocument)){
             const driveBox=viewer.querySelector('[data-cr-viewer-content]');
             const frame=document.createElement('iframe');frame.className='classroom-drive-office-preview';frame.title='Previzualizare '+driveName;
             frame.src='https://drive.google.com/file/d/'+encodeURIComponent(fileId)+'/preview';
@@ -207,12 +208,10 @@
               if(!href)return;
               const key=[href,Math.round(left),Math.round(top),Math.round(width),Math.round(height)].join('|');if(seenLinks.has(key))return;seenLinks.add(key);
               const a=document.createElement('a');a.className='classroom-pdf-link';a.href=href;a.style.left=Math.max(0,left)+'px';a.style.top=Math.max(0,top)+'px';a.style.width=Math.max(14,width)+'px';a.style.height=Math.max(14,height)+'px';a.setAttribute('aria-label',label);
-              a.addEventListener('pointerdown',e=>e.stopPropagation());
-              a.addEventListener('touchstart',e=>e.stopPropagation(),{passive:true});
+              a.target='_blank';a.rel='noopener noreferrer';
               a.addEventListener('click',e=>{
-                e.preventDefault();e.stopPropagation();
-                if(href.startsWith('#pdf-page-')){const target=pages.querySelector(href);if(target)target.scrollIntoView({behavior:'smooth',block:'start'});}
-                else window.open(href,'_blank','noopener,noreferrer');
+                e.stopPropagation();
+                if(href.startsWith('#pdf-page-')){e.preventDefault();const target=pages.querySelector(href);if(target)target.scrollIntoView({behavior:'smooth',block:'start'});}
               });
               links.append(a);
             };
@@ -224,7 +223,7 @@
               if(!href && annotation.dest){
                 try{
                   const dest=typeof annotation.dest==='string'?await pdf.getDestination(annotation.dest):annotation.dest;
-                  if(dest?.[0]){
+                  if(dest?.[0]!=null){
                     const ref=dest[0],index=typeof ref==='object'?await pdf.getPageIndex(ref):Math.max(0,Number(ref)||0);
                     href='#pdf-page-'+(index+1);
                   }
@@ -400,12 +399,20 @@
           stage.append(img);const box=viewer.querySelector('[data-cr-viewer-content]');box.replaceChildren(stage);
           try{await img.decode();}catch{}
           if(generation!==viewerGeneration)return;
-          const availableW=Math.max(1,box.clientWidth-16),availableH=Math.max(1,box.clientHeight-16);
+          const stageStyle=getComputedStyle(stage);
+          const paddingX=parseFloat(stageStyle.paddingLeft)+parseFloat(stageStyle.paddingRight),paddingY=parseFloat(stageStyle.paddingTop)+parseFloat(stageStyle.paddingBottom);
+          const availableW=Math.max(1,box.clientWidth-paddingX),availableH=Math.max(1,box.clientHeight-paddingY);
           const naturalW=Math.max(1,img.naturalWidth||availableW),naturalH=Math.max(1,img.naturalHeight||availableH);
           const fit=Math.min(1,availableW/naturalW,availableH/naturalH),fitW=Math.max(1,Math.round(naturalW*fit)),fitH=Math.max(1,Math.round(naturalH*fit));
           img.style.width=fitW+'px';img.style.height=fitH+'px';img.style.maxWidth='none';img.style.maxHeight='none';
-          stage.style.width=availableW+'px';stage.style.minWidth=availableW+'px';stage.style.minHeight=availableH+'px';
+          stage.style.width=box.clientWidth+'px';stage.style.minWidth=box.clientWidth+'px';stage.style.minHeight=box.clientHeight+'px';
           enableViewerZoom(stage,1,1);
+          const zoomControls=document.createElement('div');zoomControls.className='classroom-image-zoom-controls';
+          for(const [label,text,zoom] of [['Micșorează','−',()=>viewerZoom/1.5],['Potrivește imaginea','100%',()=>1],['Mărește','+',()=>viewerZoom*1.5]]){
+            const button=document.createElement('button');button.type='button';button.className='hub-small-button';button.textContent=text;button.setAttribute('aria-label',label);
+            button.addEventListener('click',()=>setViewerZoom(zoom()));zoomControls.append(button);
+          }
+          viewer.querySelector('.classroom-viewer-actions').prepend(zoomControls);
           const cancelImageTap=e=>{e.preventDefault();e.stopPropagation();};
           img.addEventListener('click',cancelImageTap,{capture:true});
           img.addEventListener('dblclick',cancelImageTap,{capture:true});
@@ -444,12 +451,13 @@
     const touchCenter=touches=>({x:(touches[0].clientX+touches[1].clientX)/2,y:(touches[0].clientY+touches[1].clientY)/2});
     viewerContent.addEventListener('touchstart',e=>{
       if(!viewerZoomTarget||e.touches.length!==2)return;
+      e.preventDefault();
       if(pinchFrame)cancelAnimationFrame(pinchFrame);
       pinchStartDistance=Math.max(1,touchDistance(e.touches));pinchStartZoom=viewerZoom;
       const center=touchCenter(e.touches),rect=viewerContent.getBoundingClientRect();
       pinchWorldX=(viewerContent.scrollLeft+center.x-rect.left)/viewerZoom;
       pinchWorldY=(viewerContent.scrollTop+center.y-rect.top)/viewerZoom;
-    },{passive:true});
+    },{passive:false});
     viewerContent.addEventListener('touchmove',e=>{
       if(!viewerZoomTarget||e.touches.length!==2||!pinchStartDistance)return;
       e.preventDefault();
