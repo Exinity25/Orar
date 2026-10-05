@@ -117,7 +117,7 @@
         if(/\.xlsx?$/i.test(name)){
           const data=await response.arrayBuffer();if(generation!==viewerGeneration)return;
           const XLSX=await loadXlsx();if(generation!==viewerGeneration)return;
-          const workbook=XLSX.read(data,{type:'array',cellStyles:true,cellDates:true,cellNF:true}),box=viewer.querySelector('[data-cr-viewer-content]');
+          const workbook=XLSX.read(data,{type:'array',cellStyles:true,cellDates:true,cellNF:true,cellFormula:true,cellHTML:true}),box=viewer.querySelector('[data-cr-viewer-content]');
           if(!workbook.SheetNames.length)throw Error('Fișierul Excel nu conține foi care pot fi afișate.');
           const renderSheet=sheetName=>{
             const sheet=workbook.Sheets[sheetName],ref=sheet?.['!ref'];
@@ -200,6 +200,7 @@
             for(let col=range.s.c;col<=endCol;col++){
               const meta=sheet['!cols']?.[col],ce=document.createElement('col');let width=Number(meta?.wpx)||0;
               if(!width&&Number(meta?.wch)>0)width=Math.round(Number(meta.wch)*8+18);
+              if(!width&&Number(meta?.width)>0)width=Math.round(Number(meta.width)*8+18);
               if(!width){let longest=8;for(let r=range.s.r;r<=Math.min(endRow,range.s.r+80);r++){const cell=sheet[XLSX.utils.encode_cell({r,c:col})];if(cell)longest=Math.max(longest,Math.min(28,String(cell.w??XLSX.utils.format_cell(cell)??'').length));}width=longest*8+20;}
               ce.style.width=Math.max(38,Math.min(420,width))+'px';cg.append(ce);
             }
@@ -208,7 +209,7 @@
             for(let col=range.s.c;col<=endCol;col++){const th=document.createElement('th');th.className='excel-col-head';th.textContent=XLSX.utils.encode_col(col);hr.append(th);}thead.append(hr);table.append(thead);
             const tbody=document.createElement('tbody');
             for(let r=range.s.r;r<=endRow;r++){
-              const tr=document.createElement('tr'),rowMeta=sheet['!rows']?.[r];if(Number(rowMeta?.hpx)>0)tr.style.height=Math.max(18,Math.min(320,Number(rowMeta.hpx)))+'px';
+              const tr=document.createElement('tr'),rowMeta=sheet['!rows']?.[r];if(Number(rowMeta?.hpx)>0)tr.style.height=Math.max(18,Math.min(320,Number(rowMeta.hpx)))+'px';else if(Number(rowMeta?.hpt)>0)tr.style.height=Math.max(18,Math.min(320,Number(rowMeta.hpt)*4/3))+'px';
               const num=document.createElement('th');num.className='excel-row-head';num.textContent=String(r+1);tr.append(num);
               for(let col=range.s.c;col<=endCol;col++){
                 const key=r+':'+col;if(skip.has(key))continue;
