@@ -698,3 +698,38 @@ body[data-orar-theme] .hub-brand-dot{color:var(--accent-2)!important}
   .classroom-viewer-drive{white-space:nowrap!important}
   .classroom-viewer-content{border-radius:0!important}
 }
+
+
+/* Keep the floating island lower and reserve a clear top band for it.
+   The document starts below the island, so backdrop blur never sits over file content. */
+.classroom-viewer-dialog{
+  padding-top:96px!important;
+  box-sizing:border-box!important;
+}
+.classroom-viewer-header{
+  top:28px!important;
+}
+.classroom-viewer-content{
+  flex:1 1 auto!important;
+  min-height:0!important;
+  border-radius:14px 14px 0 0!important;
+  background:#f7f8fb!important;
+}
+@media(max-width:640px){
+  .classroom-viewer-dialog{
+    padding-top:132px!important;
+  }
+  .classroom-viewer-header{
+    top:max(54px,calc(env(safe-area-inset-top) + 22px))!important;
+  }
+}
+
+/* Workbook fidelity: do not impose app-theme colors on Excel cells. */
+.classroom-excel-table,
+.classroom-excel-table td,
+.classroom-excel-table th{
+  color-scheme:light!important;
+}
+.classroom-excel-table td[style*="background-color"]{
+  background-image:none!important;
+}
