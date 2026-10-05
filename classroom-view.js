@@ -571,14 +571,14 @@
         await loadGoogle();
         client=window.google.accounts.oauth2.initTokenClient({client_id:window.ORAR_CLASSROOM_CLIENT_ID,scope:scopes.join(' '),include_granted_scopes:true,
           callback:async response=>{
-            if(response.error || !response.access_token){reauthenticating=false;message='Conectarea nu a fost finalizată. Poți încerca din nou.';render();return;}
+            if(response.error || !response.access_token){reauthenticating=false;message='Conectarea nu a fost finalizată. Poți încerca din nou.';renderProfile(rememberedAccount(),false);render();return;}
             reauthenticating=false;token=response.access_token;expires=Date.now()+Number(response.expires_in||3600)*1000;grantedScopes=String(response.scope||'');saveSession();scheduleExpiry();const authSession=++session;
             loadCourses();
             try{const user=await api('https://openidconnect.googleapis.com/v1/userinfo');if(authSession!==session || !token)return;
               const account={name:user.name||'Cont Google',email:user.email||'',picture:safeURL(user.picture)||''};
               if(account.email){try{localStorage.setItem(ACCOUNT_KEY,JSON.stringify(account));}catch{}renderProfile(account,true);} restoreCloud().catch(()=>{});
             }catch{renderProfile(rememberedAccount(),true);}
-          },error_callback:()=>{reauthenticating=false;message='Reconectarea Google nu a putut fi făcută automat. Apasă din nou pe conectare.';render();}});
+          },error_callback:()=>{reauthenticating=false;message='Reconectarea Google nu a putut fi făcută automat. Apasă din nou pe conectare.';renderProfile(rememberedAccount(),false);render();}});
         renderProfile(rememberedAccount(),Boolean(token&&Date.now()<expires));
         render();
       }catch(e){message=e.message;renderProfile(rememberedAccount(),Boolean(token&&Date.now()<expires));render();}
@@ -587,7 +587,7 @@
       if(!client || reauthenticating)return;
       const remembered=rememberedAccount();reauthenticating=true;message='';renderProfile(remembered,Boolean(token&&Date.now()<expires));render();
       const options=preferRemembered&&remembered?{prompt:'',login_hint:remembered.email}:{prompt:'select_account'};
-      try{client.requestAccessToken(options);}catch{reauthenticating=false;render();}
+      try{client.requestAccessToken(options);}catch{reauthenticating=false;renderProfile(rememberedAccount(),false);render();}
     }
     page.addEventListener('click',e=>{
       const preview=e.target.closest('[data-cr-preview]');if(preview){openViewer(preview.dataset.crPreview,preview.dataset.crPreviewTitle);return;}
