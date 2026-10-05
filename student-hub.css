@@ -138,3 +138,96 @@ body[data-orar-theme="ice"] .hub-theme-card small,body[data-orar-theme="ice"] .h
 .classroom-excel-table th{position:sticky;top:0;z-index:1;background:#eef3fa;font-weight:700}
 .classroom-sheet-select{display:block;margin:12px 14px 0;max-width:calc(100% - 28px);padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#111}
 .classroom-viewer-limit{margin:0;padding:8px 14px 14px;color:#596579;font-size:10px}
+
+
+/* Spreadsheet-style Excel viewer */
+.classroom-excel-scroll{overflow:auto;min-height:100%;height:100%;padding:0;background:#eef1f5;-webkit-overflow-scrolling:touch}
+.classroom-excel-table{border-collapse:separate;border-spacing:0;width:max-content;min-width:100%;table-layout:fixed;background:#fff;color:#111827;font:12px/1.35 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-shadow:none}
+.classroom-excel-table .excel-row-number-col{width:44px!important}
+.classroom-excel-table th,.classroom-excel-table td{box-sizing:border-box;border:0;border-right:1px solid #d8dde6;border-bottom:1px solid #d8dde6;padding:6px 8px;height:28px;min-width:0;max-width:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;background:#fff}
+.classroom-excel-table td.is-merged{white-space:normal;overflow:visible;text-overflow:clip}
+.classroom-excel-table .excel-col-head,.classroom-excel-table .excel-row-head,.classroom-excel-table .excel-corner{background:#f3f4f6;color:#4b5563;font-weight:600;text-align:center;user-select:none}
+.classroom-excel-table .excel-col-head{position:sticky;top:0;z-index:4;border-top:1px solid #d8dde6}
+.classroom-excel-table .excel-row-head{position:sticky;left:0;z-index:3;width:44px;min-width:44px;max-width:44px;padding:0 6px;border-left:1px solid #d8dde6}
+.classroom-excel-table .excel-corner{position:sticky;top:0;left:0;z-index:5;width:44px;min-width:44px;max-width:44px;border-top:1px solid #d8dde6;border-left:1px solid #d8dde6}
+.classroom-excel-table td:hover{outline:2px solid #2563eb;outline-offset:-2px;background:#f8fbff}
+.classroom-excel-table a{color:#1d4ed8;text-decoration:underline;text-underline-offset:2px}
+.classroom-sheet-select{position:sticky;top:0;z-index:7;display:block;margin:0;width:100%;max-width:none;padding:10px 14px;border:0;border-bottom:1px solid #cbd5e1;border-radius:0;background:#f8fafc;color:#111827;font-weight:600}
+.classroom-viewer-content:has(.classroom-sheet-select) .classroom-excel-scroll{height:calc(100% - 42px)}
+
+/* Per-class accent colors */
+.card-color-edit{display:grid;grid-template-columns:14px minmax(0,1fr);align-items:center;gap:5px}
+.card-color-dot{width:11px;height:11px;border-radius:50%;border:1px solid #ffffff30;box-shadow:0 0 0 2px #0002}
+.card-color-dot-default{background:var(--accent)}
+.card-color-dot-red{background:#ef4444}.card-color-dot-green{background:#22c55e}.card-color-dot-blue{background:#3b82f6}.card-color-dot-yellow{background:#facc15}.card-color-dot-orange{background:#f97316}
+.class-card.card-tone-red{--card-custom:#ef4444}.class-card.card-tone-green{--card-custom:#22c55e}.class-card.card-tone-blue{--card-custom:#3b82f6}.class-card.card-tone-yellow{--card-custom:#facc15}.class-card.card-tone-orange{--card-custom:#f97316}
+.class-card:not(.card-tone-default){border-left-color:var(--card-custom)!important}
+.class-card:not(.card-tone-default) .type-row,
+.class-card:not(.card-tone-default) .subject,
+.class-card:not(.card-tone-default) .meta-line,
+.class-card:not(.card-tone-default) .meta-icon,
+.class-card:not(.card-tone-default) .week-tag,
+.class-card:not(.card-tone-default) .pair-tag,
+.class-card:not(.card-tone-default) .week-mark,
+.class-card:not(.card-tone-default) .type-icon{color:var(--card-custom)!important}
+body.editing .class-card:not(.card-tone-default) .edit-select{color:var(--card-custom)!important}
+
+/* Complete light timetable treatment for ICE */
+body[data-orar-theme="ice"] .app{color:#111827}
+body[data-orar-theme="ice"] .title-wrap{text-shadow:none}
+body[data-orar-theme="ice"] h1,
+body[data-orar-theme="ice"] .subtitle{color:#111827}
+body[data-orar-theme="ice"] .schedule-shell{box-shadow:0 16px 45px rgba(37,99,235,.12)}
+body[data-orar-theme="ice"] .head-cell.time-head{background:#ffffff;color:#111827;border-color:#cbd5e1;box-shadow:none}
+body[data-orar-theme="ice"] .head-cell:not(.time-head){background:#2563eb!important;color:#fff!important;border-color:#2563eb!important;box-shadow:none!important}
+body[data-orar-theme="ice"] .time-cell,
+body[data-orar-theme="ice"] .slot-cell{background:#ffffff;color:#111827;border-color:#d7deea}
+body[data-orar-theme="ice"] .slot-cell.empty{background:#f8fafc;color:#64748b}
+body[data-orar-theme="ice"] .class-card,
+body[data-orar-theme="ice"] .class-card:hover{background:#ffffff;color:#111827}
+body[data-orar-theme="ice"] .class-card:hover{background:#f8fbff}
+body[data-orar-theme="ice"] .class-card.card-tone-default{border-left-color:#2563eb!important}
+body[data-orar-theme="ice"] .class-card.card-tone-default .type-row,
+body[data-orar-theme="ice"] .class-card.card-tone-default .type-icon,
+body[data-orar-theme="ice"] .class-card.card-tone-default .meta-icon,
+body[data-orar-theme="ice"] .class-card.card-tone-default .week-tag,
+body[data-orar-theme="ice"] .class-card.card-tone-default .pair-tag,
+body[data-orar-theme="ice"] .class-card.card-tone-default .week-mark{color:#2563eb!important}
+body[data-orar-theme="ice"] .class-card.card-tone-default .subject{color:#111827!important}
+body[data-orar-theme="ice"] .class-card.card-tone-default .meta-line{color:#475569!important}
+body[data-orar-theme="ice"] .note-panel{border-top-color:#d7deea}
+body[data-orar-theme="ice"] .note-label{color:#111827}
+body[data-orar-theme="ice"] .note-area,
+body[data-orar-theme="ice"] .deadline-input,
+body[data-orar-theme="ice"] .edit-input,
+body[data-orar-theme="ice"] .edit-select,
+body[data-orar-theme="ice"] .time-edit input{background:#fff;color:#111827;border-color:#cbd5e1;color-scheme:light}
+body[data-orar-theme="ice"] .note-area::placeholder{color:#94a3b8}
+body[data-orar-theme="ice"] .edit-select{color:#2563eb}
+body[data-orar-theme="ice"] .add-class{background:#ffffff;color:#334155;border-color:#94a3b8}
+body[data-orar-theme="ice"] .add-class:hover{background:#eff6ff;color:#1d4ed8;border-color:#60a5fa}
+body[data-orar-theme="ice"] .delete-class{background:#fff;color:#111827;border-color:#cbd5e1}
+body[data-orar-theme="ice"] .delete-class:hover{background:#fee2e2;color:#991b1b;border-color:#fecaca}
+body[data-orar-theme="ice"] .edit-toggle,
+body[data-orar-theme="ice"] .week-toggle{background:rgba(255,255,255,.96)!important;color:#111827!important;border-color:#cbd5e1!important;box-shadow:0 10px 28px rgba(15,23,42,.14)}
+body[data-orar-theme="ice"] .week-toggle svg{color:#111827!important}
+body[data-orar-theme="ice"] .week-toggle svg path{fill:#111827!important}
+body[data-orar-theme="ice"] .week-toggle svg circle:nth-of-type(1){stroke:#111827!important}
+body[data-orar-theme="ice"] .week-toggle svg circle:nth-of-type(2){fill:#ffffff!important}
+body[data-orar-theme="ice"] .week-toggle svg circle:nth-of-type(3){fill:#111827!important}
+body[data-orar-theme="ice"] .toast{background:#ffffff;color:#111827;border-color:#cbd5e1}
+body[data-orar-theme="ice"] .footer-mark img{filter:brightness(0) drop-shadow(0 6px 18px rgba(15,23,42,.16))}
+body[data-orar-theme="ice"] .has-note:not(.note-due-today):not(.note-overdue) .note-dot{background:#2563eb;box-shadow:0 0 7px #2563eb,0 0 16px rgba(37,99,235,.55)}
+body[data-orar-theme="ice"] .card-color-dot{border-color:#0f172a30;box-shadow:0 0 0 2px #fff}
+
+/* Darker custom accents remain readable on white cards. */
+body[data-orar-theme="ice"] .class-card.card-tone-red{--card-custom:#c62828}
+body[data-orar-theme="ice"] .class-card.card-tone-green{--card-custom:#15803d}
+body[data-orar-theme="ice"] .class-card.card-tone-blue{--card-custom:#1d4ed8}
+body[data-orar-theme="ice"] .class-card.card-tone-yellow{--card-custom:#9a6700}
+body[data-orar-theme="ice"] .class-card.card-tone-orange{--card-custom:#c2410c}
+
+@media(max-width:900px) and (orientation:landscape), (max-width:960px) and (orientation:landscape) and (hover:none) and (pointer:coarse){
+  .card-color-edit{grid-template-columns:11px minmax(0,1fr);gap:3px}
+  .card-color-dot{width:9px;height:9px}
+}
