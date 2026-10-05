@@ -780,6 +780,13 @@
       return ICONS.course;
     }
 
+    const CARD_TONES=['default','red','green','blue','yellow','orange'];
+    const CARD_TONE_LABELS={default:'DEFAULT',red:'ROȘU',green:'VERDE',blue:'ALBASTRU',yellow:'GALBEN',orange:'PORTOCALIU'};
+    function cardTone(item){
+      const value=String(item?.cardColor||'default').toLowerCase();
+      return CARD_TONES.includes(value)?value:'default';
+    }
+
     function todayISO(){
       const d = new Date();
       const y = d.getFullYear();
@@ -1119,8 +1126,9 @@
       const noteExists = Boolean((item.note || '').trim());
       const noteClass = noteState(item);
       const open = !editing && expandedKey === key;
+      const tone = cardTone(item);
       if(editing){
-        return `<article class="class-card ${noteClass}" data-card="${key}">
+        return `<article class="class-card card-tone-${tone} ${noteClass}" data-card="${key}">
           <span class="note-dot" aria-hidden="true"></span>
           <button class="delete-class" type="button" data-delete="${key}" aria-label="Șterge materia">×</button>
           <div class="edit-fields">
@@ -1129,7 +1137,6 @@
               <select class="edit-select" data-field="type" data-key="${key}" aria-label="Tip activitate">
                 ${['CURS','SEMINAR','LABORATOR'].map(v=>`<option value="${v}" ${item.type===v?'selected':''}>${v}</option>`).join('')}
               </select>
-
             </div>
             <div class="week-edit">
               <span class="week-mark">◐</span>
@@ -1137,7 +1144,12 @@
                 ${['MEREU','PARĂ','IMPARĂ'].map(v=>`<option ${data.classes[key].alternate && v==='MEREU'?'disabled':''} value="${v}" ${(item.week || (item.pair?'PARĂ':'MEREU'))===v?'selected':''}>${v}</option>`).join('')}
               </select>
             </div>
-
+            <div class="card-color-edit">
+              <span class="card-color-dot card-color-dot-${tone}" aria-hidden="true"></span>
+              <select class="edit-select" data-field="cardColor" data-key="${key}" aria-label="Culoarea cardului">
+                ${CARD_TONES.map(v=>`<option value="${v}" ${tone===v?'selected':''}>${CARD_TONE_LABELS[v]}</option>`).join('')}
+              </select>
+            </div>
             <input class="edit-input subject-input" data-field="subject" data-key="${key}" value="${escapeHtml(item.subject)}" aria-label="Materia">
             <div class="edit-meta">
               <span class="meta-icon">${ICONS.person}</span>
@@ -1148,11 +1160,9 @@
               <input class="edit-input" data-field="location" data-key="${key}" value="${escapeHtml(item.location)}" aria-label="Locație">
             </div>
           </div>
-
         </article>`;
       }
-
-      return `<article class="class-card ${noteClass}" data-card="${key}" tabindex="0" role="button" aria-expanded="${open?'true':'false'}">
+      return `<article class="class-card card-tone-${tone} ${noteClass}" data-card="${key}" tabindex="0" role="button" aria-expanded="${open?'true':'false'}">
         <span class="note-dot" aria-hidden="true" title="${escapeHtml(noteDotTitle(item))}"></span>
         <div class="type-row">
           <span class="type-icon">${typeIcon(item.type)}</span>
@@ -1244,7 +1254,7 @@
         btn.addEventListener('click', () => {
           const key = btn.dataset.add;
           const existing = data.classes[key];
-          const added = {type:'CURS',week:existing ? selectedWeek : 'MEREU',subject:'Materie nouă',professor:'Profesor',location:'Locație',note:'',deadline:''};
+          const added = {type:'CURS',week:existing ? selectedWeek : 'MEREU',subject:'Materie nouă',professor:'Profesor',location:'Locație',note:'',deadline:'',cardColor:'default'};
           if(existing) existing.alternate = added;
           else data.classes[key] = added;
           saveData('Activitate adăugată');
@@ -1287,7 +1297,7 @@
         storageSet('c11_1_selected_week',selectedWeek);
       }
       saveData('Modificare salvată');
-      if((field === 'type' || field === 'week') && e.type === 'change') render();
+      if((field === 'type' || field === 'week' || field === 'cardColor') && e.type === 'change') render();
     }
 
     document.getElementById('weekToggle').addEventListener('click', () => selectWeek(oppositeWeek(selectedWeek)));
