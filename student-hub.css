@@ -627,3 +627,20 @@ body[data-orar-theme] .hub-brand-dot{color:var(--accent-2)!important}
     padding:max(18px,env(safe-area-inset-top)) 14px 16px!important;
   }
 }
+
+
+/* File viewer: completely remove the document-obscuring header glow/fade. */
+.classroom-viewer-header{
+  box-shadow:none!important;
+  filter:none!important;
+}
+.classroom-viewer-header::before,
+.classroom-viewer-header::after,
+.classroom-viewer-content::before,
+.classroom-viewer-content::after{
+  content:none!important;
+  display:none!important;
+  background:none!important;
+  box-shadow:none!important;
+  filter:none!important;
+}
