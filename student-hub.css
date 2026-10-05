@@ -156,22 +156,20 @@ body[data-orar-theme="ice"] .hub-theme-card small,body[data-orar-theme="ice"] .h
 .classroom-viewer-content:has(.classroom-sheet-select) .classroom-excel-scroll{height:calc(100% - 42px)}
 
 /* Per-class accent colors */
-.card-color-edit{display:grid;grid-template-columns:14px minmax(0,1fr);align-items:center;gap:5px}
-.card-color-dot{width:11px;height:11px;border-radius:50%;border:1px solid #ffffff30;box-shadow:0 0 0 2px #0002}
+.card-color-dot{border-radius:50%}
 .card-color-dot-default{background:var(--accent)}
-.card-color-dot-red{background:#ef4444}.card-color-dot-green{background:#22c55e}.card-color-dot-blue{background:#3b82f6}.card-color-dot-yellow{background:#facc15}.card-color-dot-orange{background:#f97316}
-.class-card.card-tone-red{--card-custom:#ef4444}.class-card.card-tone-green{--card-custom:#22c55e}.class-card.card-tone-blue{--card-custom:#3b82f6}.class-card.card-tone-yellow{--card-custom:#facc15}.class-card.card-tone-orange{--card-custom:#f97316}
-.class-card:not(.card-tone-default){border-left-color:var(--card-custom)!important}
+.card-color-dot-red{background:#ef4444}.card-color-dot-green{background:#22c55e}.card-color-dot-blue{background:#3b82f6}.card-color-dot-yellow{background:#facc15}.card-color-dot-orange{background:#f97316}.card-color-dot-violet{background:#a855f7}
+.class-card.card-tone-red{--card-custom:#ef4444}.class-card.card-tone-green{--card-custom:#22c55e}.class-card.card-tone-blue{--card-custom:#3b82f6}.class-card.card-tone-yellow{--card-custom:#facc15}.class-card.card-tone-orange{--card-custom:#f97316}.class-card.card-tone-violet{--card-custom:#a855f7}
+
+/* A custom card accent changes only activity/parity text and icons. */
 .class-card:not(.card-tone-default) .type-row,
-.class-card:not(.card-tone-default) .subject,
-.class-card:not(.card-tone-default) .meta-line,
-.class-card:not(.card-tone-default) .meta-icon,
 .class-card:not(.card-tone-default) .week-tag,
 .class-card:not(.card-tone-default) .pair-tag,
 .class-card:not(.card-tone-default) .week-mark,
-.class-card:not(.card-tone-default) .type-icon{color:var(--card-custom)!important}
-body.editing .class-card:not(.card-tone-default) .edit-select,
-body.editing .class-card:not(.card-tone-default) .edit-input{color:var(--card-custom)!important}
+.class-card:not(.card-tone-default) .type-icon,
+.class-card:not(.card-tone-default) .meta-icon{color:var(--card-custom)!important}
+body.editing .class-card:not(.card-tone-default) [data-field="type"],
+body.editing .class-card:not(.card-tone-default) [data-field="week"]{color:var(--card-custom)!important}
 .classroom-excel-table tbody .excel-row-head{top:auto!important}
 
 /* Complete light timetable treatment for ICE */
@@ -228,6 +226,7 @@ body[data-orar-theme="ice"] .class-card.card-tone-green{--card-custom:#15803d}
 body[data-orar-theme="ice"] .class-card.card-tone-blue{--card-custom:#1d4ed8}
 body[data-orar-theme="ice"] .class-card.card-tone-yellow{--card-custom:#9a6700}
 body[data-orar-theme="ice"] .class-card.card-tone-orange{--card-custom:#c2410c}
+body[data-orar-theme="ice"] .class-card.card-tone-violet{--card-custom:#7e22ce}
 
 @media(max-width:900px) and (orientation:landscape), (max-width:960px) and (orientation:landscape) and (hover:none) and (pointer:coarse){
   .card-color-edit{grid-template-columns:11px minmax(0,1fr);gap:3px}
@@ -285,3 +284,73 @@ body[data-orar-theme="ice"].editing #scheduleTitle:focus,
 body[data-orar-theme="ice"].editing #scheduleSubtitle:focus{background:rgba(37,99,235,.07);box-shadow:0 0 0 1px rgba(37,99,235,.24)}
 body[data-orar-theme="ice"].editing #scheduleTitle:empty::before,
 body[data-orar-theme="ice"].editing #scheduleSubtitle:empty::before{color:#64748b}
+
+
+/* Card accent picker menu */
+.card-color-picker{position:absolute;right:8px;bottom:8px;z-index:14;width:24px;height:24px}
+.card-color-picker>summary{list-style:none}
+.card-color-picker>summary::-webkit-details-marker{display:none}
+.card-color-trigger{display:block;width:24px;height:24px;border-radius:50%;border:2px solid rgba(255,255,255,.6);box-shadow:0 2px 8px rgba(0,0,0,.35),0 0 0 1px rgba(0,0,0,.18);cursor:pointer}
+.card-color-picker[open]{z-index:40}
+.class-card:has(.card-color-picker[open]){z-index:39}
+.card-color-menu{position:absolute;right:0;bottom:32px;width:154px;padding:6px;border:1px solid rgba(255,255,255,.16);border-radius:11px;background:rgba(8,12,20,.98);box-shadow:0 16px 36px rgba(0,0,0,.48);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);display:grid;gap:3px}
+.card-color-menu button{display:flex;align-items:center;gap:8px;width:100%;min-height:31px;padding:5px 7px;border:0;border-radius:7px;background:transparent;color:#e9edf4;text-align:left;font-size:9px;font-weight:750;cursor:pointer}
+.card-color-menu button:hover,.card-color-menu button[aria-checked="true"]{background:rgba(255,255,255,.08)}
+.card-color-swatch{display:block;width:13px;height:13px;flex:0 0 13px;border:1px solid rgba(255,255,255,.35);box-shadow:0 0 0 1px rgba(0,0,0,.2)}
+body[data-orar-theme="ice"] .card-color-trigger{border-color:#fff;box-shadow:0 2px 7px rgba(15,23,42,.2),0 0 0 1px rgba(15,23,42,.22)}
+body[data-orar-theme="ice"] .card-color-menu{background:rgba(255,255,255,.99);border-color:#cbd5e1;box-shadow:0 16px 36px rgba(15,23,42,.18)}
+body[data-orar-theme="ice"] .card-color-menu button{color:#111827}
+body[data-orar-theme="ice"] .card-color-menu button:hover,
+body[data-orar-theme="ice"] .card-color-menu button[aria-checked="true"]{background:#eff6ff}
+
+/* Non-default themes use their own simple backgrounds, never the Bleach artwork. */
+body[data-orar-theme="ice"]:not(.orar-custom-background)::before{
+  background-image:
+    radial-gradient(circle at 18% 12%,rgba(96,165,250,.20),transparent 28%),
+    radial-gradient(circle at 82% 78%,rgba(191,219,254,.28),transparent 30%),
+    linear-gradient(155deg,#ffffff 0%,#f4f8ff 58%,#eaf3ff 100%)!important;
+  background-size:cover!important;background-position:center!important;background-repeat:no-repeat!important;opacity:1!important
+}
+body[data-orar-theme="ocean"]:not(.orar-custom-background)::before{
+  background-image:
+    radial-gradient(circle at 18% 18%,rgba(34,211,238,.14),transparent 28%),
+    radial-gradient(circle at 82% 82%,rgba(8,145,178,.12),transparent 34%),
+    linear-gradient(155deg,#030a12,#071827 56%,#08131f)!important;
+  background-size:cover!important;background-position:center!important;background-repeat:no-repeat!important;opacity:1!important
+}
+body[data-orar-theme="forest"]:not(.orar-custom-background)::before{
+  background-image:
+    radial-gradient(circle at 22% 15%,rgba(74,222,128,.11),transparent 28%),
+    radial-gradient(circle at 76% 82%,rgba(22,163,74,.10),transparent 32%),
+    linear-gradient(155deg,#040806,#09140e 55%,#070c09)!important;
+  background-size:cover!important;background-position:center!important;background-repeat:no-repeat!important;opacity:1!important
+}
+body[data-orar-theme="violet"]:not(.orar-custom-background)::before{
+  background-image:
+    radial-gradient(circle at 20% 16%,rgba(192,132,252,.13),transparent 28%),
+    radial-gradient(circle at 82% 78%,rgba(147,51,234,.12),transparent 32%),
+    linear-gradient(155deg,#08060b,#140b1d 56%,#0b0711)!important;
+  background-size:cover!important;background-position:center!important;background-repeat:no-repeat!important;opacity:1!important
+}
+body[data-orar-theme="ice"]::after{background:linear-gradient(rgba(255,255,255,.04),rgba(235,244,255,.10))!important}
+body[data-orar-theme="ocean"]::after{background:linear-gradient(rgba(1,6,12,.12),rgba(1,6,12,.24))!important}
+body[data-orar-theme="forest"]::after{background:linear-gradient(rgba(2,8,5,.14),rgba(2,8,5,.28))!important}
+body[data-orar-theme="violet"]::after{background:linear-gradient(rgba(5,3,8,.14),rgba(5,3,8,.28))!important}
+
+.note-label-landscape{display:none}
+@media (max-width:900px) and (orientation:landscape), (max-width:960px) and (orientation:landscape) and (hover:none) and (pointer:coarse){
+  .note-label-default{display:none}
+  .note-label-landscape{display:inline}
+  .note-top{grid-template-columns:auto 66px!important;justify-content:space-between}
+  .note-label{font-size:8px!important;letter-spacing:.06em;overflow:visible!important;text-overflow:clip!important}
+  .deadline-wrap{width:66px!important;max-width:66px!important}
+  .deadline-input{font-size:6.2px!important;padding:3px 0!important}
+  .deadline-input::-webkit-calendar-picker-indicator{width:10px!important}
+  .card-color-picker{right:5px;bottom:5px;width:18px;height:18px}
+  .card-color-trigger{width:18px;height:18px;border-width:1.5px}
+  .card-color-menu{right:0;bottom:25px;width:128px;padding:4px}
+  .card-color-menu button{min-height:25px;padding:3px 5px;font-size:7px}
+  .card-color-swatch{width:10px;height:10px;flex-basis:10px}
+}
+
+.card-color-cycle,.card-color-edit{display:none!important}
