@@ -43,16 +43,14 @@
     const page=document.createElement('main');page.id='hubClassroomPage';page.className='hub-page hub-hidden';page.setAttribute('aria-labelledby','classroomHeading');root.append(page);
     const profile=document.createElement('div');profile.className='classroom-profile hub-hidden';root.querySelector('.hub-drawer').append(profile);
     const viewer=document.createElement('div');viewer.className='classroom-viewer hub-hidden';viewer.setAttribute('role','dialog');viewer.setAttribute('aria-modal','true');viewer.setAttribute('aria-labelledby','classroomViewerTitle');
-    viewer.innerHTML=`<div class="classroom-viewer-backdrop" data-cr-viewer-close></div><section class="classroom-viewer-dialog"><header class="classroom-viewer-header"><h2 id="classroomViewerTitle" data-cr-viewer-title>Fișier</h2><div class="classroom-viewer-actions"><div class="classroom-viewer-zoom" data-cr-viewer-zoom hidden><button class="hub-small-button" type="button" data-cr-zoom-out aria-label="Micșorează">−</button><span data-cr-zoom-label>100%</span><button class="hub-small-button" type="button" data-cr-zoom-in aria-label="Mărește">+</button></div><a class="hub-small-button classroom-viewer-drive" data-cr-viewer-drive target="_blank" rel="noopener noreferrer">Deschide în Drive ↗</a><button class="hub-small-button classroom-viewer-close" type="button" data-cr-viewer-close aria-label="Închide previzualizarea">✕</button></div></header><div class="classroom-viewer-content" data-cr-viewer-content></div></section>`;root.append(viewer);
+    viewer.innerHTML=`<div class="classroom-viewer-backdrop" data-cr-viewer-close></div><section class="classroom-viewer-dialog"><header class="classroom-viewer-header"><h2 id="classroomViewerTitle" data-cr-viewer-title>Fișier</h2><div class="classroom-viewer-actions"><a class="hub-small-button classroom-viewer-drive" data-cr-viewer-drive target="_blank" rel="noopener noreferrer">Deschide în Drive ↗</a><button class="hub-small-button classroom-viewer-close" type="button" data-cr-viewer-close aria-label="Închide previzualizarea">✕</button></div></header><div class="classroom-viewer-content" data-cr-viewer-content></div></section>`;root.append(viewer);
     let viewerReturnFocus=null,viewerObjectUrl='',viewerGeneration=0,viewerZoom=1,viewerZoomTarget=null;
-    const zoomBox=viewer.querySelector('[data-cr-viewer-zoom]'),zoomLabel=viewer.querySelector('[data-cr-zoom-label]');
     function setViewerZoom(next){
-      viewerZoom=Math.max(.5,Math.min(2.5,Math.round(next*10)/10));
+      viewerZoom=Math.max(.5,Math.min(3,Math.round(next*100)/100));
       if(viewerZoomTarget){viewerZoomTarget.style.transform='scale('+viewerZoom+')';viewerZoomTarget.style.transformOrigin='top left';}
-      if(zoomLabel)zoomLabel.textContent=Math.round(viewerZoom*100)+'%';
     }
-    function enableViewerZoom(target){viewerZoomTarget=target;viewerZoom=1;zoomBox.hidden=false;setViewerZoom(1);}
-    function disableViewerZoom(){viewerZoomTarget=null;viewerZoom=1;zoomBox.hidden=true;if(zoomLabel)zoomLabel.textContent='100%';}
+    function enableViewerZoom(target){viewerZoomTarget=target;viewerZoom=1;setViewerZoom(1);}
+    function disableViewerZoom(){viewerZoomTarget=null;viewerZoom=1;}
     function resetViewerContent(){
       disableViewerZoom();
       if(viewerObjectUrl){URL.revokeObjectURL(viewerObjectUrl);viewerObjectUrl='';}
@@ -114,7 +112,7 @@
         if(/\.xlsx?$/i.test(name)){
           const data=await response.arrayBuffer();if(generation!==viewerGeneration)return;
           const XLSX=await loadXlsx();if(generation!==viewerGeneration)return;
-          const workbook=XLSX.read(data,{type:'array',cellStyles:true,cellDates:true,cellNF:true}),box=viewer.querySelector('[data-cr-viewer-content]');
+          const workbook=XLSX.read(data,{type:'array',cellStyles:true,cellDates:true,cellNF:true,cellHTML:true}),box=viewer.querySelector('[data-cr-viewer-content]');
           if(!workbook.SheetNames.length)throw Error('Fișierul Excel nu conține foi care pot fi afișate.');
           const renderSheet=sheetName=>{
             const sheet=workbook.Sheets[sheetName],ref=sheet?.['!ref'];
@@ -167,7 +165,7 @@
               if(!cell)return;
               const style=resolvedStyle(cell);
               if(style){
-                const fill=style.fill?.patternType==='none'?'':excelColor(style.fill?.fgColor)||excelColor(style.fill?.bgColor);if(fill)td.style.backgroundColor=fill;
+                const fill=style.fill?.patternType==='none'?'':excelColor(style.fill?.fgColor)||excelColor(style.fill?.bgColor);if(fill){td.style.setProperty('background-color',fill,'important');td.dataset.xlsxFill=fill;}
                 const font=style.font||{},fontColor=excelColor(font.color);if(fontColor)td.style.color=fontColor;
                 if(font.bold)td.style.fontWeight='700';
                 if(font.italic)td.style.fontStyle='italic';
@@ -229,11 +227,19 @@
         throw Error('Acest tip de fișier nu are viewer local.');
       }catch(error){if(generation===viewerGeneration)viewerMessage(error?.message||'Nu am putut afișa fișierul.','alert');}
     }
-    viewer.addEventListener('click',e=>{
-      if(e.target.closest('[data-cr-viewer-close]')){closeViewer();return;}
-      if(e.target.closest('[data-cr-zoom-in]')){setViewerZoom(viewerZoom+.1);return;}
-      if(e.target.closest('[data-cr-zoom-out]')){setViewerZoom(viewerZoom-.1);return;}
-    });
+    viewer.addEventListener('click',e=>{if(e.target.closest('[data-cr-viewer-close]'))closeViewer();});
+    let pinchStartDistance=0,pinchStartZoom=1;
+    viewer.querySelector('[data-cr-viewer-content]').addEventListener('touchstart',e=>{
+      if(!viewerZoomTarget||e.touches.length!==2)return;
+      pinchStartDistance=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+      pinchStartZoom=viewerZoom;
+    },{passive:true});
+    viewer.querySelector('[data-cr-viewer-content]').addEventListener('touchmove',e=>{
+      if(!viewerZoomTarget||e.touches.length!==2||!pinchStartDistance)return;
+      const distance=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+      setViewerZoom(pinchStartZoom*(distance/pinchStartDistance));e.preventDefault();
+    },{passive:false});
+    viewer.querySelector('[data-cr-viewer-content]').addEventListener('touchend',e=>{if(e.touches.length<2)pinchStartDistance=0;},{passive:true});
     viewer.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();closeViewer();}});
     const SESSION_KEY='orar_classroom_session_v2',OLD_SESSION_KEY='orar_classroom_session_v1';
     const ACCOUNT_KEY='orar_classroom_account_v1';
