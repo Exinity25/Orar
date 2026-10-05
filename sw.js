@@ -1,4 +1,4 @@
-const CACHE = 'orar-v29-drive-diagnostics';
+const CACHE = 'orar-v30-ice-excel-card-colors';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './student-hub.css', './student-hub.js', './classroom-config.js', './classroom-view.js'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
