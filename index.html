@@ -813,7 +813,6 @@
       const signature=JSON.stringify(snapshot);
       if(undoStack.length && undoStack[undoStack.length-1].signature===signature)return;
       undoStack.push({snapshot,signature});
-      if(undoStack.length>30)undoStack.shift();
       updateUndoButton();
     }
     function undoLastChange(){
