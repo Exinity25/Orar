@@ -21,7 +21,15 @@
     if(!file?.id || !previewable(title))return '';
     return `<button class="classroom-link classroom-preview-link" type="button" data-cr-preview="${esc(file.id)}" data-cr-preview-title="${esc(title)}">${esc(title)} <span aria-hidden="true">▣</span></button>`;
   };
-  let gisPromise,xlsxPromise;
+  let gisPromise,xlsxPromise,pdfjsPromise;
+  function loadPdfJs(){
+    if(pdfjsPromise)return pdfjsPromise;
+    pdfjsPromise=import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs').then(pdfjs=>{
+      pdfjs.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
+      return pdfjs;
+    }).catch(err=>{pdfjsPromise=null;throw err;});
+    return pdfjsPromise;
+  }
   function loadXlsx(){
     if(window.XLSX)return Promise.resolve(window.XLSX);
     if(xlsxPromise)return xlsxPromise;
@@ -110,11 +118,31 @@
           throw Error('Fișierul nu a putut fi descărcat din Google Drive'+(reason?' ('+reason+')':'')+'.');
         }
         if(/\.pdf$/i.test(name)){
-          const blob=await response.blob();if(generation!==viewerGeneration)return;
-          viewerObjectUrl=URL.createObjectURL(blob.type==='application/pdf'?blob:new Blob([blob],{type:'application/pdf'}));
-          const frame=document.createElement('iframe');frame.className='classroom-local-pdf';frame.title='Document PDF';frame.src=viewerObjectUrl+'#page=1&zoom=page-width&view=FitH&toolbar=1&navpanes=0';frame.setAttribute('allowfullscreen','');viewer.querySelector('[data-cr-viewer-content]').replaceChildren(frame);disableViewerZoom();return;
+          const data=await response.arrayBuffer();if(generation!==viewerGeneration)return;
+          const pdfjs=await loadPdfJs();if(generation!==viewerGeneration)return;
+          const pdf=await pdfjs.getDocument({data:new Uint8Array(data)}).promise;if(generation!==viewerGeneration)return;
+          const box=viewer.querySelector('[data-cr-viewer-content]'),pages=document.createElement('div');pages.className='classroom-pdf-pages';
+          box.replaceChildren(pages);
+          for(let pageNo=1;pageNo<=pdf.numPages;pageNo++){
+            if(generation!==viewerGeneration)return;
+            const page=await pdf.getPage(pageNo),base=page.getViewport({scale:1});
+            const available=Math.max(280,Math.min(1100,box.clientWidth||window.innerWidth)-24);
+            const scale=Math.min(2,available/base.width),viewport=page.getViewport({scale});
+            const wrap=document.createElement('div');wrap.className='classroom-pdf-page';
+            const canvas=document.createElement('canvas'),ratio=Math.min(2,window.devicePixelRatio||1);
+            canvas.width=Math.floor(viewport.width*ratio);canvas.height=Math.floor(viewport.height*ratio);
+            canvas.style.width=viewport.width+'px';canvas.style.height=viewport.height+'px';
+            wrap.append(canvas);pages.append(wrap);
+            const ctx=canvas.getContext('2d',{alpha:false});
+            await page.render({canvasContext:ctx,viewport,transform:ratio===1?null:[ratio,0,0,ratio,0,0]}).promise;
+          }
+          enableViewerZoom(pages);return;
         }
         if(/\.xlsx?$/i.test(name)){
+          const box=viewer.querySelector('[data-cr-viewer-content]');
+          const frame=document.createElement('iframe');frame.className='classroom-drive-office-preview';frame.title='Fișier Excel original';
+          frame.src='https://drive.google.com/file/d/'+encodeURIComponent(fileId)+'/preview';
+          frame.setAttribute('allow','clipboard-read; clipboard-write');box.replaceChildren(frame);disableViewerZoom();return;
           const data=await response.arrayBuffer();if(generation!==viewerGeneration)return;
           const XLSX=await loadXlsx();if(generation!==viewerGeneration)return;
           const workbook=XLSX.read(data,{type:'array',cellStyles:true,cellDates:true,cellNF:true,cellFormula:true,cellHTML:true}),box=viewer.querySelector('[data-cr-viewer-content]');
