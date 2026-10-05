@@ -1,5 +1,5 @@
-const CACHE = 'orar-v20-student-hub';
-const ASSETS = ['./', './index.html', './manifest.webmanifest', './student-hub.css', './student-hub.js'];
+const CACHE = 'orar-v21-classroom';
+const ASSETS = ['./', './index.html', './manifest.webmanifest', './student-hub.css', './student-hub.js', './classroom-config.js', './classroom-view.js'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
   self.skipWaiting();
@@ -10,6 +10,8 @@ self.addEventListener('activate', event => {
 });
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
+  // Never cache private Google API responses, tokens or profile images.
+  if (new URL(event.request.url).origin !== self.location.origin || event.request.headers.has('Authorization')) return;
   event.respondWith(fetch(event.request, {cache:'no-cache'}).then(response => {
     const copy = response.clone();
     caches.open(CACHE).then(cache => cache.put(event.request, copy));
