@@ -351,14 +351,20 @@
       profile.classList.remove('hub-hidden');
     }
     function saveSession(){try{localStorage.setItem(SESSION_KEY,JSON.stringify({token,expires,grantedScopes}));}catch{}}
-    const CLOUD_FILE='orar-sync.json',SYNC_KEYS=['c11_1_bleach_schedule_v3','orar_subject_homework_v1','c11_1_selected_week','c11_1_selected_day'];
+    const CLOUD_FILE='orar-sync.json',SYNC_KEYS=['c11_1_bleach_schedule_v3','orar_subject_homework_v1','c11_1_selected_week','c11_1_selected_day','orar_theme_v1'];
     let cloudFileId='',cloudTimer=0,cloudApplying=false;
     const cloudPayload=()=>{const values={};for(const key of SYNC_KEYS){const value=localStorage.getItem(key);if(value!==null)values[key]=value;}return {version:1,updatedAt:Date.now(),values};};
     async function findCloudFile(){
       if(cloudFileId)return cloudFileId;
       const q=encodeURIComponent("name='"+CLOUD_FILE+"' and 'appDataFolder' in parents and trashed=false");
-      const r=await fetch('https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q='+q+'&fields=files(id,name,modifiedTime)&pageSize=1',{headers:{Authorization:'Bearer '+token},cache:'no-store'});
-      if(!r.ok)throw Error('Drive appData indisponibil.');const files=(await r.json()).files||[];cloudFileId=files[0]?.id||'';return cloudFileId;
+      const r=await fetch('https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q='+q+'&fields=files(id,name,modifiedTime)&orderBy=modifiedTime%20desc&pageSize=10',{headers:{Authorization:'Bearer '+token},cache:'no-store'});
+      if(!r.ok)throw Error('Drive appData indisponibil.');
+      const files=(await r.json()).files||[];
+      cloudFileId=files[0]?.id||'';
+      if(files.length>1){
+        Promise.allSettled(files.slice(1).map(file=>fetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(file.id),{method:'DELETE',headers:{Authorization:'Bearer '+token}}))).catch(()=>{});
+      }
+      return cloudFileId;
     }
     async function uploadCloud(){
       if(cloudApplying||!token||Date.now()>=expires||!grantedScopes.includes('drive.appdata'))return;
@@ -369,9 +375,9 @@
       const r=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'multipart/related; boundary='+boundary},body:multipart});
       if(!r.ok)throw Error('Nu s-a putut crea backup-ul orarului.');cloudFileId=(await r.json()).id||'';
     }
-    function scheduleCloudUpload(){clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>uploadCloud().catch(()=>{}),700);}
+    function scheduleCloudUpload(){clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>uploadCloud().catch(()=>{}),450);}
     async function restoreCloud(){
-      if(!token||Date.now()>=expires||!grantedScopes.includes('drive.appdata'))return;
+      if(!token||Date.now()>=expires||!grantedScopes.includes('drive.appdata'))return false;
       const id=await findCloudFile();if(!id){scheduleCloudUpload();return;}
       const r=await fetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(id)+'?alt=media',{headers:{Authorization:'Bearer '+token},cache:'no-store'});if(!r.ok)return;
       const remote=await r.json();if(!remote?.values)return;
@@ -384,13 +390,23 @@
         }else if(local!==null)needsBackfill=true;
       }
       cloudApplying=false;
-      if(changed){location.reload();return;}
+      if(changed){location.reload();return true;}
       if(needsBackfill)scheduleCloudUpload();
+      return false;
     }
     window.addEventListener('orar-local-change',scheduleCloudUpload);
-    window.addEventListener('focus',()=>restoreCloud().catch(()=>{}));
-    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')restoreCloud().catch(()=>{});});
-    setInterval(()=>{if(document.visibilityState==='visible')restoreCloud().catch(()=>{});},8000);
+    window.addEventListener('orar-cloud-sync-request',async()=>{
+      try{
+        if(!token||Date.now()>=expires||!grantedScopes.includes('drive.appdata')){
+          window.dispatchEvent(new CustomEvent('orar-cloud-sync-result',{detail:{ok:false,message:'Conectează contul Google din Classroom pentru Cloud sync.'}}));
+          return;
+        }
+        const changed=await restoreCloud();
+        if(!changed)window.dispatchEvent(new CustomEvent('orar-cloud-sync-result',{detail:{ok:true,message:'Datele sunt sincronizate cu cloud-ul.'}}));
+      }catch{
+        window.dispatchEvent(new CustomEvent('orar-cloud-sync-result',{detail:{ok:false,message:'Sincronizarea cu cloud-ul nu a reușit.'}}));
+      }
+    });
     function forgetSession(){try{localStorage.removeItem(SESSION_KEY);}catch{}}
     function restoreSession(){
       try{localStorage.removeItem(OLD_SESSION_KEY);const saved=JSON.parse(localStorage.getItem(SESSION_KEY)||'null');if(saved?.token && Number(saved.expires)>Date.now()+5000){token=saved.token;expires=Number(saved.expires);grantedScopes=String(saved.grantedScopes||'');return true;}forgetSession();}catch{forgetSession();}
@@ -558,7 +574,7 @@
         else loadCourse(course.dataset.crCourse);
       }
     });
-    const restored=restoreSession();renderProfile(rememberedAccount(),restored);if(restored)scheduleExpiry();
+    const restored=restoreSession();renderProfile(rememberedAccount(),restored);if(restored){scheduleExpiry();restoreCloud().catch(()=>{});}
     render();prepareSignIn();
     return {element:page,show(){
       visible=true;render();prepareSignIn();
