@@ -845,3 +845,45 @@ body[data-orar-theme] .hub-brand-dot{color:var(--accent-2)!important}
   .classroom-docx-document{width:calc(100% - 16px);margin:8px auto 28px;padding:28px 20px;font-size:14px}
   .classroom-image-stage{padding:8px}
 }
+
+
+/* High-fidelity Classroom viewer: crisp rendering on Android, iOS and desktop. */
+.classroom-viewer-content{
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  text-rendering:optimizeLegibility;
+}
+.classroom-drive-office-preview{
+  width:100%!important;
+  height:100%!important;
+  min-height:100%!important;
+  border:0!important;
+  background:#fff!important;
+  transform:none!important;
+  filter:none!important;
+  opacity:1!important;
+  image-rendering:auto;
+  color-scheme:light;
+}
+.classroom-pdf-pages{
+  transform-origin:top left;
+  will-change:auto;
+}
+.classroom-pdf-page canvas{
+  display:block;
+  max-width:none;
+  image-rendering:auto;
+  transform:none;
+  filter:none;
+}
+.classroom-excel-table,
+.classroom-docx-document,
+.classroom-text-preview{
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+@media(max-width:640px){
+  .classroom-viewer-header{flex:none}
+  .classroom-viewer-content{width:100%;height:100%}
+  .classroom-drive-office-preview{min-width:100%;min-height:100%}
+}
