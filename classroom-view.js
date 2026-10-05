@@ -141,7 +141,11 @@
         const archive=/\.(zip|rar|7z)$/i.test(name) || /(?:zip|rar|7z|compressed|archive)/i.test(mime);
         const localSupported=/\.(pdf|csv|jpe?g|png|gif|webp|bmp|svg|avif|txt|md|json|xml|log|html?|css|js|ts|py|java|c|cpp|h|mp3|m4a|aac|flac|wav|ogg|mp4|m4v|mov|webm)$/i.test(name);
         const nativeGoogleDoc=mime==='application/vnd.google-apps.document'||mime==='application/vnd.google-apps.spreadsheet'||mime==='application/vnd.google-apps.presentation';
-        const downloadableOffice=/\.(docx?|xlsx?|xlsm|csv)$/i.test(name);
+        const officeMimeDownloadable=/application\/(?:vnd\.openxmlformats-officedocument\.(?:wordprocessingml\.document|spreadsheetml\.sheet)|vnd\.ms-(?:excel|word)|msword)/i.test(mime);
+        const downloadableOffice=/\.(docx?|xlsx?|xlsm|csv)$/i.test(name)||officeMimeDownloadable;
+        // Classroom titles can omit or alter the extension. Prefer the authenticated
+        // Drive API download for real Office files so desktop browsers never depend
+        // on Google iframe cookies / a second Google sign-in.
         if((googleNative && nativeGoogleDoc) || archive || (!localSupported && !downloadableOffice && !officeDocument)){
           const driveBox=viewer.querySelector('[data-cr-viewer-content]');
           const frame=document.createElement('iframe');frame.className='classroom-drive-office-preview';frame.title='Previzualizare '+name;
@@ -219,7 +223,7 @@
           }
           enableViewerZoom(pages);return;
         }
-        if(/\.(xlsx?|xlsm|csv)$/i.test(name)){
+        if(/\.(xlsx?|xlsm|csv)$/i.test(name)||/(?:spreadsheetml\.sheet|ms-excel)/i.test(mime)){
           const data=await response.arrayBuffer();if(generation!==viewerGeneration)return;
           const XLSX=await loadXlsx();if(generation!==viewerGeneration)return;
           const workbook=XLSX.read(data,{type:'array',cellStyles:true,cellDates:true,cellNF:true,cellFormula:true,cellHTML:true}),box=viewer.querySelector('[data-cr-viewer-content]');
@@ -335,7 +339,7 @@
           };
           renderSheet(workbook.SheetNames[0]);return;
         }
-        if(/\.docx$/i.test(name)){
+        if(/\.docx?$/i.test(name)||/(?:wordprocessingml\.document|msword)/i.test(mime)){
           const data=await response.arrayBuffer();if(generation!==viewerGeneration)return;
           const [mammoth,purify]=await Promise.all([loadMammoth(),loadPurify()]);if(generation!==viewerGeneration)return;
           const result=await mammoth.convertToHtml({arrayBuffer:data},{
