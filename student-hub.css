@@ -775,3 +775,73 @@ body[data-orar-theme] .hub-brand-dot{color:var(--accent-2)!important}
   border:0;
   background:#fff;
 }
+
+
+/* Local file viewers: desktop-safe without relying on a Google sign-in inside an iframe. */
+.classroom-docx-document{
+  width:min(900px,calc(100% - 28px));
+  margin:14px auto 40px;
+  padding:48px 56px;
+  box-sizing:border-box;
+  background:#fff;
+  color:#111827;
+  border-radius:4px;
+  box-shadow:0 4px 24px rgba(0,0,0,.18);
+  font-family:Arial,Helvetica,sans-serif;
+  font-size:15px;
+  line-height:1.5;
+  transform-origin:top left;
+}
+.classroom-docx-document img{max-width:100%;height:auto}
+.classroom-docx-document table{max-width:100%;border-collapse:collapse}
+.classroom-docx-document td,.classroom-docx-document th{padding:4px 7px;vertical-align:top}
+.classroom-docx-document a{color:#1565c0}
+.classroom-docx-document p{margin:.7em 0}
+.classroom-image-stage{
+  min-width:100%;
+  min-height:100%;
+  width:max-content;
+  padding:18px;
+  box-sizing:border-box;
+  display:flex;
+  align-items:flex-start;
+  justify-content:center;
+  transform-origin:top left;
+}
+.classroom-image-preview{
+  display:block;
+  max-width:min(100%,1400px);
+  height:auto;
+  object-fit:contain;
+  background:#fff;
+  box-shadow:0 4px 22px rgba(0,0,0,.18);
+}
+.classroom-text-preview{
+  width:min(1100px,calc(100% - 28px));
+  min-height:calc(100% - 28px);
+  margin:14px auto;
+  padding:22px;
+  box-sizing:border-box;
+  overflow:auto;
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
+  border-radius:10px;
+  background:#fff;
+  color:#111827;
+  font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+.classroom-media-stage{
+  width:100%;
+  min-height:100%;
+  display:grid;
+  place-items:center;
+  padding:18px;
+  box-sizing:border-box;
+  background:#0b0d12;
+}
+.classroom-media-stage video{display:block;max-width:100%;max-height:calc(100vh - 160px)}
+.classroom-media-stage audio{width:min(680px,100%)}
+@media(max-width:640px){
+  .classroom-docx-document{width:calc(100% - 16px);margin:8px auto 28px;padding:28px 20px;font-size:14px}
+  .classroom-image-stage{padding:8px}
+}
