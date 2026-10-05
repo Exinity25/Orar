@@ -61,10 +61,10 @@
       profile.innerHTML=`<button class="classroom-profile-summary" type="button" data-cr-profile-toggle aria-expanded="false">${picture?`<img src="${esc(picture)}" alt="" referrerpolicy="no-referrer">`:'<span class="classroom-profile-avatar" aria-hidden="true">G</span>'}<span class="classroom-profile-copy"><strong>${esc(account.name||'Cont Google')}</strong><span>${esc(account.email)}</span></span><span class="classroom-profile-chevron" aria-hidden="true">›</span></button><div class="classroom-profile-menu"><div class="classroom-profile-details"><strong>${connected?'Cont Google conectat':'Cont Google memorat'}</strong><span>${esc(account.email)}</span></div><button class="hub-small-button classroom-profile-logout" type="button" data-cr-logout>Deconectează</button></div>`;
       profile.classList.remove('hub-hidden');
     }
-    function saveSession(){try{sessionStorage.setItem(SESSION_KEY,JSON.stringify({token,expires}));}catch{}}
-    function forgetSession(){try{sessionStorage.removeItem(SESSION_KEY);}catch{}}
+    function saveSession(){try{localStorage.setItem(SESSION_KEY,JSON.stringify({token,expires}));}catch{}}
+    function forgetSession(){try{localStorage.removeItem(SESSION_KEY);}catch{}}
     function restoreSession(){
-      try{const saved=JSON.parse(sessionStorage.getItem(SESSION_KEY)||'null');if(saved?.token && Number(saved.expires)>Date.now()+5000){token=saved.token;expires=Number(saved.expires);return true;}forgetSession();}catch{forgetSession();}
+      try{const saved=JSON.parse(localStorage.getItem(SESSION_KEY)||'null');if(saved?.token && Number(saved.expires)>Date.now()+5000){token=saved.token;expires=Number(saved.expires);return true;}forgetSession();}catch{forgetSession();}
       return false;
     }
     function scheduleExpiry(){clearTimeout(expireTimer);if(token&&expires>Date.now())expireTimer=setTimeout(()=>clearSession('Sesiunea Google trebuie reînnoită.',false),Math.max(0,expires-Date.now()));}
@@ -183,7 +183,6 @@
     return {element:page,show(){
       visible=true;render();prepareSignIn();
       if(token && Date.now()<expires){if(!courses.length&&!loading)loadCourses();}
-      else if(client && rememberedAccount())requestAccess(true);
       page.classList.remove('is-entering');void page.offsetWidth;page.classList.add('is-entering');page.querySelector('h1').focus({preventScroll:true});
     }};
   }};
