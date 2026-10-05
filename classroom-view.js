@@ -133,16 +133,18 @@
           throw Error('Google Drive a refuzat accesul la fișier'+(reason?' ('+reason+')':'')+'.');
         }
         const metadata=await metadataResponse.json();
+        const driveName=String(metadata?.name||name||'Fișier');
+        viewer.querySelector('[data-cr-viewer-title]').textContent=driveName;
         const exactDriveLink=safeURL(metadata?.webViewLink||'');if(exactDriveLink)viewer.querySelector('[data-cr-viewer-drive]').href=exactDriveLink;
         const mime=String(metadata?.mimeType||'').toLowerCase();
         const googleNative=mime.startsWith('application/vnd.google-apps.');
-        const officeDocument=/\.(docx?|xlsx?|xlsm|pptx?|odt|ods|odp|rtf|pages|numbers|key)$/i.test(name)
+        const officeDocument=/\.(docx?|xlsx?|xlsm|pptx?|odt|ods|odp|rtf|pages|numbers|key)$/i.test(driveName)
           || /(?:msword|officedocument|ms-excel|ms-powerpoint|opendocument|rtf)/i.test(mime);
-        const archive=/\.(zip|rar|7z)$/i.test(name) || /(?:zip|rar|7z|compressed|archive)/i.test(mime);
-        const localSupported=/\.(pdf|csv|jpe?g|png|gif|webp|bmp|svg|avif|txt|md|json|xml|log|html?|css|js|ts|py|java|c|cpp|h|mp3|m4a|aac|flac|wav|ogg|mp4|m4v|mov|webm)$/i.test(name);
+        const archive=/\.(zip|rar|7z)$/i.test(driveName) || /(?:zip|rar|7z|compressed|archive)/i.test(mime);
+        const localSupported=/\.(pdf|csv|jpe?g|png|gif|webp|bmp|svg|avif|txt|md|json|xml|log|html?|css|js|ts|py|java|c|cpp|h|mp3|m4a|aac|flac|wav|ogg|mp4|m4v|mov|webm)$/i.test(driveName);
         const nativeGoogleDoc=mime==='application/vnd.google-apps.document'||mime==='application/vnd.google-apps.spreadsheet'||mime==='application/vnd.google-apps.presentation';
         const officeMimeDownloadable=/application\/(?:vnd\.openxmlformats-officedocument\.(?:wordprocessingml\.document|spreadsheetml\.sheet)|vnd\.ms-(?:excel|word)|msword)/i.test(mime);
-        const downloadableOffice=/\.(docx?|xlsx?|xlsm|csv)$/i.test(name)||officeMimeDownloadable;
+        const downloadableOffice=/\.(docx?|xlsx?|xlsm|csv)$/i.test(driveName)||officeMimeDownloadable;
         // Classroom titles can omit or alter the extension. Prefer the authenticated
         // Drive API download for real Office files so desktop browsers never depend
         // on Google iframe cookies / a second Google sign-in.
@@ -172,7 +174,7 @@
           if(hay.includes('insufficient') || hay.includes('scope'))throw Error('Tokenul Google nu are permisiunea Drive read-only. Deconectează-te și conectează-te din nou.');
           throw Error('Fișierul nu a putut fi descărcat din Google Drive'+(reason?' ('+reason+')':'')+'.');
         }
-        if(/\.pdf$/i.test(name)){
+        if(/\.pdf$/i.test(driveName)||mime==='application/pdf'){
           const data=await response.arrayBuffer();if(generation!==viewerGeneration)return;
           const pdfjs=await loadPdfJs();if(generation!==viewerGeneration)return;
           const pdf=await pdfjs.getDocument({data:new Uint8Array(data)}).promise;if(generation!==viewerGeneration)return;
@@ -228,7 +230,7 @@
           }
           enableViewerZoom(pages);return;
         }
-        if(/\.(xlsx?|xlsm|csv)$/i.test(name)||/(?:spreadsheetml\.sheet|ms-excel)/i.test(mime)){
+        if(/\.(xlsx?|xlsm|csv)$/i.test(driveName)||/(?:spreadsheetml\.sheet|ms-excel)/i.test(mime)){
           const data=await response.arrayBuffer();if(generation!==viewerGeneration)return;
           const XLSX=await loadXlsx();if(generation!==viewerGeneration)return;
           const workbook=XLSX.read(data,{type:'array',cellStyles:true,cellDates:true,cellNF:true,cellFormula:true,cellHTML:true}),box=viewer.querySelector('[data-cr-viewer-content]');
@@ -344,7 +346,7 @@
           };
           renderSheet(workbook.SheetNames[0]);return;
         }
-        if(/\.docx?$/i.test(name)||/(?:wordprocessingml\.document|msword)/i.test(mime)){
+        if(/\.docx?$/i.test(driveName)||/(?:wordprocessingml\.document|msword)/i.test(mime)){
           const data=await response.arrayBuffer();if(generation!==viewerGeneration)return;
           const [mammoth,purify]=await Promise.all([loadMammoth(),loadPurify()]);if(generation!==viewerGeneration)return;
           const result=await mammoth.convertToHtml({arrayBuffer:data},{
@@ -364,7 +366,7 @@
           });
           const box=viewer.querySelector('[data-cr-viewer-content]');box.replaceChildren(doc);enableViewerZoom(doc);return;
         }
-        if(/\.(jpe?g|png|gif|webp|bmp|svg|avif|heic|heif)$/i.test(name)){
+        if(/\.(jpe?g|png|gif|webp|bmp|svg|avif|heic|heif)$/i.test(driveName)||mime.startsWith('image/')){
           const blob=await response.blob();if(generation!==viewerGeneration)return;
           viewerObjectUrl=URL.createObjectURL(blob);
           const stage=document.createElement('div');stage.className='classroom-image-stage';
@@ -378,10 +380,7 @@
           img.style.width=naturalW+'px';img.style.maxWidth='none';img.style.height='auto';
           stage.style.width=Math.max(availableW,naturalW)+'px';stage.style.minHeight=Math.max(availableH,naturalH)+'px';
           enableViewerZoom(stage,fit,fit);
-          let imageTapMoved=false,imageTapX=0,imageTapY=0;
-          img.addEventListener('pointerdown',e=>{if(e.pointerType==='touch'){imageTapMoved=false;imageTapX=e.clientX;imageTapY=e.clientY;}});
-          img.addEventListener('pointermove',e=>{if(e.pointerType==='touch'&&Math.hypot(e.clientX-imageTapX,e.clientY-imageTapY)>8)imageTapMoved=true;});
-          img.addEventListener('click',e=>{if(imageTapMoved)return;e.preventDefault();e.stopPropagation();setViewerZoom(fit,e.clientX,e.clientY);});
+          img.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();});
           return;
         }
         if(/\.(txt|md|json|xml|log|html?|css|js|ts|py|java|c|cpp|h)$/i.test(name)){
