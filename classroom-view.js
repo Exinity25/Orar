@@ -8,6 +8,12 @@
   const esc = (s='') => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const safeURL = value => {try{const u=new URL(value);return u.protocol==='https:'?u.href:'';}catch{return '';}};
   const link = (url,title,cls='classroom-link') => {const safe=safeURL(url);return safe?`<a class="${cls}" href="${esc(safe)}" target="_blank" rel="noopener noreferrer">${esc(title)} ↗</a>`:'';};
+  const linkifyText = value => String(value||'').split(/(https?:\/\/[^\s]+|www\.[^\s]+)/gi).map(part=>{
+    if(!/^(https?:\/\/|www\.)/i.test(part))return esc(part);
+    let clean=part,trailing='';while(/[),.;!?]$/.test(clean)){trailing=clean.slice(-1)+trailing;clean=clean.slice(0,-1);}
+    const href=safeURL(/^www\./i.test(clean)?'https://'+clean:clean);
+    return href?`<a class="classroom-inline-link" href="${esc(href)}" target="_blank" rel="noopener noreferrer">${esc(clean)}</a>${esc(trailing)}`:esc(part);
+  }).join('');
   const previewable = title => /\.(pdf|xlsx?)$/i.test(String(title||'').trim());
   const previewButton = file => {
     const title=String(file?.title||'Fișier');
@@ -44,6 +50,12 @@
     }
     viewer.addEventListener('click',e=>{if(e.target.closest('[data-cr-viewer-close]'))closeViewer();});
     viewer.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();closeViewer();}});
+    function logout(){const old=token;clearSession();if(old && window.google?.accounts?.oauth2)window.google.accounts.oauth2.revoke(old,()=>{});}
+    profile.addEventListener('click',e=>{
+      const toggle=e.target.closest('[data-cr-profile-toggle]');
+      if(toggle){const open=profile.classList.toggle('is-open');toggle.setAttribute('aria-expanded',String(open));return;}
+      if(e.target.closest('[data-cr-logout]'))logout();
+    });
     let token='',expires=0,client=null,courses=[],posts=[],selected=null,loading=false,message='',warning='',generation=0,session=0,expireTimer,visible=false;
     const configured=()=>/^[\w.-]+\.apps\.googleusercontent\.com$/.test(window.ORAR_CLASSROOM_CLIENT_ID||'');
     function clearSession(text=''){
@@ -85,23 +97,35 @@
     function attachments(post){
       return (post.materials||[]).map(m=>{
         if(m.driveFile?.driveFile){const f=m.driveFile.driveFile;return previewButton(f) || link(f.alternateLink || (f.id?'https://drive.google.com/file/d/'+encodeURIComponent(f.id)+'/view':''),f.title||'Fișier Google Drive');}
-        if(m.link)return link(m.link.url,m.link.title||'Deschide linkul');
+        if(m.link)return link(m.link.url,m.link.title||m.link.url||'Deschide linkul');
         if(m.youtubeVideo)return link(m.youtubeVideo.alternateLink || (m.youtubeVideo.id?'https://www.youtube.com/watch?v='+encodeURIComponent(m.youtubeVideo.id):''),m.youtubeVideo.title||'Video');
         if(m.form)return link(m.form.formUrl,m.form.title||'Formular');
         return '';
       }).join('');
     }
+    function postsMarkup(){
+      if(loading)return '<p class="classroom-notice classroom-panel-notice" role="status">Se încarcă materialele…</p>';
+      const notice=warning?`<p class="classroom-notice classroom-panel-notice" role="alert">${esc(warning)}</p>`:'';
+      const body=posts.map(post=>`<article class="classroom-post"><span class="classroom-kind">${esc(post.kind)}</span><h3>${esc(post.title|| (post.kind==='Anunț'?'Anunț':'Material'))}</h3>${post.description||post.text?`<p>${linkifyText(post.description||post.text)}</p>`:''}<div class="classroom-attachments">${attachments(post)}</div>${link(post.alternateLink,'Vezi în Classroom')}</article>`).join('');
+      return notice+(body||(!warning?'<p class="hub-empty">Nu sunt materiale publicate în această clasă.</p>':''));
+    }
+    function courseMarkup(course){
+      const open=Boolean(selected && selected.id===course.id);
+      return `<section class="classroom-course ${open?'is-open':''}" data-cr-course-card="${esc(course.id)}">
+        <button class="classroom-course-summary" type="button" data-cr-course="${esc(course.id)}" aria-expanded="${open?'true':'false'}">
+          <span class="classroom-course-copy"><strong>${esc(course.name)}</strong><span>${esc(course.section||course.descriptionHeading||'')}${course.courseState==='ARCHIVED'?' · Arhivată':''}</span></span>
+          <span class="classroom-course-chevron" aria-hidden="true">›</span>
+        </button>
+        ${open?`<div class="classroom-course-panel"><div class="classroom-course-panel-head">${link(course.alternateLink,'Deschide clasa în Classroom')}</div><div class="classroom-posts">${postsMarkup()}</div></div>`:''}
+      </section>`;
+    }
     function render(){
       const signed=Boolean(token && Date.now()<expires);
       page.innerHTML=`<div class="hub-content"><header class="hub-page-header"><h1 class="hub-heading" id="classroomHeading" tabindex="-1">Classroom</h1><p class="hub-intro">Clasele și materialele tale, într-un singur loc.</p></header>
-        <div class="classroom-actions">${signed?'<button class="hub-small-button" data-cr-refresh>Actualizează</button><button class="hub-small-button" data-cr-logout>Deconectează</button>':`<button class="hub-primary" data-cr-signin ${!configured()||!client?'disabled':''}>Conectează contul Google</button>`}${link('https://classroom.google.com/','Deschide Google Classroom')}</div>
+        <div class="classroom-actions">${signed?'<button class="hub-small-button" data-cr-refresh>Actualizează</button>':`<button class="hub-primary" data-cr-signin ${!configured()||!client?'disabled':''}>Conectează contul Google</button>`}${link('https://classroom.google.com/','Deschide Google Classroom')}</div>
         ${message?`<p class="classroom-notice" role="alert">${esc(message)}</p>`:''}
         ${!configured()?'<div class="classroom-welcome"><h2>Conectarea Google nu este activată încă</h2><p>După activare, aici vei vedea clasele și materialele contului tău.</p></div>':!signed?'<div class="classroom-welcome"><h2>Materialele tale, aproape</h2><p>Conectează-te pentru a vedea clasele, documentele și materialele publicate. Nimic nu va fi modificat în Classroom.</p></div>':''}
-        ${signed&&selected?`<button class="hub-small-button classroom-back" data-cr-back>← Toate clasele</button><div class="classroom-course-heading"><h2>${esc(selected.name)}</h2>${link(selected.alternateLink,'Deschide clasa')}</div>`:''}
-        ${loading?'<p class="classroom-notice" role="status">Se încarcă…</p>':''}
-        ${warning?`<p class="classroom-notice" role="alert">${esc(warning)}</p>`:''}
-        ${signed&&!selected&&!loading?`<div class="classroom-courses">${courses.map(c=>`<button class="classroom-course" data-cr-course="${esc(c.id)}"><strong>${esc(c.name)}</strong><span>${esc(c.section||c.descriptionHeading||'')}${c.courseState==='ARCHIVED'?' · Arhivată':''}</span><small>Vezi materialele →</small></button>`).join('')||'<p class="hub-empty">Nu există clase vizibile pentru acest cont.</p>'}</div>`:''}
-        ${signed&&selected&&!loading?`<div class="classroom-posts">${posts.map(post=>`<article class="classroom-post"><span class="classroom-kind">${esc(post.kind)}</span><h3>${esc(post.title|| (post.kind==='Anunț'?'Anunț':'Material'))}</h3>${post.description||post.text?`<p>${esc(post.description||post.text)}</p>`:''}<div class="classroom-attachments">${attachments(post)}</div>${link(post.alternateLink,'Vezi în Classroom')}</article>`).join('')||(!warning?'<p class="hub-empty">Nu sunt materiale publicate în această clasă.</p>':'')}</div>`:''}</div>`;
+        ${signed?`<div class="classroom-courses">${courses.map(courseMarkup).join('')||(!loading?'<p class="hub-empty">Nu există clase vizibile pentru acest cont.</p>':'')}${loading&&!selected?'<p class="classroom-notice" role="status">Se încarcă clasele…</p>':''}</div>`:''}</div>`;
     }
     async function prepareSignIn(){
       if(!configured() || client)return;
@@ -114,7 +138,7 @@
             clearTimeout(expireTimer);expireTimer=setTimeout(()=>clearSession('Sesiunea a expirat. Conectează-te din nou.'),Math.max(0,expires-Date.now()));
             loadCourses();
             try{const user=await api('https://openidconnect.googleapis.com/v1/userinfo');if(authSession!==session || !token)return;
-              profile.innerHTML=`${safeURL(user.picture)?`<img src="${esc(safeURL(user.picture))}" alt="Fotografia contului Google" referrerpolicy="no-referrer">`:''}<div><strong>${esc(user.name||'Cont Google')}</strong><span>${esc(user.email||'')}</span></div>`;profile.classList.remove('hub-hidden');
+              profile.innerHTML=`<button class="classroom-profile-summary" type="button" data-cr-profile-toggle aria-expanded="false">${safeURL(user.picture)?`<img src="${esc(safeURL(user.picture))}" alt="" referrerpolicy="no-referrer">`:'<span class="classroom-profile-avatar" aria-hidden="true">G</span>'}<span class="classroom-profile-copy"><strong>${esc(user.name||'Cont Google')}</strong><span>${esc(user.email||'')}</span></span><span class="classroom-profile-chevron" aria-hidden="true">›</span></button><div class="classroom-profile-menu"><div class="classroom-profile-details"><strong>Cont Google conectat</strong><span>${esc(user.email||'')}</span></div><button class="hub-small-button classroom-profile-logout" type="button" data-cr-logout>Deconectează</button></div>`;profile.classList.remove('hub-hidden');
             }catch{/* Profile is optional; course access can still work. */}
           },error_callback:()=>{message='Fereastra Google a fost închisă sau blocată. Apasă din nou pe conectare.';render();}});
         render();
@@ -124,9 +148,10 @@
       const preview=e.target.closest('[data-cr-preview]');if(preview){openViewer(preview.dataset.crPreview,preview.dataset.crPreviewTitle);return;}
       if(e.target.closest('[data-cr-signin]') && client)client.requestAccessToken({prompt:'select_account'});
       if(e.target.closest('[data-cr-refresh]'))selected?loadCourse(selected.id):loadCourses();
-      if(e.target.closest('[data-cr-back]')){generation++;selected=null;posts=[];loading=false;warning='';message='';render();}
-      const course=e.target.closest('[data-cr-course]');if(course)loadCourse(course.dataset.crCourse);
-      if(e.target.closest('[data-cr-logout]')){const old=token;clearSession();if(old && window.google?.accounts?.oauth2)window.google.accounts.oauth2.revoke(old,()=>{});}
+      const course=e.target.closest('[data-cr-course]');if(course){
+        if(selected?.id===course.dataset.crCourse){generation++;selected=null;posts=[];loading=false;warning='';message='';render();}
+        else loadCourse(course.dataset.crCourse);
+      }
     });
     render();
     return {element:page,show(){visible=true;render();prepareSignIn();page.classList.remove('is-entering');void page.offsetWidth;page.classList.add('is-entering');page.querySelector('h1').focus({preventScroll:true});}};
