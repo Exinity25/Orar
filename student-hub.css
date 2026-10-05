@@ -995,3 +995,15 @@ body[data-orar-theme] .hub-brand-dot{color:var(--accent-2)!important}
 .classroom-pdf-page canvas{position:relative;z-index:1}
 .classroom-pdf-links{z-index:4!important}
 .classroom-pdf-link{-webkit-tap-highlight-color:rgba(59,130,246,.18);touch-action:manipulation}
+
+
+/* Stable image interaction: pinch is handled by the viewer; taps/double-taps never trigger browser zoom. */
+.classroom-image-stage,
+.classroom-image-preview{
+  touch-action:manipulation!important;
+  -webkit-touch-callout:none!important;
+  user-select:none!important;
+}
+.classroom-image-preview{
+  cursor:default!important;
+}
