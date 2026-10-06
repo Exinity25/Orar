@@ -1602,3 +1602,34 @@ body[data-orar-theme="custom"].orar-custom-light{color-scheme:light}
     max-height:100dvh!important;
   }
 }
+
+
+/* v68 iPhone home-indicator bleed.
+   100dvh ends at the web-content viewport on iOS; the standalone safe-area
+   can still be composited below it. Extend only the painted layer into that
+   area, while keeping interactive content inside the viewport. */
+@supports (-webkit-touch-callout:none){
+  html{
+    background:var(--bg,#05070c)!important;
+  }
+  body{
+    position:relative;
+    background:var(--bg,#05070c)!important;
+  }
+  body::before,
+  body::after{
+    bottom:calc(-1 * env(safe-area-inset-bottom))!important;
+    height:auto!important;
+    min-height:calc(100dvh + env(safe-area-inset-bottom))!important;
+  }
+  body::after{
+    background:
+      radial-gradient(circle at 50% 14%,rgba(255,255,255,.08),transparent 24%),
+      linear-gradient(rgba(2,5,11,.42),rgba(2,5,11,.58)),
+      linear-gradient(90deg,rgba(0,0,0,.22),rgba(0,0,0,0) 18%,rgba(0,0,0,0) 82%,rgba(0,0,0,.22)),
+      var(--bg,#05070c)!important;
+  }
+  body::before{
+    background-color:var(--bg,#05070c)!important;
+  }
+}
