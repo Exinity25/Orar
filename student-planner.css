@@ -43,3 +43,21 @@ body[data-orar-theme=ice] .planner-page{padding:0;color:#17263b}body[data-orar-t
   .pl-header h1{font-size:32px}
   .pl-hero{padding:20px;margin:14px 0 20px}
 }
+
+
+/* Mobile dialogs fit inside the viewport: vertical scrolling only. */
+.planner-dialog{max-width:calc(100vw - 28px);overflow-x:hidden;overscroll-behavior-x:none}
+#plSearchResults,#plSearchResults button{width:100%;max-width:100%;min-width:0;box-sizing:border-box}
+#plSearchResults button{white-space:normal;overflow-wrap:anywhere}
+.pl-campus-map{width:100%;height:min(62dvh,620px);overflow:hidden;border:1px solid #ffffff26;border-radius:14px;background:#0b0f16}
+.pl-campus-map iframe{display:block;width:100%;height:100%;border:0}
+.pl-map-note{font-size:12px;opacity:.7}
+@media(max-width:750px){
+  .planner-dialog{width:calc(100vw - 24px);max-width:calc(100vw - 24px);padding:16px}
+  .pl-dialog-head{min-width:0}
+  .pl-dialog-head h2{min-width:0;overflow-wrap:anywhere}
+  #plGlobalSearch{width:100%;max-width:100%;box-sizing:border-box}
+  #plSearchResults{overflow-x:hidden}
+  #plSearchResults button{padding:8px 11px;min-height:34px}
+  .pl-campus-map{height:56dvh}
+}
