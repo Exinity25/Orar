@@ -745,6 +745,54 @@
     .combined-overlap{--overlap:#a855f7;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--overlap) 60%,transparent),0 0 18px color-mix(in srgb,var(--overlap) 20%,transparent)}
     .overlap-tone-red{--overlap:#ef4444}.overlap-tone-green{--overlap:#22c55e}.overlap-tone-blue{--overlap:#3b82f6}
     .overlap-tone-yellow{--overlap:#facc15}.overlap-tone-orange{--overlap:#f97316}.overlap-tone-violet{--overlap:#a855f7}
+
+    /* Two simultaneous activities share one accent-colored card, divided diagonally. */
+    .schedule-grid .combined-slot.overlap-diagonal{
+      position:relative!important;
+      display:block!important;
+      min-height:var(--row-height)!important;
+      overflow:hidden!important;
+      padding:0!important;
+      border-left:4px solid var(--overlap)!important;
+      background:
+        radial-gradient(circle at 12% 12%,color-mix(in srgb,var(--overlap) 18%,transparent),transparent 34%),
+        linear-gradient(180deg,color-mix(in srgb,var(--overlap) 9%,rgba(9,13,22,.97)),rgba(9,13,22,.96))!important;
+      box-shadow:
+        inset 0 0 0 1px color-mix(in srgb,var(--overlap) 50%,transparent),
+        0 0 18px color-mix(in srgb,var(--overlap) 22%,transparent)!important;
+    }
+    .schedule-grid .combined-slot.overlap-diagonal::after{
+      content:"";position:absolute;z-index:2;left:-8%;top:50%;width:116%;height:1px;
+      background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--overlap) 88%,white 12%) 14%,color-mix(in srgb,var(--overlap) 88%,white 12%) 86%,transparent);
+      box-shadow:0 0 8px color-mix(in srgb,var(--overlap) 45%,transparent);
+      transform:rotate(-9deg);transform-origin:center;pointer-events:none;
+    }
+    .overlap-piece{
+      position:absolute;z-index:3;left:0;right:0;min-width:0;padding:7px 10px 6px 11px;
+      overflow:hidden;color:var(--text,#fff);
+    }
+    .overlap-piece.is-top{top:0;height:51%;padding-bottom:9px}
+    .overlap-piece.is-bottom{bottom:0;height:51%;padding-top:9px}
+    .overlap-mini-head{display:flex;align-items:center;gap:5px;min-width:0;line-height:1}
+    .overlap-mini-source{
+      flex:0 1 auto;min-width:0;max-width:48%;padding:2px 6px;border-radius:999px;
+      background:color-mix(in srgb,var(--overlap) 15%,transparent);color:var(--overlap);
+      font-size:7px;font-weight:900;letter-spacing:.075em;text-transform:uppercase;
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis
+    }
+    .overlap-mini-type{
+      min-width:0;color:var(--overlap);font-size:7px;font-weight:900;letter-spacing:.045em;text-transform:uppercase;
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis
+    }
+    .overlap-mini-subject{
+      margin-top:3px;color:var(--text,#fff);font-size:10px;font-weight:850;line-height:1.04;
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis
+    }
+    .overlap-mini-meta{
+      margin-top:3px;color:var(--glass-muted,var(--muted));font-size:7px;line-height:1.05;
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis
+    }
+    .overlap-mini-meta .overlap-mini-pin{color:var(--overlap);font-weight:900}
     .schedule-manager-dialog{width:min(680px,calc(100vw - 24px));max-height:min(82dvh,760px)}
     .schedule-manager-list{display:grid;gap:10px;margin:14px 0}
     .schedule-manager-row{display:grid;grid-template-columns:minmax(0,1fr) 150px auto;gap:8px;align-items:end;padding:12px;border:1px solid var(--glass-border,#ffffff18);border-radius:15px;background:rgba(255,255,255,.025)}
@@ -834,6 +882,19 @@
         height:auto!important;
         min-height:82px!important;
       }
+
+      .schedule-grid .combined-slot.overlap-diagonal{
+        height:var(--row-height)!important;
+        min-height:var(--row-height)!important;
+      }
+      .schedule-grid .combined-slot.overlap-diagonal::after{transform:rotate(-7deg)}
+      .overlap-piece{padding:5px 7px 4px 8px}
+      .overlap-piece.is-top{padding-bottom:7px}
+      .overlap-piece.is-bottom{padding-top:7px}
+      .overlap-mini-source{font-size:5.5px;padding:2px 4px;max-width:44%}
+      .overlap-mini-type{font-size:5.5px}
+      .overlap-mini-subject{font-size:8px;margin-top:2px}
+      .overlap-mini-meta{font-size:5.7px;margin-top:2px}
     }
 
   </style>
@@ -1226,10 +1287,25 @@
         <div class="meta-stack"><div class="meta-line"><span class="meta-icon">${ICONS.person}</span><span class="meta-text">${escapeHtml(item.professor)}</span></div><div class="meta-line"><span class="meta-icon">${ICONS.pin}</span><span class="meta-text">${escapeHtml(item.location)}</span></div></div>
       </article>`;
     }
+    function renderOverlapPiece(record,position){
+      const {entry,item}=record;
+      const parity=item.week!=='MEREU'?' · '+item.week:'';
+      const professor=String(item.professor||'').trim(),location=String(item.location||'').trim();
+      const meta=[professor,location].filter(Boolean).join(' · ');
+      return `<section class="overlap-piece ${position==='top'?'is-top':'is-bottom'}" aria-label="${escapeHtml(entry.name+': '+item.subject)}">
+        <div class="overlap-mini-head"><span class="overlap-mini-source">${escapeHtml(entry.name)}</span><span class="overlap-mini-type">${escapeHtml(item.type+parity)}</span></div>
+        <div class="overlap-mini-subject">${escapeHtml(item.subject)}</div>
+        <div class="overlap-mini-meta"><span class="overlap-mini-pin">⌖</span> ${escapeHtml(meta)}</div>
+      </section>`;
+    }
     function renderCombinedSlot(time,day){
       const items=combinedItemsAt(time,day);
       if(!items.length)return `<div class="slot-cell empty day-col day-${day}"></div>`;
-      const overlap=items.length>1,tone=SCHEDULE_ACCENTS.includes(scheduleBook.overlapColor)?scheduleBook.overlapColor:'violet';
+      const tone=SCHEDULE_ACCENTS.includes(scheduleBook.overlapColor)?scheduleBook.overlapColor:'violet';
+      if(items.length===2){
+        return `<div class="slot-cell combined-slot overlap-diagonal overlap-tone-${tone} day-col day-${day}">${renderOverlapPiece(items[0],'top')}${renderOverlapPiece(items[1],'bottom')}</div>`;
+      }
+      const overlap=items.length>1;
       return `<div class="slot-cell combined-slot day-col day-${day} ${overlap?'combined-overlap overlap-tone-'+tone:''}">${items.map(renderCombinedCard).join('')}</div>`;
     }
     function renderTabs(){
