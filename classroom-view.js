@@ -987,7 +987,8 @@
     const restored=restoreSession();renderProfile(rememberedAccount(),restored);if(restored){scheduleExpiry();restoreCloud().catch(()=>{});if(mailScopeOk())refreshMailSummary();}
     render();renderMail();renderDrive();prepareSignIn();setInterval(()=>{if(mailScopeOk())refreshMailSummary();},5*60000);
     return {element:page,mailElement:mailPage,driveElement:drivePage,syncPlanner,openFile:openViewer,openDriveLink,
-      getAccessToken:()=>token&&Date.now()<expires?token:'',
+      getAccessToken:()=>token&&Date.now()<expires&&String(grantedScopes||'').split(/\s+/).includes('https://www.googleapis.com/auth/generative-language.retriever')?token:'',
+      requestGeminiAccess:()=>{if(client)requestAccess(true,false);},
       contextSnapshot:()=>({
         googleConnected:Boolean(token&&Date.now()<expires),
         courses:courses.map(c=>({id:c.id,name:c.name,section:c.section||'',descriptionHeading:c.descriptionHeading||''})),
