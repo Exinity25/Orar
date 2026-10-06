@@ -76,3 +76,18 @@ body[data-orar-theme=ice] .planner-page{padding:0;color:#17263b}body[data-orar-t
   .pl-duration-picker{gap:7px}
   .pl-duration-picker select{font-size:17px!important;padding:10px 4px}
 }
+
+.pl-add-checklist{width:100%;margin:8px 0 14px;border-style:dashed!important}
+.pl-add-checklist.is-hidden,[data-checklist-editor].is-hidden{display:none!important}
+.pl-check-editor{margin:8px 0 16px;padding:12px;border:1px solid #ffffff20;border-radius:16px;background:#ffffff08}
+.pl-check-editor-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.pl-check-editor-head button{width:38px;height:38px;padding:0;border-radius:50%}
+.pl-check-edit-row{display:grid;grid-template-columns:20px minmax(0,1fr) 38px;align-items:center;gap:8px;margin:8px 0}
+.pl-check-edit-row input[name="checkitem"]{min-width:0;width:100%;margin:0}
+.pl-check-edit-row button{width:38px;height:38px;padding:0;border-radius:50%}
+.pl-check-edit-dot{width:16px;height:16px;border:2px solid currentColor;border-radius:50%;opacity:.45}
+.pl-task-checklist{display:grid;gap:7px;margin:14px 0 4px}
+.pl-check-item{display:grid!important;grid-template-columns:24px minmax(0,1fr);align-items:center;gap:9px;width:100%;padding:7px 2px!important;border:0!important;background:transparent!important;box-shadow:none!important;text-align:left;color:inherit!important}
+.pl-check-circle{display:grid;place-items:center;width:21px;height:21px;border:2px solid color-mix(in srgb,currentColor 55%,transparent);border-radius:50%;font-size:12px;font-weight:900;transition:.15s ease}
+.pl-check-item.is-done .pl-check-circle{border-color:var(--accent);background:var(--accent);color:#fff;box-shadow:0 0 12px color-mix(in srgb,var(--accent) 32%,transparent)}
+.pl-check-item.is-done>span:last-child{text-decoration:line-through;opacity:.55}
