@@ -1010,3 +1010,15 @@ body[data-orar-theme] .hub-brand-dot{color:var(--accent-2)!important}
 
 .classroom-image-zoom-controls{display:flex;gap:4px;align-items:center}
 .classroom-viewer-content.has-local-zoom{touch-action:pan-x pan-y!important}
+
+/* Read-only workbook preview: retain document dimensions and fit the whole width. */
+.classroom-workbook-stage{position:relative;margin:12px;overflow:visible;flex:none}
+.classroom-excel-table.classroom-excel-document{
+  position:absolute;top:0;left:0;min-width:0;border-collapse:collapse;
+  font:14.6667px/1.15 Calibri,Arial,sans-serif;color:#000;background:#fff;
+}
+.classroom-excel-table.classroom-excel-document td{
+  height:auto;padding:0 2px;border:1px solid #d8dde6;
+  overflow-wrap:normal;vertical-align:bottom;text-overflow:clip;
+}
+.classroom-excel-table.classroom-excel-document td:hover{outline:none}

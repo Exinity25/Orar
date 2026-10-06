@@ -1,4 +1,4 @@
-const CACHE = 'orar-v44-classroom-links-excel-image-zoom';
+const CACHE = 'orar-v45-workbook-format-fit';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './student-hub.css', './student-hub.js', './classroom-config.js', './classroom-view.js'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));

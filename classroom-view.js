@@ -22,7 +22,7 @@
     if(!file?.id)return '';
     return `<button class="classroom-link classroom-preview-link" type="button" data-cr-preview="${esc(file.id)}" data-cr-preview-title="${esc(title)}">${esc(title)} <span aria-hidden="true">▣</span></button>`;
   };
-  let gisPromise,xlsxPromise,pdfjsPromise,mammothPromise,purifyPromise;
+  let gisPromise,xlsxPromise,excelStylesPromise,pdfjsPromise,mammothPromise,purifyPromise;
   function loadScript(src,test,reset){
     if(test())return Promise.resolve();
     if(reset.value)return reset.value;
@@ -60,6 +60,10 @@
       s.onerror=()=>{xlsxPromise=null;s.remove();reject(Error('Nu s-a putut încărca viewerul Excel.'));};document.head.append(s);
     });return xlsxPromise;
   }
+  function loadExcelStyles(){
+    const ref={get value(){return excelStylesPromise;},set value(v){excelStylesPromise=v;}};
+    return loadScript('https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js',()=>Boolean(window.ExcelJS),ref).then(()=>window.ExcelJS);
+  }
   function loadGoogle(){
     if(window.google?.accounts?.oauth2)return Promise.resolve();
     if(gisPromise)return gisPromise;
@@ -75,6 +79,12 @@
     viewer.innerHTML=`<div class="classroom-viewer-backdrop" data-cr-viewer-close></div><section class="classroom-viewer-dialog"><header class="classroom-viewer-header"><h2 id="classroomViewerTitle" data-cr-viewer-title>Fișier</h2><div class="classroom-viewer-actions"><a class="hub-small-button classroom-viewer-drive" data-cr-viewer-drive target="_blank" rel="noopener noreferrer">Deschide în Drive ↗</a><button class="hub-small-button classroom-viewer-close" type="button" data-cr-viewer-close aria-label="Închide previzualizarea">✕</button></div></header><div class="classroom-viewer-content" data-cr-viewer-content></div></section>`;root.append(viewer);
     let viewerReturnFocus=null,viewerObjectUrl='',viewerGeneration=0,viewerZoom=1,viewerZoomTarget=null,viewerMinZoom=1;
     let pinchStartDistance=0,pinchStartZoom=1,pinchWorldX=0,pinchWorldY=0,pinchFrame=0;
+    function sizeWorkbookStage(){
+      if(!viewerZoomTarget?.classList.contains('classroom-excel-document'))return;
+      const stage=viewerZoomTarget.parentElement;
+      stage.style.width=Math.ceil(viewerZoomTarget.offsetWidth*viewerZoom)+'px';
+      stage.style.height=Math.ceil(viewerZoomTarget.offsetHeight*viewerZoom)+'px';
+    }
     function setViewerZoom(next,focusX=null,focusY=null){
       if(!viewerZoomTarget)return;
       const box=viewer.querySelector('[data-cr-viewer-content]'),oldZoom=viewerZoom;
@@ -88,10 +98,11 @@
       viewerZoomTarget.style.transform='scale('+viewerZoom+')';
       viewerZoomTarget.style.transformOrigin='0 0';
       viewerZoomTarget.style.setProperty('--viewer-zoom',String(viewerZoom));
+      sizeWorkbookStage();
       box.scrollLeft=Math.max(0,worldX*viewerZoom-localX);
       box.scrollTop=Math.max(0,worldY*viewerZoom-localY);
     }
-    function enableViewerZoom(target,minZoom=1,initialZoom=1){viewer.querySelector('[data-cr-viewer-content]').classList.add('has-local-zoom');viewerZoomTarget=target;viewerMinZoom=Math.max(.1,Math.min(1,Number(minZoom)||1));viewerZoom=Math.max(viewerMinZoom,Number(initialZoom)||1);target.classList.add('classroom-zoom-target');target.style.transform='scale('+viewerZoom+')';target.style.transformOrigin='0 0';target.style.setProperty('--viewer-zoom',String(viewerZoom));}
+    function enableViewerZoom(target,minZoom=1,initialZoom=1){viewer.querySelector('[data-cr-viewer-content]').classList.add('has-local-zoom');viewerZoomTarget=target;viewerMinZoom=Math.max(.01,Math.min(1,Number(minZoom)||1));viewerZoom=Math.max(viewerMinZoom,Number(initialZoom)||1);target.classList.add('classroom-zoom-target');target.style.transform='scale('+viewerZoom+')';target.style.transformOrigin='0 0';target.style.setProperty('--viewer-zoom',String(viewerZoom));sizeWorkbookStage();}
     function enableFramePinch(frame){disableViewerZoom();}
     function disableViewerZoom(){viewer.querySelector('[data-cr-viewer-content]').classList.remove('has-local-zoom');if(pinchFrame)cancelAnimationFrame(pinchFrame);pinchFrame=0;viewerZoomTarget=null;viewerZoom=1;viewerMinZoom=1;pinchStartDistance=0;pinchWorldX=pinchWorldY=0;}
     function resetViewerContent(){
@@ -259,11 +270,21 @@
           const data=await response.arrayBuffer();if(generation!==viewerGeneration)return;
           const XLSX=await loadXlsx();if(generation!==viewerGeneration)return;
           const workbook=XLSX.read(data,{type:'array',cellStyles:true,cellDates:true,cellNF:true,cellFormula:true,cellHTML:true}),box=viewer.querySelector('[data-cr-viewer-content]');
+          // SheetJS supplies values and number formats; ExcelJS preserves the XLSX styles.
+          let styledWorkbook=null,styleWarning='';
+          if(new Uint8Array(data)[0]===0x50 && new Uint8Array(data)[1]===0x4b){
+            try{
+              const ExcelJS=await loadExcelStyles();if(generation!==viewerGeneration)return;
+              styledWorkbook=new ExcelJS.Workbook();await styledWorkbook.xlsx.load(data);
+            }catch{styledWorkbook=null;styleWarning='Formatarea originală nu a putut fi încărcată. Sunt afișate datele foii.';}
+            if(generation!==viewerGeneration)return;
+          }
           if(!workbook.SheetNames.length)throw Error('Fișierul Excel nu conține foi care pot fi afișate.');
           const renderSheet=sheetName=>{
+            disableViewerZoom();
+            const styledSheet=styledWorkbook?.getWorksheet(sheetName);
             const sheet=workbook.Sheets[sheetName],ref=sheet?.['!ref'];
-            if(!ref){box.innerHTML='<div class="classroom-viewer-message">Foaia este goală.</div>';return;}
-            const range=XLSX.utils.decode_range(ref),maxRows=2500,maxCols=120,endRow=Math.min(range.e.r,range.s.r+2499),endCol=Math.min(range.e.c,range.s.c+119);
+            const range=XLSX.utils.decode_range(ref||'A1'),maxRows=2500,maxCols=120,endRow=Math.min(range.e.r,range.s.r+2499),endCol=Math.min(range.e.c,range.s.c+119);
             const indexedColors=['000000','FFFFFF','FF0000','00FF00','0000FF','FFFF00','FF00FF','00FFFF','000000','FFFFFF','FF0000','00FF00','0000FF','FFFF00','FF00FF','00FFFF','800000','008000','000080','808000','800080','008080','C0C0C0','808080'];
             const normalizeColor=raw=>{
               let value=String(raw||'').replace(/^#/,'').trim();
@@ -286,7 +307,7 @@
             const excelColor=value=>{
               if(!value)return '';
               if(typeof value==='string')return normalizeColor(value);
-              let color=normalizeColor(value.rgb);
+              let color=normalizeColor(value.argb||value.rgb);
               if(!color && Number.isInteger(value.indexed))color=normalizeColor(indexedColors[value.indexed]||'');
               if(!color && value.theme!==undefined)color=themeColor(Number(value.theme));
               const tint=Number(value.tint);
@@ -307,17 +328,16 @@
               const kinds={dotted:'dotted',dashed:'dashed',dashDot:'dashed',dashDotDot:'dashed',double:'double'};
               return (widths[side.style]||1)+'px '+(kinds[side.style]||'solid')+' '+color;
             };
-            const applyCellStyle=(td,cell)=>{
-              if(!cell)return;
-              const style=resolvedStyle(cell);
+            const applyCellStyle=(td,cell,original)=>{
+              const style=original?.style||resolvedStyle(cell);
               if(style){
-                const fill=style.fill?.patternType==='none'?'':excelColor(style.fill?.fgColor)||excelColor(style.fill?.bgColor);if(fill)td.style.backgroundColor=fill;
+                const fill=(style.fill?.pattern||style.fill?.patternType)==='none'?'':excelColor(style.fill?.fgColor)||excelColor(style.fill?.bgColor);if(fill)td.style.backgroundColor=fill;
                 const font=style.font||{},fontColor=excelColor(font.color);if(fontColor)td.style.color=fontColor;
                 if(font.bold)td.style.fontWeight='700';
                 if(font.italic)td.style.fontStyle='italic';
                 if(font.underline)td.style.textDecoration='underline';
                 if(font.strike)td.style.textDecoration=(td.style.textDecoration?td.style.textDecoration+' ':'')+'line-through';
-                if(Number(font.sz)>0)td.style.fontSize=Math.max(8,Math.min(32,Number(font.sz)*4/3))+'px';
+                if(Number(font.size||font.sz)>0)td.style.fontSize=Math.max(1,Math.min(256,Number(font.size||font.sz)*4/3))+'px';
                 if(font.name)td.style.fontFamily=String(font.name)+', system-ui, sans-serif';
                 const horizontal=style.alignment?.horizontal;
                 if(['left','center','right','justify'].includes(horizontal))td.style.textAlign=horizontal;
@@ -328,46 +348,55 @@
                 const border=style.border,top=borderCss(border?.top),right=borderCss(border?.right),bottom=borderCss(border?.bottom),left=borderCss(border?.left);
                 if(top)td.style.borderTop=top;if(right)td.style.borderRight=right;if(bottom)td.style.borderBottom=bottom;if(left)td.style.borderLeft=left;
               }
-              if(cell.t==='n' && !td.style.textAlign)td.style.textAlign='right';
-              if(cell.t==='b' && !td.style.textAlign)td.style.textAlign='center';
+              if(cell?.t==='n' && !td.style.textAlign)td.style.textAlign='right';
+              if(cell?.t==='b' && !td.style.textAlign)td.style.textAlign='center';
             };
             const starts=new Map(),skip=new Set();
             (sheet['!merges']||[]).forEach(m=>{
               if(m.s.r>=range.s.r&&m.s.r<=endRow&&m.s.c>=range.s.c&&m.s.c<=endCol)starts.set(m.s.r+':'+m.s.c,{rowspan:Math.min(m.e.r,endRow)-m.s.r+1,colspan:Math.min(m.e.c,endCol)-m.s.c+1});
               for(let r=Math.max(m.s.r,range.s.r);r<=Math.min(m.e.r,endRow);r++)for(let col=Math.max(m.s.c,range.s.c);col<=Math.min(m.e.c,endCol);col++)if(r!==m.s.r||col!==m.s.c)skip.add(r+':'+col);
             });
-            const table=document.createElement('table');table.className='classroom-excel-table';
-            const cg=document.createElement('colgroup'),rh=document.createElement('col');rh.className='excel-row-number-col';cg.append(rh);
+            const table=document.createElement('table');table.className='classroom-excel-table classroom-excel-document';table.setAttribute('aria-label',sheetName);
+            const cg=document.createElement('colgroup');let tableWidth=0;
             for(let col=range.s.c;col<=endCol;col++){
-              const meta=sheet['!cols']?.[col],ce=document.createElement('col');let width=Number(meta?.wpx)||0;
+              const meta=sheet['!cols']?.[col],original=styledSheet?.getColumn(col+1),ce=document.createElement('col');let width=Number(meta?.wpx)||0;
+              if(original?.hidden||meta?.hidden){ce.style.display='none';cg.append(ce);continue;}
+              if(Number(original?.width)>0)width=Math.floor(Number(original.width)*7+5);
               if(!width&&Number(meta?.wch)>0)width=Math.round(Number(meta.wch)*8+18);
               if(!width&&Number(meta?.width)>0)width=Math.round(Number(meta.width)*8+18);
               if(!width){let longest=8;for(let r=range.s.r;r<=Math.min(endRow,range.s.r+80);r++){const cell=sheet[XLSX.utils.encode_cell({r,c:col})];if(cell)longest=Math.max(longest,Math.min(28,String(cell.w??XLSX.utils.format_cell(cell)??'').length));}width=longest*8+20;}
-              ce.style.width=Math.max(38,Math.min(420,width))+'px';cg.append(ce);
+              width=Math.max(1,width);tableWidth+=width;ce.style.width=width+'px';cg.append(ce);
             }
             table.append(cg);
-            const thead=document.createElement('thead'),hr=document.createElement('tr'),corner=document.createElement('th');corner.className='excel-corner';hr.append(corner);
-            for(let col=range.s.c;col<=endCol;col++){const th=document.createElement('th');th.className='excel-col-head';th.textContent=XLSX.utils.encode_col(col);hr.append(th);}thead.append(hr);table.append(thead);
+            table.style.width=tableWidth+'px';
             const tbody=document.createElement('tbody');
             for(let r=range.s.r;r<=endRow;r++){
-              const tr=document.createElement('tr'),rowMeta=sheet['!rows']?.[r];if(Number(rowMeta?.hpx)>0)tr.style.height=Math.max(18,Math.min(320,Number(rowMeta.hpx)))+'px';else if(Number(rowMeta?.hpt)>0)tr.style.height=Math.max(18,Math.min(320,Number(rowMeta.hpt)*4/3))+'px';
-              const num=document.createElement('th');num.className='excel-row-head';num.textContent=String(r+1);tr.append(num);
+              const tr=document.createElement('tr'),rowMeta=sheet['!rows']?.[r],originalRow=styledSheet?.getRow(r+1);
+              if(originalRow?.hidden||rowMeta?.hidden)tr.style.display='none';
+              const rowHeight=Number(originalRow?.height||styledSheet?.properties.defaultRowHeight||rowMeta?.hpt)*4/3||Number(rowMeta?.hpx)||20;
+              tr.style.height=Math.max(1,rowHeight)+'px';
               for(let col=range.s.c;col<=endCol;col++){
                 const key=r+':'+col;if(skip.has(key))continue;
                 const td=document.createElement('td'),merge=starts.get(key),cell=sheet[XLSX.utils.encode_cell({r,c:col})];
                 if(merge){td.rowSpan=merge.rowspan;td.colSpan=merge.colspan;td.classList.add('is-merged');}
                 const value=cell?String(cell.w??XLSX.utils.format_cell(cell)??''):'';
                 if(cell?.l?.Target){const link=document.createElement('a');link.href=cell.l.Target;link.target='_blank';link.rel='noopener noreferrer';link.textContent=value;td.append(link);}else td.textContent=value;
-                applyCellStyle(td,cell);
+                if(styledSheet?.getColumn(col+1).hidden||sheet['!cols']?.[col]?.hidden)td.style.display='none';
+                applyCellStyle(td,cell,originalRow?.getCell(col+1));
                 if(cell?.f)td.title='='+cell.f;tr.append(td);
               }
               tbody.append(tr);
             }
             table.append(tbody);
-            const wrap=document.createElement('div');wrap.className='classroom-excel-scroll';wrap.append(table);
+            const wrap=document.createElement('div');wrap.className='classroom-workbook-stage';wrap.append(table);
             const fragment=document.createDocumentFragment();
             if(workbook.SheetNames.length>1){const select=document.createElement('select');select.className='classroom-sheet-select';select.setAttribute('aria-label','Alege foaia Excel');workbook.SheetNames.forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;o.selected=n===sheetName;select.append(o);});select.addEventListener('change',()=>renderSheet(select.value));fragment.append(select);}
-            fragment.append(wrap);if(range.e.r>endRow||range.e.c>endCol){const note=document.createElement('p');note.className='classroom-viewer-limit';note.textContent='Fișier mare: sunt afișate maximum '+maxRows+' rânduri și '+maxCols+' coloane.';fragment.append(note);}box.replaceChildren(fragment);enableViewerZoom(table);
+            if(ref)fragment.append(wrap);else{const empty=document.createElement('p');empty.className='classroom-viewer-message';empty.textContent='Foaia este goală.';fragment.append(empty);}
+            if(range.e.r>endRow||range.e.c>endCol){const note=document.createElement('p');note.className='classroom-viewer-limit';note.textContent='Fișier mare: sunt afișate maximum '+maxRows+' rânduri și '+maxCols+' coloane.';fragment.append(note);}if(styleWarning){const note=document.createElement('p');note.className='classroom-viewer-limit';note.textContent=styleWarning;fragment.prepend(note);}
+            box.replaceChildren(fragment);
+            if(!ref){box.scrollLeft=0;box.scrollTop=0;return;}
+            const fit=Math.min(1,Math.max(1,box.clientWidth-24)/Math.max(1,table.offsetWidth));
+            enableViewerZoom(table,Math.min(.1,fit),fit);box.scrollLeft=0;box.scrollTop=0;
           };
           renderSheet(workbook.SheetNames[0]);return;
         }
@@ -467,6 +496,7 @@
         pinchFrame=0;if(!viewerZoomTarget)return;
         const rect=viewerContent.getBoundingClientRect(),localX=center.x-rect.left,localY=center.y-rect.top;
         viewerZoom=nextZoom;viewerZoomTarget.style.transform='scale('+viewerZoom+')';viewerZoomTarget.style.transformOrigin='0 0';viewerZoomTarget.style.setProperty('--viewer-zoom',String(viewerZoom));
+        sizeWorkbookStage();
         viewerContent.scrollLeft=Math.max(0,pinchWorldX*viewerZoom-localX);
         viewerContent.scrollTop=Math.max(0,pinchWorldY*viewerZoom-localY);
       });
