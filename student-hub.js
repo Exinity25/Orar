@@ -12,7 +12,7 @@
     customize:svg('<path d="M4 20h4l11-11-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/><path d="M4 16l4 4"/>')
   };
   let initialized = false;
-  window.OrarStudentHub = {init({getSchedule}) {
+  window.OrarStudentHub = {init({getSchedule,applySchedule}) {
     if(initialized) return;
     initialized = true;
     const app = document.querySelector('.app');
@@ -79,6 +79,7 @@
       <div class="hub-status" id="hubStatus" role="status" aria-live="polite"></div>`;
     document.body.append(root);
     const classroom = window.OrarClassroom.mount(root);
+    let planner=null;
     const $ = selector => root.querySelector(selector);
     const menu=$('#hubMenu'), layer=$('#hubLayer'), page=$('#hubSubjects'), customPage=$('#hubCustomize'), list=$('#hubSubjectList');
     layer.inert = true;
@@ -187,7 +188,7 @@
     const draftFor = id => drafts.get(id) || {text:'',deadline:'',editing:null};
     const taskMarkup = (task,id) => {
       const due=validDate(task.deadline), overdue=!task.done && due && due<today(), isToday=!task.done && due===today();
-      return `<li class="hub-task ${task.done?'is-done':''}" data-task-id="${esc(task.id)}"><div class="hub-task-main"><input class="hub-task-check" type="checkbox" data-task-done ${task.done?'checked':''} aria-label="Marchează tema ca ${task.done?'nefinalizată':'finalizată'}"><span class="hub-task-text">${esc(task.text)}</span></div><div class="hub-task-meta"><span class="hub-due ${overdue?'is-overdue':isToday?'is-today':''}">${task.done?'Finalizată':overdue?'Termen depășit · '+dateLabel(due):isToday?'Termen astăzi':dateLabel(due)}</span><div class="hub-task-actions"><button class="hub-small-button" type="button" data-task-edit>Editează</button><button class="hub-small-button is-danger" type="button" data-task-delete>${deletion===id+':'+task.id?'Confirmă ștergerea':'Șterge'}</button></div></div></li>`;
+      return `<li class="hub-task ${task.done?'is-done':''}" data-task-id="${esc(task.id)}"><div class="hub-task-main"><input class="hub-task-check" type="checkbox" data-task-done ${task.done?'checked':''} aria-label="Marchează tema ca ${task.done?'nefinalizată':'finalizată'}"><span class="hub-task-text">${esc(task.text)}</span></div><div class="hub-task-meta"><span class="hub-due ${overdue?'is-overdue':isToday?'is-today':''}">${task.done?'Finalizată':overdue?'Termen depășit · '+dateLabel(due):isToday?'Termen astăzi':dateLabel(due)}</span><div class="hub-task-actions"><button class="hub-small-button" type="button" data-task-edit>Editează</button><button class="hub-small-button" type="button" data-task-progress>Progres / prioritate</button><button class="hub-small-button is-danger" type="button" data-task-delete>${deletion===id+':'+task.id?'Confirmă ștergerea':'Șterge'}</button></div></div></li>`;
     };
     const renderSubjects = () => {
       const subjects=collectSubjects(), all=subjects.flatMap(s=>tasksFor(s.id));
@@ -196,7 +197,7 @@
       list.innerHTML=visible.map((subject,index)=>{
         const {id,name,count,current}=subject, tasks=tasksFor(id), draft=draftFor(id), pending=tasks.filter(t=>!t.done).length;
         const sorted=[...tasks].sort((a,b)=>Number(Boolean(a.done))-Number(Boolean(b.done)) || (validDate(a.deadline)||'9999').localeCompare(validDate(b.deadline)||'9999'));
-        return `<details class="hub-subject" data-subject-id="${esc(id)}" ${openSubjects.has(id)?'open':''}><summary><span class="hub-icon hub-subject-mark">${icons.book}</span><span class="hub-subject-name"><strong>${esc(name)}</strong><small>${current?count+(count===1?' activitate în orar':' activități în orar'):'Păstrată dintr-un orar anterior'} · ${pending?pending+(pending===1?' temă de făcut':' teme de făcut'):'Nicio temă în așteptare'}</small></span><span class="hub-chevron" aria-hidden="true">›</span></summary><div class="hub-subject-body"><ul class="hub-tasks">${sorted.map(task=>taskMarkup(task,id)).join('')}</ul>${tasks.length?'':'<p class="hub-empty">Adaugă prima temă pentru această materie.</p>'}<form class="hub-form"><label for="hubTaskText${index}">${draft.editing?'Editează tema':'Temă nouă'}<textarea id="hubTaskText${index}" name="text" placeholder="Ce ai de pregătit?" required maxlength="5000">${esc(draft.text)}</textarea></label><div class="hub-form-footer"><label for="hubTaskDate${index}">Termen<input id="hubTaskDate${index}" type="date" name="deadline" value="${esc(draft.deadline)}"></label><button class="hub-primary" type="submit">${draft.editing?'Salvează':'Adaugă tema'}</button>${draft.editing?'<button class="hub-small-button" type="button" data-task-cancel>Anulează</button>':''}</div></form></div></details>`;
+        return `<details class="hub-subject" data-subject-id="${esc(id)}" ${openSubjects.has(id)?'open':''}><summary><span class="hub-icon hub-subject-mark">${icons.book}</span><span class="hub-subject-name"><strong>${esc(name)}</strong><small>${current?count+(count===1?' activitate în orar':' activități în orar'):'Păstrată dintr-un orar anterior'} · ${pending?pending+(pending===1?' temă de făcut':' teme de făcut'):'Nicio temă în așteptare'}</small></span><span class="hub-chevron" aria-hidden="true">›</span></summary><div class="hub-subject-body"><button type="button" class="hub-small-button" data-subject-resources>Resurse și notițe</button><ul class="hub-tasks">${sorted.map(task=>taskMarkup(task,id)).join('')}</ul>${tasks.length?'':'<p class="hub-empty">Adaugă prima temă pentru această materie.</p>'}<form class="hub-form"><label for="hubTaskText${index}">${draft.editing?'Editează tema':'Temă nouă'}<textarea id="hubTaskText${index}" name="text" placeholder="Ce ai de pregătit?" required maxlength="5000">${esc(draft.text)}</textarea></label><div class="hub-form-footer"><label for="hubTaskDate${index}">Termen<input id="hubTaskDate${index}" type="date" name="deadline" value="${esc(draft.deadline)}"></label><button class="hub-primary" type="submit">${draft.editing?'Salvează':'Adaugă tema'}</button>${draft.editing?'<button class="hub-small-button" type="button" data-task-cancel>Anulează</button>':''}</div></form></div></details>`;
       }).join('') || '<p class="hub-empty">'+(search?'Nu am găsit această materie.':'Adaugă materiile în orar, iar ele vor apărea aici.')+'</p>';
       list.querySelectorAll('details').forEach(el=>{wireSubjectMotion(el);el.addEventListener('toggle',()=>{if(!el.isConnected || subjectMotions.has(el))return;el.open?openSubjects.add(el.dataset.subjectId):openSubjects.delete(el.dataset.subjectId);});});
     };
@@ -276,24 +277,26 @@
       });
     }
 
+    if(window.OrarPlanner)planner=window.OrarPlanner.mount({root,getSchedule,applySchedule,getSubjects:collectSubjects,changeView:next=>changeView(next),tell,classroom,applyTheme});
+
     const closeMenu = (restore=true) => {
       layer.classList.remove('is-open');layer.setAttribute('aria-hidden','true');layer.inert=true;
-      menu.setAttribute('aria-expanded','false');app.inert=false;page.inert=false;customPage.inert=false;classroom.element.inert=false;menu.inert=false;
+      menu.setAttribute('aria-expanded','false');app.inert=false;page.inert=false;customPage.inert=false;classroom.element.inert=false;menu.inert=false;if(planner)planner.element.inert=false;
       if(restore)menu.focus({preventScroll:true});
     };
     const openMenu = () => {
       layer.inert=false;layer.setAttribute('aria-hidden','false');layer.classList.add('is-open');menu.setAttribute('aria-expanded','true');
-      app.inert=true;page.inert=true;customPage.inert=true;classroom.element.inert=true;menu.inert=true;$('#hubClose').focus({preventScroll:true});
+      app.inert=true;page.inert=true;customPage.inert=true;classroom.element.inert=true;menu.inert=true;if(planner)planner.element.inert=true;$('#hubClose').focus({preventScroll:true});
     };
     const changeView = next => {
-      view=next;closeMenu(false);
+      view=next;closeMenu(false);if(planner){planner.hide();if(view.startsWith('planner:'))planner.show(view.slice(8));}
       app.classList.toggle('hub-hidden',view!=='schedule');page.classList.toggle('hub-hidden',view!=='subjects');customPage.classList.toggle('hub-hidden',view!=='customize');classroom.element.classList.toggle('hub-hidden',view!=='classroom');
       root.querySelectorAll('[data-hub-view]').forEach(el=>el.dataset.hubView===view?el.setAttribute('aria-current','page'):el.removeAttribute('aria-current'));
       if(view==='subjects'){
         renderSubjects();page.classList.remove('is-entering');void page.offsetWidth;page.classList.add('is-entering');$('#hubHeading').focus({preventScroll:true});
       } else if(view==='classroom') classroom.show();
       else if(view==='customize'){updateThemeButtons();updateBackgroundStatus();customPage.classList.remove('is-entering');void customPage.offsetWidth;customPage.classList.add('is-entering');$('#hubCustomizeHeading').focus({preventScroll:true});}
-      else menu.focus({preventScroll:true});
+      else if(!view.startsWith('planner:'))menu.focus({preventScroll:true});
     };
     menu.addEventListener('click',openMenu);$('#hubClose').addEventListener('click',()=>closeMenu());$('#hubBackdrop').addEventListener('click',()=>closeMenu());
     root.querySelectorAll('[data-hub-view]').forEach(el=>el.addEventListener('click',()=>changeView(el.dataset.hubView)));
@@ -345,7 +348,9 @@
     list.addEventListener('click',e=>{
       const details=e.target.closest('[data-subject-id]');if(!details)return;const id=details.dataset.subjectId;
       if(e.target.closest('[data-task-cancel]')){drafts.delete(id);openSubjects.add(id);renderSubjects();return;}
+      if(e.target.closest('[data-subject-resources]')){planner?.openSubject(id);return;}
       const row=e.target.closest('[data-task-id]');if(!row)return;
+      if(e.target.closest('[data-task-progress]')){planner?.openTask('hw:'+id+':'+row.dataset.taskId);return;}
       const task=tasksFor(id).find(t=>t.id===row.dataset.taskId);if(!task)return;
       if(e.target.closest('[data-task-edit]')){
         drafts.set(id,{text:task.text,deadline:validDate(task.deadline),editing:task.id});openSubjects.add(id);renderSubjects();
@@ -358,6 +363,8 @@
       }
     });
     window.addEventListener('storage',e=>{if(e.key!==KEY)return;try{const next=JSON.parse(e.newValue||'{"subjects":{}}');if(next?.subjects && typeof next.subjects==='object'){store=next;if(view==='subjects')renderSubjects();}}catch{}});
+    window.addEventListener('orar-homework-change',()=>{try{store=JSON.parse(localStorage.getItem(KEY)||'{"subjects":{}}');if(view==='subjects')renderSubjects();}catch{}});
+    if(planner)changeView('planner:today');
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible' && view==='subjects')renderSubjects();});
   }};
 })();

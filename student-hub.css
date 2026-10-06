@@ -1022,3 +1022,14 @@ body[data-orar-theme] .hub-brand-dot{color:var(--accent-2)!important}
   overflow-wrap:normal;vertical-align:bottom;text-overflow:clip;
 }
 .classroom-excel-table.classroom-excel-document td:hover{outline:none}
+
+.classroom-excel-table.classroom-excel-document td.has-overflow-text{overflow:visible}
+.classroom-excel-overflow-text{position:relative;z-index:1;display:block;white-space:nowrap;overflow:hidden}
+.classroom-viewer-header{flex-wrap:wrap}
+.classroom-download-status{flex-basis:100%;margin:4px 0 0;color:#f5c88a;font-size:12px}
+.classroom-download-status[hidden]{display:none}
+@media(max-width:640px){
+  .classroom-viewer-header>h2{flex-basis:100%;max-width:none!important}
+  .classroom-viewer-actions{width:100%;justify-content:flex-end;flex-wrap:wrap}
+  .classroom-viewer-download{font-size:11px;white-space:nowrap}
+}
