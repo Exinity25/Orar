@@ -65,3 +65,14 @@ body[data-orar-theme=ice] .planner-page{padding:0;color:#17263b}body[data-orar-t
 .pl-attendance-toggle{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0}
 .pl-attendance-toggle button{width:100%}
 .pl-attendance-toggle button.is-active{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent),0 0 12px color-mix(in srgb,var(--accent) 28%,transparent)}
+
+
+/* Focus duration picker: three compact native wheels (iOS opens its wheel picker). */
+.pl-duration-picker{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:16px 0}
+.pl-duration-picker label{margin:0!important;min-width:0;text-align:center}
+.pl-duration-picker label>span{font-size:11px;letter-spacing:.08em;text-transform:uppercase;opacity:.65}
+.pl-duration-picker select{width:100%;min-width:0;text-align:center;text-align-last:center;font-variant-numeric:tabular-nums;font-size:18px!important;padding:11px 8px}
+@media(max-width:420px){
+  .pl-duration-picker{gap:7px}
+  .pl-duration-picker select{font-size:17px!important;padding:10px 4px}
+}
