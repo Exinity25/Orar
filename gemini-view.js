@@ -140,4 +140,43 @@
         page.innerHTML=`<div class="gemini-shell ${collapsed?'is-collapsed':''}">
           <aside class="gemini-sidebar" aria-label="Chat-uri Gemini">
             <div class="gemini-sidebar-top">
-              <button class="gemini-collapse" type="button" data-gemini-colla
+              <button class="gemini-collapse" type="button" data-gemini-collapse aria-label="${collapsed?'Extinde lista de chat-uri':'Restrânge lista de chat-uri'}">${collapsed?'›':'‹'}</button>
+              <button class="hub-primary gemini-new-chat" type="button" data-gemini-new><span>＋</span><strong>Chat nou</strong></button>
+            </div>
+            <div class="gemini-chat-list">${chats.map(item=>`<div class="gemini-chat-row ${item.id===activeId?'is-active':''}"><button type="button" data-gemini-chat="${esc(item.id)}"><span>◌</span><strong>${esc(item.title||'Chat nou')}</strong></button><button type="button" class="gemini-chat-delete" data-gemini-delete="${esc(item.id)}" aria-label="Șterge chat">×</button></div>`).join('')}</div>
+            <button class="gemini-key-button" type="button" data-gemini-key title="Cheie Gemini"><span>⌘</span><strong>${apiKey()?'Cheie configurată':'Configurează cheia'}</strong></button>
+          </aside>
+          <section class="gemini-main">
+            <header class="gemini-header"><div><span class="hub-eyebrow">AI</span><h1 id="geminiHeading" tabindex="-1">Gemini</h1></div><small>gemini-2.5-flash · Free Tier</small></header>
+            <div class="gemini-conversation" data-gemini-conversation>${renderMessages(chat)}${busy?'<div class="gemini-thinking"><i></i><i></i><i></i></div>':''}</div>
+            <div class="gemini-pending-files">${pendingFiles.map((file,index)=>`<span>▧ ${esc(file.name)} <button type="button" data-gemini-remove-file="${index}" aria-label="Elimină fișierul">×</button></span>`).join('')}</div>
+            <form class="gemini-composer" data-gemini-form>
+              <label class="gemini-attach" aria-label="Atașează fișiere">＋<input type="file" data-gemini-files multiple accept="image/*,.pdf,.txt,.md,.csv,.json,.xml,.html,.doc,.docx,.ppt,.pptx,.xls,.xlsx"></label>
+              <textarea name="message" rows="1" maxlength="20000" placeholder="Mesaj pentru Gemini…" aria-label="Mesaj pentru Gemini"></textarea>
+              <button class="gemini-send" type="submit" ${busy?'disabled':''} aria-label="Trimite">↑</button>
+            </form>
+          </section>
+        </div>`;
+        requestAnimationFrame(()=>{
+          const box=page.querySelector('[data-gemini-conversation]');if(box)box.scrollTop=box.scrollHeight;
+        });
+      }
+
+      async function sendMessage(text){
+        const clean=String(text||'').trim();
+        if(!clean&&pendingFiles.length===0)return;
+        const key=apiKey();if(!key){openKeyDialog();return;}
+        if(!activeChat())createChat();
+        const chat=activeChat(),files=pendingFiles.slice();pendingFiles=[];
+        const attachmentParts=[];
+        busy=true;
+        const userMessage={role:'user',text:clean||'Analizează fișierele atașate.',attachments:files.map(file=>({name:file.name,type:file.type,size:file.size})),parts:attachmentParts};
+        chat.messages.push(userMessage);if(chat.title==='Chat nou')chat.title=titleFrom(clean||files[0]?.name);chat.updated=Date.now();writeChats(chats);render();
+        try{
+          for(const file of files)attachmentParts.push(await filePart(file));
+          const recent=chat.messages.slice(-24);
+          const history=recent.map((message,index)=>({role:message.role,parts:messageParts(message,index===recent.length-1)}));
+          const answer=await generate(key,history,systemPrompt(),false);
+          chat.messages.push({role:'model',text:answer,attachments:[]});chat.updated=Date.now();writeChats(chats);
+        }catch(error){
+          chat.messages.push({role:'model',t
