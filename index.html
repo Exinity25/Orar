@@ -371,7 +371,7 @@
       font-size:12px;
       user-select:text;
     }
-    .note-area:focus{border-color:rgba(255,255,255,.3);box-shadow:0 0 0 3px rgba(255,255,255,.04)}
+    .note-area:focus,.note-area:focus-visible{outline:none;border-color:rgba(255,255,255,.11);box-shadow:0 0 14px color-mix(in srgb,var(--accent) 48%,transparent),0 0 28px color-mix(in srgb,var(--accent) 18%,transparent)}
     .note-area::placeholder{color:#747d8e}
 
     .edit-fields{display:grid;gap:6px;margin-top:4px}
@@ -1267,10 +1267,6 @@
             panel.style.transform = '';
           }
 
-          requestAnimationFrame(() => {
-            const area = grid.querySelector(`[data-note="${key}"]`);
-            if(area) area.focus({preventScroll:true});
-          });
         });
       });
     }
