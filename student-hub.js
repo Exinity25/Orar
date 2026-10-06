@@ -182,11 +182,13 @@
       const subjects=new Map();
       const add = item => {
         const name=String(item?.subject || '').trim();if(!name)return;
-        const id=normalize(name);if(!subjects.has(id))subjects.set(id,{id,name,count:0,current:true});subjects.get(id).count++;
+        const id=normalize(name),professor=String(item?.professor||'').trim();
+        if(!subjects.has(id))subjects.set(id,{id,name,count:0,current:true,professors:[]});
+        const subject=subjects.get(id);subject.count++;if(professor&&!subject.professors.includes(professor))subject.professors.push(professor);
       };
       Object.values(getSchedule()?.classes || {}).forEach(item=>{add(item);if(item?.alternate)add(item.alternate);});
       Object.entries(store.subjects).forEach(([id,value])=>{
-        if(!subjects.has(id) && Array.isArray(value?.tasks) && value.tasks.length) subjects.set(id,{id,name:String(value.name||id),count:0,current:false});
+        if(!subjects.has(id) && Array.isArray(value?.tasks) && value.tasks.length) subjects.set(id,{id,name:String(value.name||id),count:0,current:false,professors:[]});
       });
       return [...subjects.values()].sort((a,b)=>a.name.localeCompare(b.name,'ro'));
     };
@@ -345,7 +347,7 @@
       await applyStoredBackground();tell('Fundalul Bleach DEFAULT a fost restaurat.');
     });
     window.addEventListener('orar-drive-section-request',()=>{changeView('drive');});
-    document.addEventListener('click',e=>{const a=e.target.closest('a[href]');if(!a||a.closest('#hubMailPage,#hubDrivePage'))return;const href=a.href||'';if(classroom.openDriveLink?.(href,a.textContent||'Fișier Google Drive')){e.preventDefault();changeView('drive');}});
+    document.addEventListener('click',e=>{const a=e.target.closest('a[href]');if(!a||a.closest('#hubMailPage,#hubDrivePage'))return;const href=a.href||'';if(classroom.openDriveLink?.(href,a.textContent||'Fișier Google Drive'))e.preventDefault();});
         window.addEventListener('orar-mail-unread',e=>{const dot=$('#hubMailDot'),count=Math.max(0,Number(e.detail?.count)||0);if(dot){dot.hidden=!count;dot.title=count?count+' mail-uri necitite':'';}});
     $('#hubSearch').addEventListener('input',e=>{search=e.target.value;renderSubjects();});
     list.addEventListener('input',e=>{
