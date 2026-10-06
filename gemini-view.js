@@ -61,7 +61,7 @@
   }
 
   window.OrarGemini={
-    mount({root,getSchedule,applySchedule,getAppContext,getGoogleToken,changeView,tell}){
+    mount({root,getSchedule,applySchedule,getAppContext,getGoogleToken,requestGoogleAccess,changeView,tell}){
       const page=document.createElement('main');
       page.id='hubGeminiPage';
       page.className='hub-page hub-hidden gemini-page';
@@ -157,7 +157,7 @@
       async function sendMessage(text){
         const clean=String(text||'').trim();
         if(!clean&&pendingFiles.length===0)return;
-        const accessToken=String(getGoogleToken?.()||'');if(!accessToken){tell?.('Conectează sau reconectează contul Google pentru a folosi Gemini.');return;}
+        const accessToken=String(getGoogleToken?.()||'');if(!accessToken){requestGoogleAccess?.();tell?.('Acceptă permisiunea Gemini pentru contul Google conectat, apoi încearcă din nou.');return;}
         if(!activeChat())createChat();
         const chat=activeChat(),files=pendingFiles.slice();pendingFiles=[];
         const attachmentParts=[];
@@ -199,7 +199,7 @@
       }
 
       async function importSchedule(file,group=''){
-        const accessToken=String(getGoogleToken?.()||'');if(!accessToken)throw Error('Conectează sau reconectează contul Google pentru a folosi Gemini.');
+        const accessToken=String(getGoogleToken?.()||'');if(!accessToken){requestGoogleAccess?.();throw Error('Acceptă permisiunea Gemini pentru contul Google conectat, apoi încearcă din nou.');}
         if(!file)throw Error('Alege o poză sau un PDF.');
         if(!/^image\//.test(file.type)&&file.type!=='application/pdf'&&!/\.pdf$/i.test(file.name))throw Error('Pentru importul orarului folosește o fotografie sau un PDF.');
         const current=getSchedule();
