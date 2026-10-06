@@ -20,7 +20,7 @@
     const drive=driveTargetFromUrl(href);
     return drive?`<a class="classroom-inline-link" href="${esc(href)}" data-orar-drive-id="${esc(drive.id)}" data-orar-drive-type="${drive.type}">${esc(clean)}</a>${esc(trailing)}`:`<a class="classroom-inline-link" href="${esc(href)}" target="_blank" rel="noopener noreferrer">${esc(clean)}</a>${esc(trailing)}`;
   }).join('');
-  const previewable = title => /\.(pdf|docx?|xlsx?|xlsm|csv|pptx?|odt|ods|odp|rtf|pages|numbers|key|zip|rar|7z|jpe?g|png|gif|webp|bmp|svg|avif|heic|heif|txt|md|json|xml|log|html?|css|js|ts|py|java|c|cpp|h|mp3|m4a|aac|flac|wav|ogg|mp4|m4v|mov|webm)$/i.test(String(title||'').trim());
+  const previewable = title => /\.(pdf|docx?|xlsx?|xlsm|csv|pptx?|odt|ods|odp|rtf|pages|numbers|key|zip|rar|7z|jpe?g|png|gif|webp|bmp|svg|avif|heic|heif|txt|md|json|xml|log|html?|css|js|ts|py|java|c|cpp|h|mp3|m4a|aac|flac|wav|ogg|mp4|m4v|mov|webm|avi)$/i.test(String(title||'').trim());
   const previewButton = file => {
     const title=String(file?.title||'Fișier');
     if(!file?.id)return '';
@@ -119,7 +119,7 @@
       disableViewerZoom();
       if(viewerDownload?.objectUrl)URL.revokeObjectURL(viewerDownload.objectUrl);
       viewerDownload=null;downloadButton.disabled=true;downloadButton.textContent='↓ Descarcă';downloadButton.title='Fișierul se încarcă';downloadStatus.hidden=true;downloadStatus.textContent='';
-      viewer.querySelector('.classroom-image-zoom-controls')?.remove();
+      viewer.querySelector('.classroom-image-zoom-controls')?.remove();viewer.querySelector('.classroom-viewer-media-fullscreen')?.remove();
       if(viewerObjectUrl){URL.revokeObjectURL(viewerObjectUrl);viewerObjectUrl='';}
       viewer.querySelector('[data-cr-viewer-content]').replaceChildren();
     }
@@ -183,7 +183,7 @@
         const officeDocument=/\.(docx?|xlsx?|xlsm|pptx?|odt|ods|odp|rtf|pages|numbers|key)$/i.test(driveName)
           || /(?:msword|officedocument|ms-excel|ms-powerpoint|opendocument|rtf)/i.test(mime);
         const archive=/\.(zip|rar|7z)$/i.test(driveName) || /(?:zip|rar|7z|compressed|archive)/i.test(mime);
-        const localSupported=/\.(pdf|csv|jpe?g|png|gif|webp|bmp|svg|avif|txt|md|json|xml|log|html?|css|js|ts|py|java|c|cpp|h|mp3|m4a|aac|flac|wav|ogg|mp4|m4v|mov|webm)$/i.test(driveName);
+        const localSupported=/\.(pdf|csv|jpe?g|png|gif|webp|bmp|svg|avif|txt|md|json|xml|log|html?|css|js|ts|py|java|c|cpp|h|mp3|m4a|aac|flac|wav|ogg|mp4|m4v|mov|webm|avi)$/i.test(driveName);
         const nativeGoogleDoc=mime==='application/vnd.google-apps.document'||mime==='application/vnd.google-apps.spreadsheet'||mime==='application/vnd.google-apps.presentation';
         const officeMimeDownloadable=/application\/(?:vnd\.openxmlformats-officedocument\.(?:wordprocessingml\.document|spreadsheetml\.sheet)|vnd\.ms-(?:excel|word)|msword)/i.test(mime);
         const downloadableOffice=/\.(docx?|xlsx?|xlsm|csv)$/i.test(driveName)||officeMimeDownloadable;
@@ -524,38 +524,37 @@
           const audio=document.createElement('audio');audio.controls=true;audio.preload='metadata';audio.src=viewerObjectUrl;wrap.append(audio);
           viewer.querySelector('[data-cr-viewer-content]').replaceChildren(wrap);disableViewerZoom();return;
         }
-        if(/\.(mp4|m4v|mov|webm)$/i.test(name)){
+        if(/\.(mp4|m4v|mov|webm|avi)$/i.test(name)){
           const blob=await response.blob();if(generation!==viewerGeneration)return;
           viewerObjectUrl=URL.createObjectURL(blob);
           const wrap=document.createElement('div');wrap.className='classroom-media-stage classroom-video-stage';
           const shell=document.createElement('div');shell.className='classroom-video-shell';
-          const video=document.createElement('video');video.controls=false;video.playsInline=true;video.preload='metadata';video.src=viewerObjectUrl;video.setAttribute('webkit-playsinline','');
+          const video=document.createElement('video');video.playsInline=true;video.preload='metadata';video.src=viewerObjectUrl;video.setAttribute('webkit-playsinline','');
+          const isiOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+          const failCleanly=()=>{if(generation!==viewerGeneration)return;const box=viewer.querySelector('[data-cr-viewer-content]');box.innerHTML='<div class="classroom-viewer-message classroom-video-unsupported" role="alert"><div><strong>Videoclipul nu poate fi redat local pe acest dispozitiv.</strong><p>Formatul '+esc(name.split('.').pop()?.toUpperCase()||'video')+' nu este suportat direct de playerul iPhone. Îl poți deschide în Google Drive sau descărca.</p></div></div>';};
+          let playable=false;video.addEventListener('loadedmetadata',()=>{playable=true;},{once:true});video.addEventListener('error',failCleanly,{once:true});
+          if(isiOS){
+            video.controls=true;
+            shell.append(video);wrap.append(shell);viewer.querySelector('[data-cr-viewer-content]').replaceChildren(wrap);disableViewerZoom();
+            const fs=document.createElement('button');fs.type='button';fs.className='hub-small-button classroom-viewer-media-fullscreen';fs.textContent='⛶ Fullscreen';fs.setAttribute('aria-label','Ecran complet');
+            fs.addEventListener('click',()=>{try{if(typeof video.webkitEnterFullscreen==='function')video.webkitEnterFullscreen();else if(video.requestFullscreen)video.requestFullscreen();}catch{}});
+            viewer.querySelector('.classroom-viewer-actions').prepend(fs);
+            setTimeout(()=>{if(!playable&&video.readyState===0&&!video.error){try{video.load();}catch{}}},250);
+            return;
+          }
+          video.controls=false;
           const controls=document.createElement('div');controls.className='classroom-video-controls';
           controls.innerHTML='<button type="button" class="classroom-video-button classroom-video-play" aria-label="Redă">▶</button><span class="classroom-video-time" data-video-current>0:00</span><input class="classroom-video-progress" type="range" min="0" max="1000" value="0" step="1" aria-label="Poziția în videoclip"><span class="classroom-video-time" data-video-duration>0:00</span><button type="button" class="classroom-video-button" data-video-mute aria-label="Dezactivează sunetul">◖</button><button type="button" class="classroom-video-button classroom-video-fullscreen" data-video-fullscreen aria-label="Ecran complet">⛶</button>';
-          shell.append(video,controls);wrap.append(shell);
-          viewer.querySelector('[data-cr-viewer-content]').replaceChildren(wrap);disableViewerZoom();
+          shell.append(video,controls);wrap.append(shell);viewer.querySelector('[data-cr-viewer-content]').replaceChildren(wrap);disableViewerZoom();
           const play=controls.querySelector('.classroom-video-play'),progress=controls.querySelector('.classroom-video-progress'),current=controls.querySelector('[data-video-current]'),duration=controls.querySelector('[data-video-duration]'),mute=controls.querySelector('[data-video-mute]'),fullscreen=controls.querySelector('[data-video-fullscreen]');
           const mediaTime=value=>{const seconds=Math.max(0,Math.floor(Number(value)||0)),m=Math.floor(seconds/60),s=String(seconds%60).padStart(2,'0');return m+':'+s;};
-          const updatePlay=()=>{play.textContent=video.paused?'▶':'❚❚';play.setAttribute('aria-label',video.paused?'Redă':'Pauză');shell.classList.toggle('is-playing',!video.paused);};
+          const updatePlay=()=>{play.textContent=video.paused?'▶':'❚❚';play.setAttribute('aria-label',video.paused?'Redă':'Pauză');};
           const updateTime=()=>{current.textContent=mediaTime(video.currentTime);duration.textContent=mediaTime(video.duration);progress.value=Number.isFinite(video.duration)&&video.duration>0?Math.round(video.currentTime/video.duration*1000):0;};
-          play.addEventListener('click',()=>video.paused?video.play().catch(()=>{}):video.pause());
-          video.addEventListener('click',()=>video.paused?video.play().catch(()=>{}):video.pause());
+          play.addEventListener('click',()=>video.paused?video.play().catch(()=>{}):video.pause());video.addEventListener('click',()=>video.paused?video.play().catch(()=>{}):video.pause());
           video.addEventListener('play',updatePlay);video.addEventListener('pause',updatePlay);video.addEventListener('timeupdate',updateTime);video.addEventListener('loadedmetadata',updateTime);video.addEventListener('durationchange',updateTime);video.addEventListener('ended',updatePlay);
           progress.addEventListener('input',()=>{if(Number.isFinite(video.duration)&&video.duration>0)video.currentTime=video.duration*Number(progress.value)/1000;});
-          mute.addEventListener('click',()=>{video.muted=!video.muted;mute.textContent=video.muted?'⌁':'◖';mute.setAttribute('aria-label',video.muted?'Activează sunetul':'Dezactivează sunetul');});
-          fullscreen.addEventListener('click',async()=>{
-            try{
-              if(typeof video.webkitEnterFullscreen==='function'){video.webkitEnterFullscreen();return;}
-              if(document.fullscreenElement){await document.exitFullscreen?.();return;}
-              if(shell.requestFullscreen){await shell.requestFullscreen();return;}
-              if(video.requestFullscreen){await video.requestFullscreen();return;}
-              throw Error('Fullscreen indisponibil');
-            }catch{
-              try{if(typeof video.webkitRequestFullscreen==='function')video.webkitRequestFullscreen();}catch{}
-            }
-          });
-          const syncFullscreen=()=>fullscreen.setAttribute('aria-label',document.fullscreenElement?'Ieși din ecran complet':'Ecran complet');
-          document.addEventListener('fullscreenchange',syncFullscreen,{once:false});
+          mute.addEventListener('click',()=>{video.muted=!video.muted;mute.textContent=video.muted?'⌁':'◖';});
+          fullscreen.addEventListener('click',async()=>{try{if(document.fullscreenElement){await document.exitFullscreen?.();return;}if(shell.requestFullscreen){await shell.requestFullscreen();return;}if(video.requestFullscreen){await video.requestFullscreen();return;}}catch{}});
           updatePlay();updateTime();return;
         }
         throw Error('Acest tip de fișier nu are încă viewer local.');
