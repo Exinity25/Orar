@@ -1723,3 +1723,76 @@ body:not([data-orar-theme]):not(.orar-custom-background)::after{
     }
   }
 }
+
+
+/* v74 iOS overlay keyboard + post-rotation hit-test recovery.
+   Gemini keeps its pre-keyboard stage size; the keyboard overlays that stage
+   and only the composer follows the visible viewport. */
+.hub-layer:not(.is-open){display:none!important}
+.hub-layer.is-open{display:block!important}
+
+@supports (-webkit-touch-callout:none){
+  body.gemini-keyboard-open{
+    top:0!important;
+    bottom:auto!important;
+    height:var(--gemini-stage-height,100lvh)!important;
+    min-height:var(--gemini-stage-height,100lvh)!important;
+    max-height:var(--gemini-stage-height,100lvh)!important;
+  }
+  body.gemini-keyboard-open::before,
+  body.gemini-keyboard-open::after{
+    top:0!important;
+    bottom:auto!important;
+    height:var(--gemini-stage-height,100lvh)!important;
+    min-height:var(--gemini-stage-height,100lvh)!important;
+    max-height:var(--gemini-stage-height,100lvh)!important;
+    background-size:cover!important;
+  }
+  body.gemini-keyboard-open .gemini-page{
+    top:0!important;
+    bottom:auto!important;
+    width:var(--gemini-stage-width,100vw)!important;
+    height:var(--gemini-stage-height,100lvh)!important;
+    min-height:var(--gemini-stage-height,100lvh)!important;
+    max-height:var(--gemini-stage-height,100lvh)!important;
+    overflow:hidden!important;
+  }
+  body.gemini-keyboard-open .gemini-shell,
+  body.gemini-keyboard-open .gemini-main{
+    height:var(--gemini-stage-height,100lvh)!important;
+    min-height:var(--gemini-stage-height,100lvh)!important;
+    max-height:var(--gemini-stage-height,100lvh)!important;
+  }
+
+  /* The static Gemini scene follows any iOS visual-viewport pan so it stays
+     in the same physical screen position. The composer is positioned
+     independently above the keyboard. */
+  body.gemini-keyboard-open .gemini-header,
+  body.gemini-keyboard-open .gemini-conversation{
+    translate:0 var(--gemini-viewport-offset,0px)!important;
+  }
+
+  /* During orientation settling, remove transformed/composited hit targets.
+     This prevents stale iOS hit-testing after landscape Edit -> portrait. */
+  body.orientation-recovering .app,
+  body.orientation-recovering .schedule-shell,
+  body.orientation-recovering .schedule-grid,
+  body.orientation-recovering .class-card,
+  body.orientation-recovering .mobile-tabs,
+  body.orientation-recovering .edit-toggle,
+  body.orientation-recovering .undo-toggle,
+  body.orientation-recovering .redo-toggle,
+  body.orientation-recovering .week-toggle,
+  body.orientation-recovering .schedule-manager-toggle,
+  body.orientation-recovering .hub-menu-button{
+    animation:none!important;
+    transition:none!important;
+  }
+  body.orientation-recovering :is(
+    .edit-toggle,.undo-toggle,.redo-toggle,.week-toggle,.schedule-manager-toggle,
+    .hub-menu-button,.day-tab,.class-card,.add-class,.delete-class
+  ){
+    pointer-events:auto!important;
+    touch-action:manipulation!important;
+  }
+}
