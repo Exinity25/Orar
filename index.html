@@ -752,7 +752,8 @@
 
     .schedule-grid .combined-slot.overlap-split{
       position:relative!important;
-      display:block!important;
+      /* Keep this non-important so portrait day filtering can hide overlap cells from inactive days. */
+      display:block;
       min-height:var(--row-height)!important;
       overflow:hidden!important;
       padding:0!important;

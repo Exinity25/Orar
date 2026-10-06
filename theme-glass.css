@@ -155,3 +155,19 @@ html body[data-ui-glass][data-ui-glass] .class-card:not(.card-tone-default){
 html body[data-ui-glass][data-ui-glass] .class-card:not(.card-tone-default) :is(.type-row,.type-icon,.meta-icon,.pair-tag,.week-tag,.week-mark,.schedule-source){
   color:var(--card-custom)!important;
 }
+
+/* Multi-schedule cards must keep each schedule's own accent on person/location icons. */
+html body[data-ui-glass][data-ui-glass] .combined-class-card:not(.card-tone-default) .meta-icon{
+  color:var(--card-custom)!important;
+}
+html body[data-ui-glass][data-ui-glass] .combined-class-card:not(.card-tone-default) .meta-icon svg{
+  color:inherit!important;
+  stroke:currentColor!important;
+}
+html body[data-ui-glass][data-ui-glass] .overlap-piece .overlap-mini-meta .meta-icon{
+  color:var(--piece-accent)!important;
+}
+html body[data-ui-glass][data-ui-glass] .overlap-piece .overlap-mini-meta .meta-icon svg{
+  color:inherit!important;
+  stroke:currentColor!important;
+}
