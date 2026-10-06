@@ -62,7 +62,7 @@
           <section class="hub-custom-section" aria-labelledby="hubThemeHeading">
             <div class="hub-custom-section-head"><div><span class="hub-eyebrow">Aspect</span><h2 id="hubThemeHeading">Theme</h2></div><small>DEFAULT păstrează exact aspectul actual.</small></div>
             <div class="hub-theme-grid" id="hubThemeGrid">
-              <button class="hub-theme-card" type="button" data-theme-choice="default" aria-pressed="false"><span class="hub-theme-preview theme-preview-default"><i></i><i></i><i></i></span><strong>DEFAULT</strong><small>Negru · roșu · Bleach</small></button>
+              <button class="hub-theme-card" type="button" data-theme-choice="default" aria-pressed="false"><span class="hub-theme-preview theme-preview-default"><i></i><i></i><i></i></span><strong>DEFAULT</strong><small>Negru · roșu</small></button>
               <button class="hub-theme-card" type="button" data-theme-choice="ice" aria-pressed="false"><span class="hub-theme-preview theme-preview-ice"><i></i><i></i><i></i></span><strong>ICE</strong><small>Alb · albastru · negru</small></button>
               <button class="hub-theme-card" type="button" data-theme-choice="ocean" aria-pressed="false"><span class="hub-theme-preview theme-preview-ocean"><i></i><i></i><i></i></span><strong>OCEAN</strong><small>Navy · cyan · alb</small></button>
               <button class="hub-theme-card" type="button" data-theme-choice="forest" aria-pressed="false"><span class="hub-theme-preview theme-preview-forest"><i></i><i></i><i></i></span><strong>FOREST</strong><small>Grafit · verde · alb</small></button>
@@ -368,6 +368,13 @@
       }
       view=next;closeMenu(false);if(planner){planner.hide();if(view.startsWith('planner:'))planner.show(view.slice(8));}
       app.classList.toggle('hub-hidden',view!=='schedule');page.classList.toggle('hub-hidden',view!=='subjects');customPage.classList.toggle('hub-hidden',view!=='customize');classroom.element.classList.toggle('hub-hidden',view!=='classroom');if(classroom.mailElement)classroom.mailElement.classList.toggle('hub-hidden',view!=='mail');if(classroom.driveElement)classroom.driveElement.classList.toggle('hub-hidden',view!=='drive');if(gemini)gemini.element.classList.toggle('hub-hidden',view!=='gemini');
+      if(leavingGemini&&hasIosViewportQuirk){
+        requestAnimationFrame(()=>{
+          settleIosViewport();
+          void document.documentElement.offsetHeight;
+          requestAnimationFrame(settleIosViewport);
+        });
+      }
       root.querySelectorAll('[data-hub-view]').forEach(el=>el.dataset.hubView===view?el.setAttribute('aria-current','page'):el.removeAttribute('aria-current'));
       if(view==='subjects'){
         renderSubjects();page.classList.remove('is-entering');void page.offsetWidth;page.classList.add('is-entering');$('#hubHeading').focus({preventScroll:true});
@@ -408,7 +415,7 @@
     $('#hubBackgroundReset').addEventListener('click',async()=>{
       try{await backgroundDbAction('delete');}catch{}
       try{localStorage.removeItem(BG_MODE_KEY);localStorage.removeItem(BG_NAME_KEY);}catch{}
-      await applyStoredBackground();tell('Fundalul Bleach DEFAULT a fost restaurat.');
+      await applyStoredBackground();tell('Fundalul DEFAULT a fost restaurat.');
     });
     window.addEventListener('orar-drive-section-request',()=>{changeView('drive');});
     document.addEventListener('click',e=>{const a=e.target.closest('a[href]');if(!a||a.closest('#hubMailPage,#hubDrivePage'))return;const href=a.href||'';if(classroom.openDriveLink?.(href,a.textContent||'Fișier Google Drive'))e.preventDefault();});
