@@ -1123,7 +1123,7 @@ body[data-orar-theme="custom"].orar-custom-light{color-scheme:light}
 .pl-subject-task span{font-size:11px;color:var(--muted,#aeb7c7)}
 
 /* Mail */
-.hub-nav-dot{width:8px;height:8px;border-radius:50%;background:#ff315d;box-shadow:0 0 10px #ff315d;flex:0 0 8px;margin-left:auto}
+.hub-nav-dot{width:8px;height:8px;border-radius:50%;background:var(--accent,#ff315d);box-shadow:0 0 10px color-mix(in srgb,var(--accent,#ff315d) 78%,transparent);flex:0 0 8px;margin-left:auto}
 .hub-nav-dot[hidden]{display:none!important}
 .mail-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 18px}
 .mail-list{display:grid;gap:10px}
@@ -1157,3 +1157,8 @@ body[data-orar-theme="custom"].orar-custom-light{color-scheme:light}
   .hub-page:not(.hub-hidden) :is(.hub-subject,.hub-custom-section,.classroom-course,.classroom-post,.mail-card,.mail-message),
   .planner-page:not(.hub-hidden) :is(.pl-card,.pl-hero,.pl-event,.pl-day,.pl-metrics article,.pl-subject-group){animation:none!important}
 }
+
+.app:not(.hub-hidden) .class-card{animation:orar-card-enter 230ms cubic-bezier(.2,.78,.2,1) both}
+.app:not(.hub-hidden) .class-card:nth-of-type(2n){animation-delay:18ms}
+.app:not(.hub-hidden) .class-card:nth-of-type(3n){animation-delay:34ms}
+@media(prefers-reduced-motion:reduce){.app:not(.hub-hidden) .class-card{animation:none!important}}
