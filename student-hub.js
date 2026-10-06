@@ -9,6 +9,7 @@
     calendar:svg('<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4m10-4v4M3 11h18m-13 4h2m4 0h2"/>'),
     book:svg('<path d="M12 5v15M3 4h5a4 4 0 0 1 4 2 4 4 0 0 1 4-2h5v15h-5a5 5 0 0 0-4 2 5 5 0 0 0-4-2H3Z"/>'),
     classroom:svg('<rect x="3" y="4" width="18" height="15" rx="2"/><circle cx="12" cy="10" r="2"/><path d="M8 16c0-4 8-4 8 0M7 22h10"/>'),
+    mail:svg('<rect x="3" y="5" width="18" height="14" rx="3"/><path d="m4 7 8 6 8-6"/>'),
     customize:svg('<path d="M4 20h4l11-11-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/><path d="M4 16l4 4"/>')
   };
   let initialized = false;
@@ -38,8 +39,9 @@
           <div class="hub-brand"><div><strong>Orar<span class="hub-brand-dot">.</span></strong><small>Spațiul tău pentru facultate</small></div><button class="hub-close" id="hubClose" type="button" aria-label="Închide meniul">✕</button></div>
           <nav class="hub-nav" aria-label="Secțiuni">
             <button class="hub-nav-item" data-hub-view="schedule" aria-current="page" type="button"><span class="hub-icon">${icons.calendar}</span><span class="hub-nav-copy"><strong>Orar</strong><small>Programul săptămânii</small></span></button>
-            <button class="hub-nav-item" data-hub-view="subjects" type="button"><span class="hub-icon">${icons.book}</span><span class="hub-nav-copy"><strong>Materii</strong><small>Teme și termene</small></span></button>
+            <button class="hub-nav-item" data-hub-view="planner:tasks" type="button"><span class="hub-icon">${icons.book}</span><span class="hub-nav-copy"><strong>Planificator</strong><small>Planificator și materii</small></span></button>
             <button class="hub-nav-item" id="hubClassroom" data-hub-view="classroom" type="button"><span class="hub-icon">${icons.classroom}</span><span class="hub-nav-copy"><strong>Classroom</strong><small>Clase și materiale</small></span></button>
+            <button class="hub-nav-item" id="hubMailNav" data-hub-view="mail" type="button"><span class="hub-icon">${icons.mail}</span><span class="hub-nav-copy"><strong>Mail</strong><small>Inbox și mesaje</small></span><span class="hub-nav-dot" id="hubMailDot" hidden aria-label="Mail-uri noi"></span></button>
             <button class="hub-nav-item" data-hub-view="customize" type="button"><span class="hub-icon">${icons.customize}</span><span class="hub-nav-copy"><strong>Personalizare</strong><small>Temă și fundal</small></span></button>
           </nav>
         </aside>
@@ -61,6 +63,12 @@
               <button class="hub-theme-card" type="button" data-theme-choice="ocean" aria-pressed="false"><span class="hub-theme-preview theme-preview-ocean"><i></i><i></i><i></i></span><strong>OCEAN</strong><small>Navy · cyan · alb</small></button>
               <button class="hub-theme-card" type="button" data-theme-choice="forest" aria-pressed="false"><span class="hub-theme-preview theme-preview-forest"><i></i><i></i><i></i></span><strong>FOREST</strong><small>Grafit · verde · alb</small></button>
               <button class="hub-theme-card" type="button" data-theme-choice="violet" aria-pressed="false"><span class="hub-theme-preview theme-preview-violet"><i></i><i></i><i></i></span><strong>VIOLET</strong><small>Antracit · violet · alb</small></button>
+              <button class="hub-theme-card" type="button" data-theme-choice="custom" aria-pressed="false"><span class="hub-theme-preview theme-preview-custom"><i></i><i></i><i></i></span><strong>CUSTOM</strong><small>Accent și aspect alese de tine</small></button>
+            </div>
+            <div class="hub-custom-theme-controls" id="hubCustomThemeControls" hidden>
+              <label>Accent <input id="hubCustomAccent" type="color" value="#d9133b"></label>
+              <label>Aspect <select id="hubCustomAppearance"><option value="dark">Întunecat</option><option value="light">Luminos</option></select></label>
+              <small>Aceste opțiuni se aplică doar temei CUSTOM. Fundalul poate fi schimbat separat pentru orice temă.</small>
             </div>
           </section>
           <section class="hub-custom-section" aria-labelledby="hubBackgroundHeading">
@@ -83,16 +91,23 @@
     const $ = selector => root.querySelector(selector);
     const menu=$('#hubMenu'), layer=$('#hubLayer'), page=$('#hubSubjects'), customPage=$('#hubCustomize'), list=$('#hubSubjectList');
     layer.inert = true;
-    const THEME_KEY='orar_theme_v1',BG_MODE_KEY='orar_background_mode_v1',BG_NAME_KEY='orar_background_name_v1';
-    const THEMES=new Set(['default','ice','ocean','forest','violet']);
-    const themeMeta={default:'#080b12',ice:'#f4f8ff',ocean:'#071626',forest:'#07130e',violet:'#120b1d'};
+    const THEME_KEY='orar_theme_v1',BG_MODE_KEY='orar_background_mode_v1',BG_NAME_KEY='orar_background_name_v1',CUSTOM_ACCENT_KEY='orar_custom_accent_v1',CUSTOM_APPEARANCE_KEY='orar_custom_appearance_v1';
+    const THEMES=new Set(['default','ice','ocean','forest','violet','custom']);
+    const themeMeta={default:'#080b12',ice:'#f4f8ff',ocean:'#071626',forest:'#07130e',violet:'#120b1d',custom:'#080b12'};
     let backgroundObjectUrl='';
     const currentTheme=()=>{try{const value=localStorage.getItem(THEME_KEY)||'default';return THEMES.has(value)?value:'default';}catch{return 'default';}};
-    const updateThemeButtons=()=>{root.querySelectorAll('[data-theme-choice]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.themeChoice===currentTheme())));};
+    const customAccent=()=>{try{const value=localStorage.getItem(CUSTOM_ACCENT_KEY)||'#d9133b';return /^#[0-9a-f]{6}$/i.test(value)?value:'#d9133b';}catch{return '#d9133b';}};
+    const customAppearance=()=>{try{return localStorage.getItem(CUSTOM_APPEARANCE_KEY)==='light'?'light':'dark';}catch{return 'dark';}};
+    const clearCustomThemeVars=()=>{for(const prop of ['--bg','--panel','--panel-2','--line','--line-hot','--accent','--accent-2','--text','--muted','--muted-2','--glass-base','--glass-raised','--glass-edge','--glass-ink','--glass-muted','--glass-option'])document.body.style.removeProperty(prop);document.body.classList.remove('orar-custom-light');};
+    const applyCustomTheme=()=>{const accent=customAccent(),light=customAppearance()==='light';document.body.classList.toggle('orar-custom-light',light);const vars=light?{'--bg':'#f5f7fb','--panel':'rgba(255,255,255,.96)','--panel-2':'rgba(246,248,252,.98)','--line':'rgba(15,23,42,.14)','--line-hot':accent,'--accent':accent,'--accent-2':accent,'--text':'#111827','--muted':'#526071','--muted-2':'#758195','--glass-base':'238,242,248','--glass-raised':'255,255,255','--glass-edge':'33,45,65','--glass-ink':'#111827','--glass-muted':'#526071','--glass-option':'#f4f6fa'}:{'--bg':'#07090e','--panel':'rgba(13,16,24,.96)','--panel-2':'rgba(18,21,31,.96)','--line':'rgba(255,255,255,.13)','--line-hot':accent,'--accent':accent,'--accent-2':accent,'--text':'#f8fafc','--muted':'#b6becb','--muted-2':'#8791a1','--glass-base':'5,7,11','--glass-raised':'20,23,31','--glass-edge':'255,255,255','--glass-ink':'#f8fafc','--glass-muted':'#b6becb','--glass-option':'#131720'};for(const [k,v] of Object.entries(vars))document.body.style.setProperty(k,v);};
+    const updateCustomControls=()=>{const controls=$('#hubCustomThemeControls'),accent=$('#hubCustomAccent'),appearance=$('#hubCustomAppearance'),active=currentTheme()==='custom';if(controls)controls.hidden=!active;if(accent)accent.value=customAccent();if(appearance)appearance.value=customAppearance();};
+    const updateThemeButtons=()=>{root.querySelectorAll('[data-theme-choice]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.themeChoice===currentTheme())));updateCustomControls();};
     const applyTheme=(name,save=true)=>{
       if(!THEMES.has(name))name='default';
+      clearCustomThemeVars();
       if(name==='default')delete document.body.dataset.orarTheme;else document.body.dataset.orarTheme=name;
-      const pageBg={
+      if(name==='custom')applyCustomTheme();
+      const pageBg=name==='custom'?(customAppearance()==='light'?'#f5f7fb':'#07090e'):{
         default:'#080b12',
         ice:'#eaf3ff',
         ocean:'#08131f',
@@ -101,8 +116,8 @@
       }[name]||'#080b12';
       document.documentElement.style.backgroundColor=pageBg;
       document.body.style.backgroundColor=pageBg;
-      const meta=document.querySelector('meta[name="theme-color"]');if(meta)meta.setAttribute('content',themeMeta[name]||themeMeta.default);
-      if(save){try{localStorage.setItem(THEME_KEY,name);window.dispatchEvent(new CustomEvent('orar-theme-selected'));window.dispatchEvent(new CustomEvent('orar-local-change',{detail:{key:THEME_KEY}}));}catch{}}
+      const meta=document.querySelector('meta[name="theme-color"]');if(meta)meta.setAttribute('content',name==='custom'?pageBg:(themeMeta[name]||themeMeta.default));
+      if(save){try{localStorage.setItem(THEME_KEY,name);window.dispatchEvent(new CustomEvent('orar-theme-selected',{detail:{theme:name}}));window.dispatchEvent(new CustomEvent('orar-local-change',{detail:{key:THEME_KEY}}));}catch{}}
       updateThemeButtons();
     };
     const openBackgroundDb=()=>new Promise((resolve,reject)=>{
@@ -281,20 +296,21 @@
 
     const closeMenu = (restore=true) => {
       layer.classList.remove('is-open');layer.setAttribute('aria-hidden','true');layer.inert=true;
-      menu.setAttribute('aria-expanded','false');app.inert=false;page.inert=false;customPage.inert=false;classroom.element.inert=false;menu.inert=false;if(planner)planner.element.inert=false;
+      menu.setAttribute('aria-expanded','false');app.inert=false;page.inert=false;customPage.inert=false;classroom.element.inert=false;if(classroom.mailElement)classroom.mailElement.inert=false;menu.inert=false;if(planner)planner.element.inert=false;
       if(restore)menu.focus({preventScroll:true});
     };
     const openMenu = () => {
       layer.inert=false;layer.setAttribute('aria-hidden','false');layer.classList.add('is-open');menu.setAttribute('aria-expanded','true');
-      app.inert=true;page.inert=true;customPage.inert=true;classroom.element.inert=true;menu.inert=true;if(planner)planner.element.inert=true;$('#hubClose').focus({preventScroll:true});
+      app.inert=true;page.inert=true;customPage.inert=true;classroom.element.inert=true;if(classroom.mailElement)classroom.mailElement.inert=true;menu.inert=true;if(planner)planner.element.inert=true;$('#hubClose').focus({preventScroll:true});
     };
     const changeView = next => {
       view=next;closeMenu(false);if(planner){planner.hide();if(view.startsWith('planner:'))planner.show(view.slice(8));}
-      app.classList.toggle('hub-hidden',view!=='schedule');page.classList.toggle('hub-hidden',view!=='subjects');customPage.classList.toggle('hub-hidden',view!=='customize');classroom.element.classList.toggle('hub-hidden',view!=='classroom');
+      app.classList.toggle('hub-hidden',view!=='schedule');page.classList.toggle('hub-hidden',view!=='subjects');customPage.classList.toggle('hub-hidden',view!=='customize');classroom.element.classList.toggle('hub-hidden',view!=='classroom');if(classroom.mailElement)classroom.mailElement.classList.toggle('hub-hidden',view!=='mail');
       root.querySelectorAll('[data-hub-view]').forEach(el=>el.dataset.hubView===view?el.setAttribute('aria-current','page'):el.removeAttribute('aria-current'));
       if(view==='subjects'){
         renderSubjects();page.classList.remove('is-entering');void page.offsetWidth;page.classList.add('is-entering');$('#hubHeading').focus({preventScroll:true});
       } else if(view==='classroom') classroom.show();
+      else if(view==='mail') classroom.showMail?.();
       else if(view==='customize'){updateThemeButtons();updateBackgroundStatus();customPage.classList.remove('is-entering');void customPage.offsetWidth;customPage.classList.add('is-entering');$('#hubCustomizeHeading').focus({preventScroll:true});}
       else if(!view.startsWith('planner:'))menu.focus({preventScroll:true});
     };
@@ -309,6 +325,8 @@
       }
     });
     $('#hubThemeGrid').addEventListener('click',e=>{const button=e.target.closest('[data-theme-choice]');if(!button)return;applyTheme(button.dataset.themeChoice);tell('Tema '+button.querySelector('strong').textContent+' este activă.');});
+    $('#hubCustomAccent').addEventListener('input',e=>{try{localStorage.setItem(CUSTOM_ACCENT_KEY,e.target.value);window.dispatchEvent(new CustomEvent('orar-local-change',{detail:{key:CUSTOM_ACCENT_KEY}}));}catch{}if(currentTheme()==='custom')applyTheme('custom',false);});
+    $('#hubCustomAppearance').addEventListener('change',e=>{try{localStorage.setItem(CUSTOM_APPEARANCE_KEY,e.target.value);window.dispatchEvent(new CustomEvent('orar-local-change',{detail:{key:CUSTOM_APPEARANCE_KEY}}));}catch{}if(currentTheme()==='custom')applyTheme('custom',false);});
     $('#hubBackgroundInput').addEventListener('change',async e=>{
       const file=e.target.files?.[0];if(!file)return;
       try{
@@ -323,6 +341,7 @@
       try{localStorage.removeItem(BG_MODE_KEY);localStorage.removeItem(BG_NAME_KEY);}catch{}
       await applyStoredBackground();tell('Fundalul Bleach DEFAULT a fost restaurat.');
     });
+    window.addEventListener('orar-mail-unread',e=>{const dot=$('#hubMailDot'),count=Math.max(0,Number(e.detail?.count)||0);if(dot){dot.hidden=!count;dot.title=count?count+' mail-uri necitite':'';}});
     $('#hubSearch').addEventListener('input',e=>{search=e.target.value;renderSubjects();});
     list.addEventListener('input',e=>{
       const details=e.target.closest('[data-subject-id]');if(!details || !e.target.closest('form'))return;
