@@ -164,7 +164,7 @@
         'Ai și acces de scriere LIMITAT la două acțiuni explicite cerute de utilizator: add_course și add_task. Nu pretinde că ai modificat alte tipuri de date.',
         'Răspunde EXCLUSIV cu JSON valid, fără markdown, în schema: {"reply":"text pentru utilizator","action":null} sau {"reply":"confirmare scurtă","action":{...}}.',
         'Pentru add_course schema acțiunii este: {"kind":"add_course","subject":"Materia","activityType":"CURS|SEMINAR|LABORATOR","day":"Luni|Marți|Miercuri|Joi|Vineri","start":"HH:MM","end":"HH:MM","professor":"Nume","location":"Sală / locație","week":"MEREU|PARĂ|IMPARĂ"}.',
-        'Nu emite add_course până nu ai: materie, tipul activității (curs/seminar/laborator), ziua, ora de început, ora de sfârșit, profesorul și locația. Dacă lipsesc, întreabă utilizatorul concret pentru toate câmpurile lipsă. Dacă paritatea nu este menționată, week poate fi MEREU.',
+        'Nu emite add_course până nu ai: materie, tipul activității (curs/seminar/laborator), ziua, ora de început, ora de sfârșit, profesorul și locația. Dacă lipsesc, întreabă utilizatorul concret pentru toate câmpurile lipsă, de preferat într-un singur mesaj. Formularea generică «adaugă un curs/o materie» nu confirmă activityType; tipul este confirmat doar când utilizatorul spune explicit CURS ca tip, seminar sau laborator. Dacă paritatea nu este menționată, week poate fi MEREU.',
         'Pentru add_task schema acțiunii este: {"kind":"add_task","title":"Tema","subject":"Materia sau gol","deadline":"DD/MM/YYYY","priority":"low|medium|high","checklist":["pas 1","pas 2"]}.',
         'Nu emite add_task până nu ai titlul, termenul, importanța/prioritatea și decizia despre checklist. Dacă checklist-ul nu a fost menționat, întreabă dacă dorește checklist; folosește [] doar dacă utilizatorul spune explicit că nu dorește. Materia este opțională.',
         'Toate datele pe care le afișezi utilizatorului și deadline din acțiune trebuie să fie strict în format DD/MM/YYYY. Nu afișa YYYY-MM-DD.',
@@ -180,7 +180,7 @@
         return parts;
       }
       function renderMessages(chat){
-        if(!chat||!chat.messages.length)return '<div class="gemini-empty"><span>✦</span><h2>Cu ce te pot ajuta?</h2><p>Gemini poate folosi contextul curent al aplicației și fișierele pe care le atașezi.</p></div>';
+        if(!chat||!chat.messages.length)return '<div class="gemini-empty"><span>✦</span><h2>Cu ce te pot ajuta?</h2><p>Gemini poate folosi contextul aplicației, analiza fișiere și adăuga activități în orar sau teme în Planificator.</p></div>';
         return chat.messages.map(message=>`<article class="gemini-message is-${message.role==='model'?'model':'user'}"><div class="gemini-message-label">${message.role==='model'?'Gemini':'Tu'}</div><div class="gemini-message-body">${linkify(message.text||'')}</div>${message.attachments?.length?`<div class="gemini-message-files">${message.attachments.map(file=>`<span>▧ ${esc(file.name)}</span>`).join('')}</div>`:''}</article>`).join('');
       }
       function render(){
@@ -307,7 +307,7 @@
           const raw=await generate(accessToken,history,systemPrompt(),true),envelope=parseAssistantEnvelope(raw);
           let answer=envelope.reply;
           if(envelope.action){
-            try{const confirmation=executeAssistantAction(envelope.action);answer=answer||confirmation;}
+            try{const confirmation=executeAssistantAction(envelope.action);answer=confirmation;}
             catch(error){answer='Nu am putut face modificarea: '+(error?.message||'acțiune invalidă.');}
           }
           answer=displayDate(answer||'Nu am primit un răspuns utilizabil.');
