@@ -102,7 +102,7 @@
       document.documentElement.style.backgroundColor=pageBg;
       document.body.style.backgroundColor=pageBg;
       const meta=document.querySelector('meta[name="theme-color"]');if(meta)meta.setAttribute('content',themeMeta[name]||themeMeta.default);
-      if(save){try{localStorage.setItem(THEME_KEY,name);window.dispatchEvent(new CustomEvent('orar-local-change',{detail:{key:THEME_KEY}}));}catch{}}
+      if(save){try{localStorage.setItem(THEME_KEY,name);window.dispatchEvent(new CustomEvent('orar-theme-selected'));window.dispatchEvent(new CustomEvent('orar-local-change',{detail:{key:THEME_KEY}}));}catch{}}
       updateThemeButtons();
     };
     const openBackgroundDb=()=>new Promise((resolve,reject)=>{

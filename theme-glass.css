@@ -1,0 +1,98 @@
+/* Shared appearance for application chrome. Original document content keeps its own formatting. */
+body{
+  --glass-base:5,6,9;--glass-raised:19,21,27;--glass-edge:255,255,255;
+  --glass-opacity:.76;--glass-bottom:.62;--glass-ink:#fff;--glass-muted:#bbc0cc;
+  --glass-option:#14161d;--glass-shadow:0 14px 38px #0005;
+  --glass-surface:linear-gradient(145deg,rgba(var(--glass-raised),var(--glass-opacity)),rgba(var(--glass-base),var(--glass-bottom)));
+  --glass-border:rgba(var(--glass-edge),.17);--glass-highlight:rgba(var(--glass-edge),.12);
+  --glass-soft:rgba(var(--glass-edge),.055);--glass-focus:color-mix(in srgb,var(--accent) 48%,transparent);
+  --glass-link:var(--accent-2);--pl-accent:var(--accent-2);color-scheme:dark;
+}
+body[data-orar-theme="ice"]{--glass-base:224,235,252;--glass-raised:255,255,255;--glass-edge:36,70,118;--glass-opacity:.88;--glass-bottom:.78;--glass-ink:#13243e;--glass-muted:#435876;--glass-option:#f1f6ff;--glass-shadow:0 14px 38px #14386820;--glass-link:var(--accent);color-scheme:light}
+body[data-orar-theme="ocean"]{--glass-base:3,18,29;--glass-raised:10,39,52;--glass-edge:160,235,251;--glass-ink:#ecfbff;--glass-muted:#afd0dc;--glass-option:#0b2433}
+body[data-orar-theme="forest"]{--glass-base:3,16,10;--glass-raised:15,37,25;--glass-edge:172,240,190;--glass-ink:#effff4;--glass-muted:#b3cebc;--glass-option:#11281b}
+body[data-orar-theme="violet"]{--glass-base:14,6,24;--glass-raised:36,20,52;--glass-edge:226,196,255;--glass-ink:#fbf3ff;--glass-muted:#d0badf;--glass-option:#23142f}
+html body[data-ui-glass][data-ui-glass]{background-color:var(--bg)!important;color:var(--glass-ink)}
+html body[data-ui-glass][data-ui-glass] :is(.app,.hub-page,.hub-drawer,.planner-dialog,.classroom-viewer-header){color:var(--glass-ink)!important}
+/* One material, shared by old and new cards, dialogs and floating controls. */
+html body[data-ui-glass][data-ui-glass] :is(.class-card,.time-cell,.head-cell,.hub-subject,.hub-task,.hub-form,.hub-custom-section,.hub-theme-card,.hub-background-card,.classroom-course,.classroom-welcome,.classroom-post,.classroom-profile-menu,.classroom-profile-summary,.classroom-viewer-header,.classroom-sheet-select,.hub-drawer,.planner-dialog,.pl-card,.pl-hero,.pl-day,.pl-metrics article,.card-color-menu,.hub-status,.toast){
+  background:var(--glass-surface)!important;color:var(--glass-ink)!important;border-color:var(--glass-border)!important;
+  -webkit-backdrop-filter:blur(24px) saturate(145%)!important;backdrop-filter:blur(24px) saturate(145%)!important;
+  box-shadow:var(--glass-shadow),inset 0 1px 0 var(--glass-highlight),inset 0 -1px 0 rgba(var(--glass-edge),.035)!important;
+  background-clip:padding-box;
+}
+html body[data-ui-glass][data-ui-glass] :is(.pl-card,.pl-hero,.pl-metrics article,.hub-custom-section,.hub-background-card,.classroom-post,.classroom-course,.classroom-welcome){border-radius:18px}
+html body[data-ui-glass][data-ui-glass] :is(.slot-cell,.slot-cell.empty,.schedule-shell,.mobile-tabs){background:transparent!important;border-color:var(--glass-border)!important}
+html body[data-ui-glass][data-ui-glass] :is(.note-panel,.pl-event,.hub-brand,.classroom-panel-notice){border-color:var(--glass-border)!important}
+html body[data-ui-glass][data-ui-glass] :is(.hub-page,.planner-dialog,.app,.classroom-viewer-header) :is(button,.hub-small-button,.hub-primary,.classroom-viewer-drive),
+html body[data-ui-glass][data-ui-glass] :is(.hub-menu-button,.hub-close,.hub-nav-item,.edit-toggle,.undo-toggle,.week-toggle,.cloud-sync-button,.card-color-trigger){
+  color:var(--glass-ink)!important;background:var(--glass-surface)!important;border-color:var(--glass-border)!important;
+  -webkit-backdrop-filter:blur(18px) saturate(145%);backdrop-filter:blur(18px) saturate(145%);
+  box-shadow:inset 0 1px 0 var(--glass-highlight),0 4px 14px rgba(var(--glass-base),.14)!important;
+  -webkit-tap-highlight-color:transparent;
+}
+html body[data-ui-glass][data-ui-glass] :is(.planner-page,.planner-dialog,.planner-preferences) button{min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:6px;vertical-align:middle;line-height:1.3}
+html body[data-ui-glass][data-ui-glass] :is(.hub-page,.planner-dialog,.app,.classroom-viewer-header) button:hover:not(:disabled),
+html body[data-ui-glass][data-ui-glass] .hub-nav-item:hover{border-color:var(--glass-focus)!important;background:color-mix(in srgb,var(--accent) 13%,rgba(var(--glass-base),.82))!important}
+/* Selected states share the current theme accent, including custom accents. */
+html body[data-ui-glass][data-ui-glass] :is(.head-cell:not(.time-head),.day-tab.active,.hub-nav-item[aria-current="page"],.hub-primary,.classroom-course.is-open,.pl-day.pl-today,.hub-theme-card[aria-pressed="true"],.edit-toggle[aria-pressed="true"],.card-color-menu button[aria-checked="true"]){
+  background:linear-gradient(120deg,color-mix(in srgb,var(--accent) 27%,rgba(var(--glass-base),.8)),rgba(var(--glass-base),.72))!important;
+  border-color:var(--accent)!important;color:var(--glass-ink)!important;box-shadow:inset 0 1px 0 var(--glass-highlight),0 5px 22px color-mix(in srgb,var(--accent) 14%,transparent)!important;
+}
+html body[data-ui-glass][data-ui-glass] :is(.class-card,.class-card.card-tone-default){border-left-color:var(--accent)!important}
+/* Form fields, browser date/select chrome, placeholders and options follow the theme. */
+html body[data-ui-glass][data-ui-glass] :is(.app,.hub-page,.planner-dialog,.planner-preferences) :is(input:not([type=checkbox]):not([type=radio]):not([type=color]),textarea,select),
+html body[data-ui-glass][data-ui-glass] .hub-search{
+  color:var(--glass-ink)!important;background:rgba(var(--glass-base),.62)!important;border:1px solid var(--glass-border)!important;
+  box-shadow:inset 0 1px 0 var(--glass-highlight)!important;color-scheme:inherit;
+}
+html body[data-ui-glass][data-ui-glass] .hub-search input{background:transparent!important;border:0!important;box-shadow:none!important}
+html body[data-ui-glass][data-ui-glass] :is(.app,.hub-page,.planner-dialog,.planner-preferences) option{background:var(--glass-option)!important;color:var(--glass-ink)!important}
+html body[data-ui-glass][data-ui-glass] :is(input,textarea)::placeholder{color:var(--glass-muted)!important;opacity:.8}
+html body[data-ui-glass][data-ui-glass] :is(.app,.hub-page,.planner-dialog,.planner-preferences) :is(input,select,textarea,button,a):focus-visible,
+html body[data-ui-glass][data-ui-glass] .hub-search:focus-within{outline:2px solid var(--accent)!important;outline-offset:3px;box-shadow:0 0 0 4px var(--glass-focus)!important}
+html body[data-ui-glass][data-ui-glass] :is(input[type=checkbox],input[type=radio],progress,meter){accent-color:var(--accent)!important}
+/* Typography and icon accents; no mint/orange/pink remnants in alternate themes. */
+html body[data-ui-glass][data-ui-glass] :is(h1,.subject,.class-card .subject,.classroom-course-copy strong,.hub-task-text,.note-label,.hub-form label,.classroom-profile-details strong){color:var(--glass-ink)!important}
+html body[data-ui-glass][data-ui-glass] :is(.subtitle,.meta-line,.class-card .meta-line,.hub-intro,.hub-empty,.hub-local-note,.hub-subject-name small,.hub-brand small,.hub-theme-card small,.hub-background-copy span,.hub-custom-section-head>small,.hub-due,.classroom-course-copy>span,.classroom-profile-copy>span,.classroom-profile-details span,.classroom-welcome p,.classroom-post p,.pl-eyebrow,.pl-event time,.pl-event small,.classroom-viewer-zoom span){color:var(--glass-muted)!important}
+html body[data-ui-glass][data-ui-glass] :is(.type-row,.type-icon,.meta-icon,.pair-tag,.week-tag,.week-mark,.hub-eyebrow,.hub-brand-dot,.hub-chevron,.hub-external,.classroom-kind,.classroom-course-chevron,.classroom-profile-chevron,.classroom-profile-signin-arrow,.pl-metrics strong,.planner-page output,.pl-overdue,.hub-due.is-overdue,.hub-due.is-today,.hub-small-button.is-danger,.classroom-profile-logout,.classroom-download-status){color:var(--glass-link)!important}
+html body[data-ui-glass][data-ui-glass] :is(.class-card.card-tone-default) :is(.type-row,.type-icon,.meta-icon,.pair-tag,.week-tag,.week-mark){color:var(--glass-link)!important}
+html body[data-ui-glass][data-ui-glass] :is(.classroom-link,.classroom-inline-link,.planner-page a,.planner-dialog a){color:var(--glass-link)!important;text-decoration-color:var(--glass-focus)!important}
+html body[data-ui-glass][data-ui-glass] :is(.hub-pill,.hub-subject-mark,.classroom-profile-avatar,.classroom-attachments .classroom-link,.pl-badge,.pl-tag,.pl-cal-event,.pl-heat,.pl-empty,.classroom-notice){color:var(--glass-ink)!important;background:var(--glass-soft)!important;border-color:var(--glass-border)!important}
+html body[data-ui-glass][data-ui-glass] :is(.pl-busy,.pl-overdue,.classroom-notice[role="status"],.pl-kind-exam){background:color-mix(in srgb,var(--accent) 22%,rgba(var(--glass-base),.66))!important;color:var(--glass-link)!important;border-color:var(--glass-focus)!important}
+html body[data-ui-glass][data-ui-glass] :is(.note-dot,.has-note .note-dot){background:var(--accent)!important;box-shadow:0 0 9px var(--glass-focus)!important}
+html body[data-ui-glass][data-ui-glass] :is(.week-toggle svg,.undo-toggle svg){color:var(--glass-ink)!important}
+html body[data-ui-glass][data-ui-glass] .week-toggle svg path{fill:var(--glass-ink)!important}
+html body[data-ui-glass][data-ui-glass] .week-toggle svg circle:nth-of-type(1){stroke:var(--glass-ink)!important}
+html body[data-ui-glass][data-ui-glass] .week-toggle svg circle:nth-of-type(2){fill:var(--glass-option)!important}
+html body[data-ui-glass][data-ui-glass] .week-toggle svg circle:nth-of-type(3){fill:var(--glass-ink)!important}
+html body[data-ui-glass][data-ui-glass] :is(.hub-backdrop,.classroom-viewer-backdrop){background:rgba(var(--glass-base),.65)!important}
+html body[data-ui-glass][data-ui-glass] .planner-dialog::backdrop{background:rgba(var(--glass-base),.65)}
+html body[data-ui-glass][data-ui-glass] :is(.classroom-viewer-content,.classroom-excel-scroll,.classroom-image-stage,.classroom-media-stage){background:var(--glass-option)!important}
+html body[data-ui-glass][data-ui-glass] :is(.classroom-viewer-message,.classroom-viewer-limit){color:var(--glass-muted)!important}
+/* Stable control alignment: titles may wrap, controls never drift into a new arbitrary column. */
+.pl-header>.pl-row{justify-content:flex-start;flex-wrap:nowrap;flex:none}
+.pl-header>.pl-row button{white-space:nowrap}
+.pl-header [data-action=undo],.pl-header [data-action=redo]{width:44px;padding:0;flex:0 0 44px}
+.pl-attendance-card{display:grid!important;grid-template-columns:minmax(0,1fr) 160px;align-items:center;gap:20px}
+.pl-attendance-card>div{min-width:0;overflow-wrap:anywhere}
+.pl-attendance-card select{width:100%;min-width:0}
+.pl-attendance-card p{margin-bottom:0}
+.pl-task>.pl-row{justify-content:flex-start}.pl-task>.pl-row button{flex:1 1 120px}
+.planner-preferences form{display:grid;gap:8px}.planner-preferences form>button{justify-self:start}
+.pl-content{padding-top:calc(100px + env(safe-area-inset-top));padding-bottom:calc(70px + env(safe-area-inset-bottom))}
+.planner-page .pl-card h2,.planner-page .pl-card h3{overflow-wrap:anywhere}
+@media(max-width:600px){
+ .pl-attendance-card{grid-template-columns:minmax(0,1fr)!important;gap:12px}
+ .pl-attendance-card select{justify-self:stretch}
+ .pl-header{gap:16px}.pl-header>.pl-row{width:100%}
+ .pl-header>.pl-row button:first-child{margin-right:auto}
+ .classroom-viewer-actions{transform:none;align-items:center}
+ .hub-task-meta{margin-left:0;align-items:flex-start}.hub-task-actions{width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.hub-task-actions button{min-width:0;white-space:normal}
+}
+@media(prefers-reduced-transparency:reduce){body{--glass-opacity:1;--glass-bottom:.97}}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){body{--glass-opacity:.97;--glass-bottom:.97}}
+@media print{html body[data-ui-glass][data-ui-glass] .planner-dialog{background:white!important;color:black!important;box-shadow:none!important;backdrop-filter:none!important}html body[data-ui-glass][data-ui-glass] .planner-dialog :is(h1,h2,h3,strong,p,small,time){color:black!important}}
+
+/* Override the older per-theme cascade consistently. */
+html body[data-ui-glass][data-ui-glass] #plSearchResults button{justify-content:flex-start;text-align:left}
