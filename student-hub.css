@@ -1577,17 +1577,25 @@ body[data-orar-theme="custom"].orar-custom-light{color-scheme:light}
 
 
 
-/* v70 stable iOS safe-area paint.
-   The background gets a JS-maintained full-height value that does not collapse
-   when the iOS keyboard opens. This keeps the home-indicator area painted after
-   leaving Gemini while preserving the DEFAULT artwork and all custom themes. */
+/* v71 iOS keyboard isolation.
+   Normal app pages keep the pre-keyboard viewport height. Only Gemini is
+   allowed to follow 100dvh while its keyboard is visible, so leaving Gemini
+   cannot carry a shortened viewport into the rest of the app. */
+body:not([data-orar-theme]):not(.orar-custom-background)::before{
+  background-image:none!important;
+  background-color:var(--bg,#05070c)!important;
+}
+body:not([data-orar-theme]):not(.orar-custom-background)::after{
+  background:none!important;
+}
+
 @supports (-webkit-touch-callout:none){
   html,body{background-color:var(--bg,#05070c)!important}
   body::before,
   body::after{
     top:0!important;
     bottom:auto!important;
-    height:calc(var(--ios-stable-viewport-height,100dvh) + env(safe-area-inset-bottom))!important;
+    height:calc(var(--ios-stable-viewport-height,100lvh) + env(safe-area-inset-bottom))!important;
     min-height:0!important;
     border-radius:0!important;
     -webkit-mask-image:none!important;
@@ -1595,5 +1603,25 @@ body[data-orar-theme="custom"].orar-custom-light{color-scheme:light}
     -webkit-transform:translateZ(0);
     transform:translateZ(0);
   }
-  .app,.hub-page,.gemini-shell,.gemini-main{min-height:100%!important}
+
+  /* Pages outside Gemini never inherit the keyboard-shortened dvh. */
+  .app,
+  .hub-page:not(.gemini-page){
+    height:var(--ios-stable-viewport-height,100lvh)!important;
+    min-height:var(--ios-stable-viewport-height,100lvh)!important;
+    max-height:var(--ios-stable-viewport-height,100lvh)!important;
+  }
+
+  /* Gemini alone tracks the live keyboard viewport. */
+  .gemini-page{
+    height:100dvh!important;
+    min-height:100dvh!important;
+    max-height:100dvh!important;
+  }
+  .gemini-shell,
+  .gemini-main{
+    height:100%!important;
+    min-height:0!important;
+    max-height:none!important;
+  }
 }
