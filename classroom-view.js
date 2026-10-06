@@ -6,7 +6,9 @@
     'https://www.googleapis.com/auth/classroom.coursework.me.readonly',
     'https://www.googleapis.com/auth/classroom.announcements.readonly',
     'https://www.googleapis.com/auth/drive.readonly',
-    'https://www.googleapis.com/auth/drive.appdata'];
+    'https://www.googleapis.com/auth/drive.appdata',
+    'https://www.googleapis.com/auth/gmail.modify',
+    'https://www.googleapis.com/auth/gmail.send'];
   const esc = (s='') => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const safeURL = value => {try{const u=new URL(String(value||'').trim());return ['https:','http:','mailto:','tel:'].includes(u.protocol)?u.href:'';}catch{return '';}};
   const link = (url,title,cls='classroom-link') => {const safe=safeURL(url);return safe?`<a class="${cls}" href="${esc(safe)}" target="_blank" rel="noopener noreferrer">${esc(title)} ↗</a>`:'';};
@@ -74,6 +76,8 @@
   }
   window.OrarClassroom={mount(root){
     const page=document.createElement('main');page.id='hubClassroomPage';page.className='hub-page hub-hidden';page.setAttribute('aria-labelledby','classroomHeading');root.append(page);
+    const mailPage=document.createElement('main');mailPage.id='hubMailPage';mailPage.className='hub-page hub-hidden mail-page';mailPage.setAttribute('aria-labelledby','mailHeading');root.append(mailPage);
+    const mailModal=document.createElement('dialog');mailModal.className='planner-dialog mail-dialog';root.append(mailModal);
     const profile=document.createElement('div');profile.className='classroom-profile hub-hidden';root.querySelector('.hub-drawer').append(profile);
     const viewer=document.createElement('div');viewer.className='classroom-viewer hub-hidden';viewer.setAttribute('role','dialog');viewer.setAttribute('aria-modal','true');viewer.setAttribute('aria-labelledby','classroomViewerTitle');
     viewer.innerHTML=`<div class="classroom-viewer-backdrop" data-cr-viewer-close></div><section class="classroom-viewer-dialog"><header class="classroom-viewer-header"><h2 id="classroomViewerTitle" data-cr-viewer-title>Fișier</h2><div class="classroom-viewer-actions"><button class="hub-small-button classroom-viewer-download" type="button" data-cr-viewer-download disabled aria-label="Descarcă fișierul">↓ Descarcă</button><a class="hub-small-button classroom-viewer-drive" data-cr-viewer-drive target="_blank" rel="noopener noreferrer">Deschide în Drive ↗</a><button class="hub-small-button classroom-viewer-close" type="button" data-cr-viewer-close aria-label="Închide previzualizarea">✕</button></div></header><div class="classroom-viewer-content" data-cr-viewer-content></div></section>`;root.append(viewer);
@@ -557,6 +561,7 @@
     const SESSION_KEY='orar_classroom_session_v2',OLD_SESSION_KEY='orar_classroom_session_v1';
     const ACCOUNT_KEY='orar_classroom_account_v1';
     let token='',expires=0,grantedScopes='',client=null,courses=[],posts=[],selected=null,loading=false,message='',warning='',generation=0,session=0,expireTimer,visible=false,reauthenticating=false;
+    let mailItems=[],mailLoading=false,mailMessage='',mailOpen=null,mailBody='',mailUnread=0,mailVisible=false;
     let courseToggleMotion=0;
     const configured=()=>/^[\w.-]+\.apps\.googleusercontent\.com$/.test(window.ORAR_CLASSROOM_CLIENT_ID||'');
     function rememberedAccount(){try{const value=JSON.parse(localStorage.getItem(ACCOUNT_KEY)||'null');return value&&value.email?value:null;}catch{return null;}}
@@ -648,7 +653,7 @@
     }
     function scheduleExpiry(){clearTimeout(expireTimer);if(token&&expires>Date.now())expireTimer=setTimeout(()=>clearSession('Sesiunea Google trebuie reînnoită.',false),Math.max(0,expires-Date.now()));}
     function clearSession(text='',forgetAccount=false){
-      closeViewer(false);generation++;session++;clearTimeout(expireTimer);token='';expires=0;grantedScopes='';forgetSession();courses=[];posts=[];selected=null;loading=false;message=text;warning='';reauthenticating=false;
+      closeViewer(false);generation++;session++;clearTimeout(expireTimer);token='';expires=0;grantedScopes='';forgetSession();courses=[];posts=[];selected=null;loading=false;message=text;warning='';reauthenticating=false;mailItems=[];mailOpen=null;mailBody='';mailUnread=0;mailMessage='';window.dispatchEvent(new CustomEvent('orar-mail-unread',{detail:{count:0}}));
       if(forgetAccount){try{localStorage.removeItem(ACCOUNT_KEY);}catch{}}
       renderProfile(rememberedAccount(),false);
       render();
@@ -674,6 +679,38 @@
       }
       return response.json();
     }
+
+    const mailScopeOk=()=>Boolean(token&&Date.now()<expires&&grantedScopes.includes('gmail.modify')&&grantedScopes.includes('gmail.send'));
+    async function gmailApi(path,options={}){
+      if(!token||Date.now()>=expires)throw Error('Sesiunea Google trebuie reînnoită.');
+      const response=await fetch('https://gmail.googleapis.com/gmail/v1/users/me/'+path,{...options,headers:{Authorization:'Bearer '+token,...(options.headers||{})},cache:'no-store',credentials:'omit'});
+      if(response.status===401){clearSession('Sesiunea Google trebuie reînnoită.',false);throw Error('Sesiunea Google trebuie reînnoită.');}
+      if(!response.ok){let payload=null;try{payload=await response.clone().json();}catch{}throw Error(payload?.error?.message||'Gmail nu a putut fi accesat.');}
+      if(response.status===204)return null;return response.json();
+    }
+    const mailHeader=(row,name)=>row?.payload?.headers?.find(h=>String(h.name).toLowerCase()===name.toLowerCase())?.value||'';
+    function decodeMailData(data=''){try{const normalized=String(data).replace(/-/g,'+').replace(/_/g,'/'),pad='='.repeat((4-normalized.length%4)%4),binary=atob(normalized+pad),bytes=Uint8Array.from(binary,c=>c.charCodeAt(0));return new TextDecoder().decode(bytes);}catch{return '';}}
+    function mailPlain(payload){if(!payload)return '';const parts=payload.parts||[],plain=parts.find(p=>p.mimeType==='text/plain'&&p.body?.data);if(plain)return decodeMailData(plain.body.data);for(const part of parts){const nested=mailPlain(part);if(nested)return nested;}if(payload.mimeType==='text/plain'&&payload.body?.data)return decodeMailData(payload.body.data);if(payload.mimeType==='text/html'&&payload.body?.data){const doc=new DOMParser().parseFromString(decodeMailData(payload.body.data),'text/html');return doc.body?.textContent||'';}return '';}
+    function encodeMailRaw(text){const bytes=new TextEncoder().encode(text);let binary='';for(const b of bytes)binary+=String.fromCharCode(b);return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}
+    async function refreshMailSummary(){if(!mailScopeOk())return;try{const label=await gmailApi('labels/INBOX');mailUnread=Number(label?.messagesUnread)||0;window.dispatchEvent(new CustomEvent('orar-mail-unread',{detail:{count:mailUnread}}));}catch{}}
+    async function refreshMail(){
+      if(!mailScopeOk()){mailLoading=false;mailItems=[];mailMessage='Pentru Mail, reconectează contul Google și acceptă accesul Gmail.';renderMail();return;}
+      mailLoading=true;mailMessage='';renderMail();
+      try{const list=await gmailApi('messages?labelIds=INBOX&maxResults=30'),ids=(list?.messages||[]).map(x=>x.id),rows=await Promise.all(ids.map(async id=>{const q=new URLSearchParams({format:'metadata'});for(const h of ['Subject','From','Date'])q.append('metadataHeaders',h);return gmailApi('messages/'+encodeURIComponent(id)+'?'+q.toString());}));mailItems=rows.map(row=>({id:row.id,subject:mailHeader(row,'Subject')||'(fără subiect)',from:mailHeader(row,'From')||'Expeditor necunoscut',date:mailHeader(row,'Date'),snippet:row.snippet||'',unread:(row.labelIds||[]).includes('UNREAD')}));await refreshMailSummary();}catch(e){mailMessage=e.message||'Nu am putut încărca mail-urile.';}finally{mailLoading=false;renderMail();}
+    }
+    async function openMail(id){if(!mailScopeOk())return;mailLoading=true;renderMail();try{const row=await gmailApi('messages/'+encodeURIComponent(id)+'?format=full');mailOpen={id:row.id,subject:mailHeader(row,'Subject')||'(fără subiect)',from:mailHeader(row,'From')||'',date:mailHeader(row,'Date')||''};mailBody=mailPlain(row.payload)||row.snippet||'(Mesaj fără conținut text.)';}catch(e){mailMessage=e.message||'Mesajul nu a putut fi deschis.';}finally{mailLoading=false;renderMail();}}
+    function renderMail(){
+      const connected=Boolean(token&&Date.now()<expires),gmail=mailScopeOk(),account=rememberedAccount();let body='';
+      if(!connected)body='<div class="classroom-welcome"><h2>Conectează contul Google</h2><p>Mail folosește același cont conectat pentru Classroom și Drive.</p><button class="hub-primary" data-mail-connect>Conectează contul Google</button></div>';
+      else if(!gmail)body='<div class="classroom-welcome"><h2>Activează Mail</h2><p>Este necesar acces Gmail pentru a vedea inboxul și a trimite mesaje de pe '+esc(account?.email||'contul conectat')+'.</p><button class="hub-primary" data-mail-connect>Activează accesul Mail</button></div>';
+      else if(mailOpen)body='<section class="mail-detail"><button class="hub-small-button" data-mail-back>← Inbox</button><article class="mail-message"><span class="hub-eyebrow">MESAJ</span><h2>'+esc(mailOpen.subject)+'</h2><div class="mail-meta"><strong>'+esc(mailOpen.from)+'</strong><span>'+esc(mailOpen.date)+'</span></div><pre>'+esc(mailBody)+'</pre></article></section>';
+      else{const rows=mailItems.map(m=>'<button class="mail-card '+(m.unread?'is-unread':'')+'" type="button" data-mail-open="'+esc(m.id)+'"><span class="mail-sender">'+esc(m.from)+'</span><strong>'+esc(m.subject)+'</strong><span class="mail-snippet">'+esc(m.snippet)+'</span><time>'+esc(m.date)+'</time></button>').join('');body='<div class="mail-toolbar"><button class="hub-primary" data-mail-compose>Scrie mail</button><button class="hub-small-button" data-mail-refresh '+(mailLoading?'disabled':'')+'>'+(mailLoading?'Se actualizează…':'Actualizează')+'</button></div>'+(mailMessage?'<p class="classroom-notice" role="alert">'+esc(mailMessage)+'</p>':'')+'<div class="mail-list">'+(rows||(mailLoading?'':'<p class="hub-empty">Inboxul este gol.</p>'))+'</div>';}
+      mailPage.innerHTML='<div class="hub-content"><header class="hub-page-header"><h1 class="hub-heading" id="mailHeading" tabindex="-1">Mail</h1><p class="hub-intro">Inbox și mesaje trimise direct din contul Google conectat.</p></header>'+body+'</div>';
+    }
+    function composeMail(){mailModal.innerHTML='<div class="pl-dialog-head"><h2>Mail nou</h2><button type="button" data-mail-close aria-label="Închide">✕</button></div><form data-mail-form><label>Către<input name="to" type="email" required autocomplete="email"></label><label>Subiect<input name="subject" maxlength="300"></label><label>Mesaj<textarea name="body" rows="10" required maxlength="50000"></textarea></label><button class="hub-primary">Trimite</button></form>';if(!mailModal.open)mailModal.showModal();}
+    mailPage.addEventListener('click',e=>{if(e.target.closest('[data-mail-connect]')){requestAccess(Boolean(rememberedAccount()));return;}if(e.target.closest('[data-mail-refresh]')){refreshMail();return;}if(e.target.closest('[data-mail-compose]')){composeMail();return;}if(e.target.closest('[data-mail-back]')){mailOpen=null;mailBody='';renderMail();return;}const open=e.target.closest('[data-mail-open]');if(open)openMail(open.dataset.mailOpen);});
+    mailModal.addEventListener('click',e=>{if(e.target.closest('[data-mail-close]'))mailModal.close();});
+    mailModal.addEventListener('submit',async e=>{const form=e.target.closest('[data-mail-form]');if(!form)return;e.preventDefault();const fd=new FormData(form),to=String(fd.get('to')||'').trim(),subject=String(fd.get('subject')||'').trim(),body=String(fd.get('body')||'');if(!to||!body)return;const raw=['To: '+to,'Subject: '+subject,'Content-Type: text/plain; charset="UTF-8"','MIME-Version: 1.0','',body].join('\r\n'),button=form.querySelector('button');button.disabled=true;button.textContent='Se trimite…';try{await gmailApi('messages/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({raw:encodeMailRaw(raw)})});mailModal.close();mailMessage='Mail trimis.';renderMail();}catch(err){mailMessage=err.message||'Mailul nu a putut fi trimis.';mailModal.close();renderMail();}});
     async function listAll(path,field,currentGeneration){
       const items=[];let next='';
       do{
@@ -757,7 +794,7 @@
     function postsMarkup(){
       if(loading)return '<p class="classroom-notice classroom-panel-notice" role="status">Se încarcă materialele…</p>';
       const notice=warning?`<p class="classroom-notice classroom-panel-notice" role="alert">${esc(warning)}</p>`:'';
-      const body=posts.map(post=>`<article class="classroom-post"><span class="classroom-kind">${esc(post.kind)}</span><h3>${esc(post.title|| (post.kind==='Anunț'?'Anunț':'Material'))}</h3><div class="classroom-attachments">${attachments(post)}</div><div class="classroom-post-classroom-link">${link(post.alternateLink,'Deschide în Classroom')}</div></article>`).join('');
+      const body=posts.map(post=>`<article class="classroom-post"><span class="classroom-kind">${esc(post.kind)}</span><h3>${esc(post.title|| (post.kind==='Anunț'?'Anunț':'Material'))}</h3>${post.description||post.text?`<p>${linkifyText(post.description||post.text)}</p>`:''}<div class="classroom-attachments">${attachments(post)}</div><div class="classroom-post-classroom-link">${link(post.alternateLink,'Deschide în Classroom')}</div></article>`).join('');
       return notice+(body||(!warning?'<p class="hub-empty">Nu sunt materiale publicate în această clasă.</p>':''));
     }
     function courseMarkup(course){
@@ -789,7 +826,7 @@
             loadCourses();
             try{const user=await api('https://openidconnect.googleapis.com/v1/userinfo');if(authSession!==session || !token)return;
               const account={name:user.name||'Cont Google',email:user.email||'',picture:safeURL(user.picture)||''};
-              if(account.email){try{localStorage.setItem(ACCOUNT_KEY,JSON.stringify(account));}catch{}renderProfile(account,true);} restoreCloud().catch(()=>{});
+              if(account.email){try{localStorage.setItem(ACCOUNT_KEY,JSON.stringify(account));}catch{}renderProfile(account,true);} restoreCloud().catch(()=>{});if(mailScopeOk()){refreshMailSummary();if(mailVisible)refreshMail();}else if(mailVisible)renderMail();
             }catch{renderProfile(rememberedAccount(),true);}
           },error_callback:()=>{reauthenticating=false;message='Reconectarea Google nu a putut fi făcută automat. Apasă din nou pe conectare.';renderProfile(rememberedAccount(),false);render();}});
         renderProfile(rememberedAccount(),Boolean(token&&Date.now()<expires));
@@ -829,9 +866,9 @@
       if(failures)throw Error('Nu s-au putut actualiza toate secțiunile Classroom. Datele locale sunt păstrate; reîncearcă.');
       return {courses:courseList.map(c=>({id:String(c.id),name:c.name})),posts:items,updated:new Date().toISOString()};
     }
-    const restored=restoreSession();renderProfile(rememberedAccount(),restored);if(restored){scheduleExpiry();restoreCloud().catch(()=>{});}
-    render();prepareSignIn();
-    return {element:page,syncPlanner,openFile:openViewer,isConnected:()=>Boolean(token&&Date.now()<expires),show(){
+    const restored=restoreSession();renderProfile(rememberedAccount(),restored);if(restored){scheduleExpiry();restoreCloud().catch(()=>{});if(mailScopeOk())refreshMailSummary();}
+    render();renderMail();prepareSignIn();
+    return {element:page,mailElement:mailPage,syncPlanner,openFile:openViewer,isConnected:()=>Boolean(token&&Date.now()<expires),showMail(){mailVisible=true;renderMail();prepareSignIn();if(mailScopeOk()&&!mailLoading&&!mailItems.length)refreshMail();mailPage.classList.remove('is-entering');void mailPage.offsetWidth;mailPage.classList.add('is-entering');mailPage.querySelector('h1')?.focus({preventScroll:true});},show(){
       visible=true;render();prepareSignIn();
       if(token && Date.now()<expires){if(!courses.length&&!loading)loadCourses();}
       page.classList.remove('is-entering');void page.offsetWidth;page.classList.add('is-entering');page.querySelector('h1').focus({preventScroll:true});
