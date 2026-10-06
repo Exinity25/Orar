@@ -1116,21 +1116,31 @@
       if(item.week==='MEREU'||item.week===selectedWeek)return item;
       return item.alternate&&item.alternate.week===selectedWeek?item.alternate:null;
     }
+    const timeMinutes=value=>{const [h,m]=String(value||'00:00').split(':').map(Number);return (h||0)*60+(m||0);};
     function combinedTimes(){
-      const map=new Map();
-      scheduleBook.schedules.forEach(entry=>(entry.schedule.times||[]).forEach(pair=>{
-        if(!Array.isArray(pair)||!pair[0]||!pair[1])return;
-        map.set(pair[0]+'|'+pair[1],[String(pair[0]),String(pair[1])]);
+      const intervals=[];
+      scheduleBook.schedules.forEach(entry=>(entry.schedule.times||[]).forEach((pair,row)=>{
+        if(!Array.isArray(pair)||!/^\d{2}:\d{2}$/.test(pair[0]||'')||!/^\d{2}:\d{2}$/.test(pair[1]||''))return;
+        const start=timeMinutes(pair[0]),end=timeMinutes(pair[1]);if(end<=start)return;
+        intervals.push({start,end,startText:String(pair[0]),endText:String(pair[1]),entryId:entry.id,row});
       }));
-      return [...map.values()].sort((a,b)=>a[0].localeCompare(b[0])||a[1].localeCompare(b[1]));
+      intervals.sort((a,b)=>a.start-b.start||a.end-b.end);
+      const bands=[];
+      for(const interval of intervals){
+        const last=bands[bands.length-1];
+        if(last&&interval.start<last.end){
+          last.end=Math.max(last.end,interval.end);last.endText=last.end===interval.end?interval.endText:last.endText;last.members.push(interval);
+        }else bands.push({start:interval.start,end:interval.end,startText:interval.startText,endText:interval.endText,members:[interval]});
+      }
+      return bands.map(band=>[band.startText,band.endText,band]);
     }
     function combinedItemsAt(time,day){
-      const out=[];
-      scheduleBook.schedules.forEach(entry=>{
-        const row=(entry.schedule.times||[]).findIndex(pair=>pair?.[0]===time[0]&&pair?.[1]===time[1]);
-        if(row<0)return;const key=row+'-'+day,item=activeItemFrom(entry.schedule,key);
+      const band=time[2],out=[];if(!band)return out;
+      for(const member of band.members){
+        const entry=scheduleBook.schedules.find(item=>item.id===member.entryId);if(!entry)continue;
+        const key=member.row+'-'+day,item=activeItemFrom(entry.schedule,key);
         if(item)out.push({entry,item,key});
-      });
+      }
       return out;
     }
     function renderCombinedCard(record){
