@@ -742,66 +742,38 @@
       background:color-mix(in srgb,var(--card-custom,var(--accent)) 12%,transparent);color:var(--card-custom,var(--accent));
       font-size:7px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis
     }
-    .combined-overlap{--overlap:#a855f7;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--overlap) 60%,transparent),0 0 18px color-mix(in srgb,var(--overlap) 20%,transparent)}
-    .overlap-tone-red{--overlap:#ef4444}.overlap-tone-green{--overlap:#22c55e}.overlap-tone-blue{--overlap:#3b82f6}
-    .overlap-tone-yellow{--overlap:#facc15}.overlap-tone-orange{--overlap:#f97316}.overlap-tone-violet{--overlap:#a855f7}
+    /* Combined overlap: only the accent of each schedule is used. */
+    .schedule-accent-red{--piece-accent:#ef4444}
+    .schedule-accent-green{--piece-accent:#22c55e}
+    .schedule-accent-blue{--piece-accent:#3b82f6}
+    .schedule-accent-yellow{--piece-accent:#facc15}
+    .schedule-accent-orange{--piece-accent:#f97316}
+    .schedule-accent-violet{--piece-accent:#a855f7}
 
-    /* Landscape overlap: one outlined card made from two color-coded triangles.
-       No colored diagonal stroke: the diagonal is only the boundary between surfaces.
-       Portrait combined cards are intentionally left unchanged. */
-    .overlap-accent-red{--piece-accent:#ef4444}
-    .overlap-accent-green{--piece-accent:#22c55e}
-    .overlap-accent-blue{--piece-accent:#3b82f6}
-    .overlap-accent-yellow{--piece-accent:#facc15}
-    .overlap-accent-orange{--piece-accent:#f97316}
-    .overlap-accent-violet{--piece-accent:#a855f7}
-
-    .schedule-grid .combined-slot.overlap-diagonal{
+    .schedule-grid .combined-slot.overlap-split{
       position:relative!important;
       display:block!important;
       min-height:var(--row-height)!important;
       overflow:hidden!important;
       padding:0!important;
-      border-left:0!important;
-      border-color:color-mix(in srgb,var(--overlap) 58%,var(--line))!important;
-      background:rgba(8,12,20,.96)!important;
-      box-shadow:
-        inset 0 0 0 1px color-mix(in srgb,var(--overlap) 68%,transparent),
-        0 0 18px color-mix(in srgb,var(--overlap) 18%,transparent)!important;
+      border-color:var(--line)!important;
+      background:var(--panel,rgba(8,12,20,.96))!important;
+      box-shadow:none!important;
     }
-
-    .overlap-side-bar{
-      position:absolute;z-index:8;left:0;top:0;bottom:0;width:4px;
-      display:grid;grid-template-rows:1fr 1fr;overflow:hidden;
-      border-radius:var(--radius) 0 0 var(--radius);pointer-events:none
-    }
-    .overlap-side-half{
-      display:block;min-height:0;background:var(--piece-accent);
-      box-shadow:0 0 10px color-mix(in srgb,var(--piece-accent) 48%,transparent)
-    }
-
     .overlap-piece{
-      position:absolute;z-index:3;inset:0;min-width:0;overflow:hidden;
-      color:var(--text,#fff);pointer-events:none
-    }
-    .overlap-piece.is-top{
-      clip-path:polygon(0 0,100% 0,0 100%);
+      position:absolute;z-index:3;min-width:0;overflow:hidden;box-sizing:border-box;
+      color:var(--text,#fff);pointer-events:none;
       background:
-        radial-gradient(circle at 16% 12%,color-mix(in srgb,var(--piece-accent) 20%,transparent),transparent 43%),
-        linear-gradient(145deg,color-mix(in srgb,var(--piece-accent) 10%,rgba(9,13,22,.98)),rgba(9,13,22,.93) 72%)
+        radial-gradient(circle at 14% 14%,color-mix(in srgb,var(--piece-accent) 18%,transparent),transparent 46%),
+        linear-gradient(145deg,color-mix(in srgb,var(--piece-accent) 8%,var(--panel,rgba(9,13,22,.98))),var(--panel,rgba(9,13,22,.94)) 74%);
     }
-    .overlap-piece.is-bottom{
-      clip-path:polygon(100% 0,100% 100%,0 100%);
-      background:
-        radial-gradient(circle at 84% 88%,color-mix(in srgb,var(--piece-accent) 20%,transparent),transparent 43%),
-        linear-gradient(325deg,color-mix(in srgb,var(--piece-accent) 10%,rgba(9,13,22,.98)),rgba(9,13,22,.93) 72%)
+    .overlap-piece::before{
+      content:"";position:absolute;z-index:1;left:0;top:0;bottom:0;width:4px;
+      background:var(--piece-accent);
+      box-shadow:0 0 10px color-mix(in srgb,var(--piece-accent) 42%,transparent);
+      pointer-events:none
     }
-    .overlap-piece-inner{
-      position:absolute;min-width:0;width:64%;display:grid;gap:2px
-    }
-    .overlap-piece.is-top .overlap-piece-inner{left:11px;top:6px}
-    .overlap-piece.is-bottom .overlap-piece-inner{right:8px;bottom:6px}
-
+    .overlap-piece-inner{position:absolute;z-index:2;min-width:0;display:grid;gap:2px}
     .overlap-mini-head{display:flex;align-items:center;gap:4px;min-width:0;line-height:1}
     .overlap-mini-source{
       flex:0 1 auto;min-width:0;max-width:52%;padding:2px 5px;border-radius:999px;
@@ -821,16 +793,17 @@
       display:flex;align-items:center;gap:3px;min-width:0;color:var(--glass-muted,var(--muted));
       font-size:6px;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis
     }
-    .overlap-mini-meta .meta-icon{
-      flex:0 0 auto;width:8px;height:8px;color:var(--piece-accent)
+    .overlap-piece .overlap-mini-meta .meta-icon,
+    body[data-orar-theme] .overlap-piece .overlap-mini-meta .meta-icon{
+      flex:0 0 auto;width:8px;height:8px;color:var(--piece-accent)!important
     }
-    .overlap-mini-meta .meta-icon svg{display:block;width:8px;height:8px;stroke:currentColor}
+    .overlap-piece .overlap-mini-meta .meta-icon svg{display:block;width:8px;height:8px;stroke:currentColor}
     .overlap-mini-meta .overlap-mini-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .schedule-manager-dialog{width:min(680px,calc(100vw - 24px));max-height:min(82dvh,760px)}
     .schedule-manager-list{display:grid;gap:10px;margin:14px 0}
     .schedule-manager-row{display:grid;grid-template-columns:minmax(0,1fr) 150px auto;gap:8px;align-items:end;padding:12px;border:1px solid var(--glass-border,#ffffff18);border-radius:15px;background:rgba(255,255,255,.025)}
-    .schedule-manager-row label,.schedule-overlap-setting{display:grid;gap:5px;font-size:10px;color:var(--glass-muted,var(--muted))}
-    .schedule-manager-row input,.schedule-manager-row select,.schedule-overlap-setting select{min-width:0}
+    .schedule-manager-row label{display:grid;gap:5px;font-size:10px;color:var(--glass-muted,var(--muted))}
+    .schedule-manager-row input,.schedule-manager-row select{min-width:0}
     .schedule-manager-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
     .schedule-manager-active{font-size:9px;font-weight:900;color:var(--accent);letter-spacing:.05em;text-transform:uppercase}
     .schedule-manager-dialog .schedule-add-button{width:100%;margin-top:8px}
@@ -916,18 +889,41 @@
         min-height:82px!important;
       }
 
-      .schedule-grid .combined-slot.overlap-diagonal{
+      .schedule-grid .combined-slot.overlap-split{
         height:var(--row-height)!important;
         min-height:var(--row-height)!important;
       }
-      .overlap-piece-inner{width:66%;gap:1px}
-      .overlap-piece.is-top .overlap-piece-inner{left:9px;top:4px}
-      .overlap-piece.is-bottom .overlap-piece-inner{right:6px;bottom:4px}
+      .overlap-piece.is-top{left:0;right:0;top:0;height:50%}
+      .overlap-piece.is-bottom{
+        left:0;right:0;top:50%;height:50%;
+        border-top:1px solid var(--line)
+      }
+      .overlap-piece-inner{left:9px;right:6px;top:4px;width:auto;gap:1px}
       .overlap-mini-source{font-size:5.5px;padding:2px 4px;max-width:50%}
       .overlap-mini-type{font-size:5.5px}
       .overlap-mini-subject{font-size:8px}
       .overlap-mini-meta{font-size:5.5px}
-      .overlap-mini-meta .meta-icon,.overlap-mini-meta .meta-icon svg{width:7px;height:7px}
+      .overlap-piece .overlap-mini-meta .meta-icon,
+      .overlap-piece .overlap-mini-meta .meta-icon svg{width:7px;height:7px}
+    }
+
+    @media (max-width:960px) and (orientation:portrait){
+      .schedule-grid .combined-slot.overlap-split{
+        height:var(--row-height)!important;
+        min-height:var(--row-height)!important;
+      }
+      .overlap-piece.is-top{left:0;top:0;width:50%;height:100%}
+      .overlap-piece.is-bottom{
+        left:50%;top:0;width:50%;height:100%;
+        border-left:1px solid var(--line)
+      }
+      .overlap-piece-inner{left:11px;right:7px;top:8px;width:auto;gap:2px}
+      .overlap-mini-source{font-size:6.5px;padding:2px 5px;max-width:52%}
+      .overlap-mini-type{font-size:6.5px}
+      .overlap-mini-subject{font-size:10px}
+      .overlap-mini-meta{font-size:6.5px}
+      .overlap-piece .overlap-mini-meta .meta-icon,
+      .overlap-piece .overlap-mini-meta .meta-icon svg{width:8px;height:8px}
     }
 
   </style>
@@ -1099,13 +1095,13 @@
             });
             parsed.activeId=parsed.schedules.some(x=>x.id===parsed.activeId)?parsed.activeId:parsed.schedules[0].id;
             parsed.view=parsed.view==='combined'?'combined':'single';
-            parsed.overlapColor=SCHEDULE_ACCENTS.includes(parsed.overlapColor)?parsed.overlapColor:'violet';
+            delete parsed.overlapColor;
             return parsed;
           }
         }
       }catch{}
       const schedule=normalizeScheduleData(clone(legacy||initialData));
-      return {version:1,activeId:'primary',view:'single',overlapColor:'violet',schedules:[{id:'primary',name:String(schedule.title||'Orar 1').slice(0,60),accent:'red',schedule}]};
+      return {version:1,activeId:'primary',view:'single',schedules:[{id:'primary',name:String(schedule.title||'Orar 1').slice(0,60),accent:'red',schedule}]};
     }
     function syncActiveSchedule(){
       const entry=activeScheduleEntry();if(entry)entry.schedule=data;
@@ -1320,14 +1316,14 @@
         <div class="meta-stack"><div class="meta-line"><span class="meta-icon">${ICONS.person}</span><span class="meta-text">${escapeHtml(item.professor)}</span></div><div class="meta-line"><span class="meta-icon">${ICONS.pin}</span><span class="meta-text">${escapeHtml(item.location)}</span></div></div>
       </article>`;
     }
-    function overlapAccentTone(record){
+    function scheduleAccentTone(record){
       const tone=String(record?.entry?.accent||'red').toLowerCase();
       return SCHEDULE_ACCENTS.includes(tone)?tone:'red';
     }
     function renderOverlapPiece(record,position){
-      const {entry,item}=record,tone=overlapAccentTone(record);
+      const {entry,item}=record,tone=scheduleAccentTone(record);
       const parity=item.week!=='MEREU'?' · '+item.week:'';
-      return `<section class="overlap-piece ${position==='top'?'is-top':'is-bottom'} overlap-accent-${tone}" aria-label="${escapeHtml(entry.name+': '+item.subject)}">
+      return `<section class="overlap-piece ${position==='top'?'is-top':'is-bottom'} schedule-accent-${tone}" aria-label="${escapeHtml(entry.name+': '+item.subject)}">
         <div class="overlap-piece-inner">
           <div class="overlap-mini-head"><span class="overlap-mini-source">${escapeHtml(entry.name)}</span><span class="overlap-mini-type">${escapeHtml(item.type+parity)}</span></div>
           <div class="overlap-mini-subject">${escapeHtml(item.subject)}</div>
@@ -1339,16 +1335,10 @@
     function renderCombinedSlot(time,day){
       const items=combinedItemsAt(time,day);
       if(!items.length)return `<div class="slot-cell empty day-col day-${day}"></div>`;
-      const tone=SCHEDULE_ACCENTS.includes(scheduleBook.overlapColor)?scheduleBook.overlapColor:'violet';
-      if(items.length===2&&isLandscapeOverlapView()){
-        const topTone=overlapAccentTone(items[0]),bottomTone=overlapAccentTone(items[1]);
-        return `<div class="slot-cell combined-slot overlap-diagonal overlap-tone-${tone} day-col day-${day}">
-          <span class="overlap-side-bar" aria-hidden="true"><i class="overlap-side-half overlap-accent-${topTone}"></i><i class="overlap-side-half overlap-accent-${bottomTone}"></i></span>
-          ${renderOverlapPiece(items[0],'top')}${renderOverlapPiece(items[1],'bottom')}
-        </div>`;
+      if(items.length===2&&isCompactOverlapView()){
+        return `<div class="slot-cell combined-slot overlap-split day-col day-${day}">${renderOverlapPiece(items[0],'top')}${renderOverlapPiece(items[1],'bottom')}</div>`;
       }
-      const overlap=items.length>1;
-      return `<div class="slot-cell combined-slot day-col day-${day} ${overlap?'combined-overlap overlap-tone-'+tone:''}">${items.map(renderCombinedCard).join('')}</div>`;
+      return `<div class="slot-cell combined-slot day-col day-${day}">${items.map(renderCombinedCard).join('')}</div>`;
     }
     function renderTabs(){
       mobileTabs.innerHTML = DAYS.map((day,i) =>
@@ -1547,8 +1537,8 @@
       return Boolean(window.matchMedia && window.matchMedia('(max-width:900px) and (orientation:landscape)').matches);
     }
 
-    function isLandscapeOverlapView(){
-      return Boolean(window.matchMedia && window.matchMedia('(max-width:960px) and (orientation:landscape)').matches);
+    function isCompactOverlapView(){
+      return Boolean(window.matchMedia && window.matchMedia('(max-width:960px)').matches);
     }
 
     let noteToggleMotionId = 0;
@@ -1867,7 +1857,6 @@
           <label>Accent<select data-schedule-accent="${escapeHtml(entry.id)}">${SCHEDULE_ACCENTS.map(color=>`<option value="${color}" ${entry.accent===color?'selected':''}>${CARD_TONE_LABELS[color]}</option>`).join('')}</select></label>
           <div class="schedule-manager-actions">${entry.id===activeScheduleId?'<span class="schedule-manager-active">Se editează</span>':`<button type="button" data-schedule-edit="${escapeHtml(entry.id)}">Editează</button>`}<button type="button" data-schedule-gemini="${escapeHtml(entry.id)}">Upload Gemini</button>${scheduleBook.schedules.length>1?`<button type="button" data-schedule-delete="${escapeHtml(entry.id)}">Șterge</button>`:''}</div>
         </section>`).join('')}</div>
-        <label class="schedule-overlap-setting">Accent pentru suprapuneri<select data-overlap-color>${SCHEDULE_ACCENTS.map(color=>`<option value="${color}" ${scheduleBook.overlapColor===color?'selected':''}>${CARD_TONE_LABELS[color]}</option>`).join('')}</select></label>
         <button class="hub-primary schedule-add-button" type="button" data-schedule-add>＋ Adaugă încă un orar</button>`;
     }
 
@@ -1910,7 +1899,7 @@
     });
     scheduleManagerDialog.addEventListener('change',e=>{
       const accent=e.target.closest('[data-schedule-accent]');if(accent){const entry=scheduleBook.schedules.find(x=>x.id===accent.dataset.scheduleAccent);if(entry&&SCHEDULE_ACCENTS.includes(accent.value)){entry.accent=accent.value;persistScheduleBook();render();}return;}
-      const overlap=e.target.closest('[data-overlap-color]');if(overlap&&SCHEDULE_ACCENTS.includes(overlap.value)){scheduleBook.overlapColor=overlap.value;persistScheduleBook();render();}
+
     });
 
     document.getElementById('weekToggle').addEventListener('click', () => selectWeek(oppositeWeek(selectedWeek)));
@@ -1965,11 +1954,11 @@
 
 
 
-    let lastLandscapeOverlapView=isLandscapeOverlapView();
+    let lastCompactOverlapView=isCompactOverlapView();
     window.addEventListener('resize',()=>{
-      const nextLandscapeOverlapView=isLandscapeOverlapView();
-      if(nextLandscapeOverlapView===lastLandscapeOverlapView)return;
-      lastLandscapeOverlapView=nextLandscapeOverlapView;
+      const nextCompactOverlapView=isCompactOverlapView();
+      if(nextCompactOverlapView===lastCompactOverlapView)return;
+      lastCompactOverlapView=nextCompactOverlapView;
       if(!editing)render();
     },{passive:true});
 
