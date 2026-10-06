@@ -122,7 +122,9 @@
       viewerDownload=null;downloadButton.disabled=true;downloadButton.textContent='↓ Descarcă';downloadButton.title='Fișierul se încarcă';downloadStatus.hidden=true;downloadStatus.textContent='';
       viewer.querySelector('.classroom-image-zoom-controls')?.remove();viewer.querySelector('.classroom-viewer-media-fullscreen')?.remove();
       if(viewerObjectUrl){URL.revokeObjectURL(viewerObjectUrl);viewerObjectUrl='';}
-      viewer.querySelector('[data-cr-viewer-content]').replaceChildren();
+      const content=viewer.querySelector('[data-cr-viewer-content]');
+      content.classList.remove('has-drive-video');
+      content.replaceChildren();
     }
     downloadButton.addEventListener('click',async()=>{
       const file=viewerDownload,generation=viewerGeneration;if(!file)return;
