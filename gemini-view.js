@@ -175,19 +175,24 @@
           if(!vv){
             page.style.setProperty('--gemini-keyboard-inset','0px');
             page.style.setProperty('--gemini-viewport-offset','0px');
+            document.body.style.setProperty('--gemini-viewport-offset','0px');
             return;
           }
           if(!focused){
             geminiUnfocusedViewportHeight=Math.max(1,Math.round(vv.height+Math.max(0,vv.offsetTop)));
             page.style.setProperty('--gemini-keyboard-inset','0px');
             page.style.setProperty('--gemini-viewport-offset','0px');
+            document.body.style.setProperty('--gemini-viewport-offset','0px');
             return;
           }
           if(!geminiUnfocusedViewportHeight)geminiUnfocusedViewportHeight=Math.max(1,Math.round(vv.height+Math.max(0,vv.offsetTop)));
           const visibleBottom=vv.height+Math.max(0,vv.offsetTop);
-          const inset=Math.max(0,Math.round(geminiUnfocusedViewportHeight-visibleBottom));
+          const baseHeight=geminiStageHeight||geminiUnfocusedViewportHeight;
+          const inset=Math.max(0,Math.round(baseHeight-visibleBottom));
+          const offset=Math.max(0,Math.round(vv.offsetTop));
           page.style.setProperty('--gemini-keyboard-inset',inset+'px');
-          page.style.setProperty('--gemini-viewport-offset',Math.max(0,Math.round(vv.offsetTop))+'px');
+          page.style.setProperty('--gemini-viewport-offset',offset+'px');
+          document.body.style.setProperty('--gemini-viewport-offset',offset+'px');
         });
       };
 
@@ -580,6 +585,7 @@
         setTimeout(()=>{
           page.style.setProperty('--gemini-keyboard-inset','0px');
           page.style.setProperty('--gemini-viewport-offset','0px');
+          document.body.style.setProperty('--gemini-viewport-offset','0px');
           setGeminiKeyboardOpen(false);
           geminiStageHeight=0;
           geminiStageWidth=0;
@@ -616,6 +622,7 @@
         window.addEventListener('orientationchange',()=>{
           page.style.setProperty('--gemini-keyboard-inset','0px');
           page.style.setProperty('--gemini-viewport-offset','0px');
+          document.body.style.setProperty('--gemini-viewport-offset','0px');
           setGeminiKeyboardOpen(false);
           geminiStageHeight=0;geminiStageWidth=0;
           setTimeout(()=>{
@@ -640,7 +647,7 @@
       return {
         element:page,
         show(){chatMenuOpen=false;setGeminiKeyboardOpen(false);geminiStageHeight=0;geminiStageWidth=0;page.classList.remove('is-entering');void page.offsetWidth;page.classList.add('is-entering');render();requestAnimationFrame(captureGeminiStage);page.querySelector('#geminiHeading')?.focus({preventScroll:true});},
-        hide(){setGeminiKeyboardOpen(false);page.style.setProperty('--gemini-keyboard-inset','0px');page.style.setProperty('--gemini-viewport-offset','0px');},
+        hide(){setGeminiKeyboardOpen(false);page.style.setProperty('--gemini-keyboard-inset','0px');page.style.setProperty('--gemini-viewport-offset','0px');document.body.style.setProperty('--gemini-viewport-offset','0px');},
         openScheduleImport,
         contextSnapshot(){return {chats:chats.map(chat=>({id:chat.id,title:chat.title,updated:chat.updated,messages:chat.messages.slice(-20).map(m=>({role:m.role,text:m.text,attachments:m.attachments}))}))};}
       };
