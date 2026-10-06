@@ -161,10 +161,14 @@
       const systemPrompt=()=>[
         'Ești Gemini integrat în aplicația universitară Orar. Răspunde în română, clar și practic.',
         'Ai acces de citire la snapshot-ul curent al aplicației: orar, materii, profesori, săli, locații, task-uri, termene, notițe, examene, prezențe, catalog, focus, resurse, Classroom, Mail și Drive în măsura în care sunt încărcate.',
-        'Ai și acces de scriere LIMITAT la două acțiuni explicite cerute de utilizator: add_course și add_task. Nu pretinde că ai modificat alte tipuri de date.',
+        'Ai acces de scriere numai pentru acțiuni cerute explicit de utilizator: add_course, update_course, delete_course și add_task. Nu pretinde că ai modificat alte tipuri de date.',
         'Răspunde EXCLUSIV cu JSON valid, fără markdown, în schema: {"reply":"text pentru utilizator","action":null} sau {"reply":"confirmare scurtă","action":{...}}.',
-        'Pentru add_course schema acțiunii este: {"kind":"add_course","subject":"Materia","activityType":"CURS|SEMINAR|LABORATOR","day":"Luni|Marți|Miercuri|Joi|Vineri","start":"HH:MM","end":"HH:MM","professor":"Nume","location":"Sală / locație","week":"MEREU|PARĂ|IMPARĂ"}.',
-        'Nu emite add_course până nu ai: materie, tipul activității (curs/seminar/laborator), ziua, ora de început, ora de sfârșit, profesorul și locația. Dacă lipsesc, întreabă utilizatorul concret pentru toate câmpurile lipsă, de preferat într-un singur mesaj. Formularea generică «adaugă un curs/o materie» nu confirmă activityType; tipul este confirmat doar când utilizatorul spune explicit CURS ca tip, seminar sau laborator. Dacă paritatea nu este menționată, week poate fi MEREU.',
+        'Dacă există mai multe orare, acțiunile asupra orarului pot include "targetSchedule":"numele orarului". Dacă utilizatorul numește un orar/facultate, setează targetSchedule. Dacă nu îl numește, folosește orarul marcat active din snapshot. Dacă nu poți identifica sigur orarul cerut, întreabă.',
+        'Pentru add_course schema acțiunii este: {"kind":"add_course","targetSchedule":"opțional","subject":"Materia","activityType":"CURS|SEMINAR|LABORATOR","day":"Luni|Marți|Miercuri|Joi|Vineri","start":"HH:MM","end":"HH:MM","professor":"Nume","location":"Sală / locație","week":"MEREU|PARĂ|IMPARĂ"}.',
+        'Nu emite add_course până nu ai: materie, tipul activității (curs/seminar/laborator), ziua, ora de început, ora de sfârșit, profesorul și locația. Dacă lipsesc, întreabă utilizatorul concret pentru toate câmpurile lipsă, de preferat într-un singur mesaj. Formularea generică «adaugă un curs/o materie» nu confirmă activityType. Dacă paritatea nu este menționată, week poate fi MEREU.',
+        'Pentru update_course schema este: {"kind":"update_course","targetSchedule":"opțional","target":{"subject":"Materia existentă","day":"Luni|Marți|Miercuri|Joi|Vineri","start":"HH:MM","activityType":"opțional","week":"opțional"},"changes":{"subject":"opțional","activityType":"opțional","day":"opțional","start":"opțional","end":"opțional","professor":"opțional","location":"opțional","week":"opțional"}}.',
+        'Pentru update_course identifică sigur activitatea existentă. Ai nevoie cel puțin de materie, zi și ora de început; dacă sunt mai multe variante la aceeași celulă, folosește activityType/week când sunt cunoscute sau întreabă utilizatorul. În changes pune numai câmpurile pe care utilizatorul a cerut să le schimbi.',
+        'Pentru delete_course schema este: {"kind":"delete_course","targetSchedule":"opțional","target":{"subject":"Materia existentă","day":"Luni|Marți|Miercuri|Joi|Vineri","start":"HH:MM","activityType":"opțional","week":"opțional"}}. Nu șterge dacă activitatea nu poate fi identificată fără ambiguitate; întreabă înainte.',
         'Pentru add_task schema acțiunii este: {"kind":"add_task","title":"Tema","subject":"Materia sau gol","deadline":"DD/MM/YYYY","priority":"low|medium|high","checklist":["pas 1","pas 2"]}.',
         'Nu emite add_task până nu ai titlul, termenul, importanța/prioritatea și decizia despre checklist. Dacă checklist-ul nu a fost menționat, întreabă dacă dorește checklist; folosește [] doar dacă utilizatorul spune explicit că nu dorește. Materia este opțională.',
         'Toate datele pe care le afișezi utilizatorului și deadline din acțiune trebuie să fie strict în format DD/MM/YYYY. Nu afișa YYYY-MM-DD.',
@@ -180,7 +184,7 @@
         return parts;
       }
       function renderMessages(chat){
-        if(!chat||!chat.messages.length)return '<div class="gemini-empty"><span>✦</span><h2>Cu ce te pot ajuta?</h2><p>Gemini poate folosi contextul aplicației, analiza fișiere și adăuga activități în orar sau teme în Planificator.</p></div>';
+        if(!chat||!chat.messages.length)return '<div class="gemini-empty"><span>✦</span><h2>Cu ce te pot ajuta?</h2><p>Gemini poate folosi contextul aplicației, analiza fișiere și adăuga, modifica sau șterge activități din orar, plus teme în Planificator.</p></div>';
         return chat.messages.map(message=>`<article class="gemini-message is-${message.role==='model'?'model':'user'}"><div class="gemini-message-label">${message.role==='model'?'Gemini':'Tu'}</div><div class="gemini-message-body">${linkify(message.text||'')}</div>${message.attachments?.length?`<div class="gemini-message-files">${message.attachments.map(file=>`<span>▧ ${esc(file.name)}</span>`).join('')}</div>`:''}</article>`).join('');
       }
       function render(){
@@ -233,34 +237,130 @@
         const key=norm(value);if(!key||key==='mereu')return 'MEREU';if(key==='para'||key==='par')return 'PARĂ';if(key==='impara'||key==='impar')return 'IMPARĂ';
         throw Error('Frecvența trebuie să fie MEREU, PARĂ sau IMPARĂ.');
       }
+      function availableScheduleTargets(){
+        const targets=Array.isArray(getScheduleTargets?.())?getScheduleTargets():[];
+        return targets.filter(item=>item&&item.id);
+      }
+      function resolveScheduleTarget(label=''){
+        const targets=availableScheduleTargets();
+        if(!targets.length){
+          const schedule=getSchedule?.();if(!schedule)throw Error('Orarul curent nu poate fi modificat.');
+          return {id:'',name:'orarul activ',schedule};
+        }
+        let target=null;
+        const raw=String(label||'').trim();
+        if(raw){
+          const needle=norm(raw);
+          const exact=targets.filter(item=>norm(item.id)===needle||norm(item.name)===needle);
+          const fuzzy=exact.length?exact:targets.filter(item=>norm(item.name).includes(needle)||needle.includes(norm(item.name)));
+          if(fuzzy.length!==1)throw Error('Nu pot identifica sigur orarul „'+raw+'”. Spune exact numele orarului.');
+          target=fuzzy[0];
+        }else target=targets.find(item=>item.active)||targets[0];
+        const schedule=(typeof getScheduleById==='function'?getScheduleById(target.id):null)||getSchedule?.();
+        if(!schedule||!Array.isArray(schedule.times)||!schedule.classes)throw Error('Orarul selectat nu poate fi modificat.');
+        return {id:target.id,name:target.name||'orarul selectat',schedule};
+      }
+      function commitScheduleTarget(target,next){
+        if(target.id&&typeof applyScheduleTo==='function'){
+          if(applyScheduleTo(target.id,next)===false)throw Error('Orarul selectat nu a putut fi salvat.');
+        }else applySchedule(next);
+      }
+      function ensureTimeRow(schedule,start,end){
+        let row=schedule.times.findIndex(pair=>Array.isArray(pair)&&pair[0]===start&&pair[1]===end);
+        if(row>=0)return row;
+        const rows=schedule.times.map((pair,index)=>({pair:[String(pair[0]||''),String(pair[1]||'')],old:index}));
+        rows.push({pair:[start,end],old:null});
+        rows.sort((a,b)=>clockMinutes(a.pair[0])-clockMinutes(b.pair[0])||clockMinutes(a.pair[1])-clockMinutes(b.pair[1]));
+        const remapped={};
+        for(const [key,value] of Object.entries(schedule.classes)){
+          const match=/^(\d+)-([0-4])$/.exec(key);if(!match)continue;
+          const newRow=rows.findIndex(item=>item.old===Number(match[1]));if(newRow>=0)remapped[newRow+'-'+match[2]]=value;
+        }
+        schedule.times=rows.map(item=>item.pair);schedule.classes=remapped;
+        return rows.findIndex(item=>item.old===null);
+      }
+      function placeCourse(schedule,item,day,start,end){
+        if(day<0)throw Error('Ziua activității nu este validă.');
+        if(clockMinutes(end)<=clockMinutes(start))throw Error('Ora de sfârșit trebuie să fie după ora de început.');
+        const row=ensureTimeRow(schedule,start,end),key=row+'-'+day,existing=schedule.classes[key];
+        if(!existing){schedule.classes[key]=item;return {row,key};}
+        const existingWeek=normalizeWeek(existing.week||'MEREU'),week=normalizeWeek(item.week||'MEREU');
+        if(!existing.alternate&&week!=='MEREU'&&existingWeek!=='MEREU'&&existingWeek!==week){existing.alternate=item;return {row,key};}
+        throw Error('Intervalul '+DAY_NAMES[day]+' '+start+'–'+end+' este deja ocupat. Alege alt interval sau o paritate compatibilă.');
+      }
       function addCourseFromAction(action){
+        const target=resolveScheduleTarget(action.targetSchedule);
         const subject=String(action.subject||'').trim(),professor=String(action.professor||'').trim(),location=String(action.location||'').trim();
         const activityType=normalizeActivityType(action.activityType),week=normalizeWeek(action.week||'MEREU'),day=dayIndex(action.day);
         const start=normalizeClock(action.start),end=normalizeClock(action.end);
         if(!subject||!professor||!location||day<0)throw Error('Lipsesc materia, profesorul, locația sau ziua.');
-        if(clockMinutes(end)<=clockMinutes(start))throw Error('Ora de sfârșit trebuie să fie după ora de început.');
-        const current=getSchedule?.();if(!current||!Array.isArray(current.times)||!current.classes)throw Error('Orarul curent nu poate fi modificat.');
-        const next=cloneValue(current);
-        let row=next.times.findIndex(pair=>Array.isArray(pair)&&pair[0]===start&&pair[1]===end);
-        if(row<0){
-          const rows=next.times.map((pair,index)=>({pair:[String(pair[0]||''),String(pair[1]||'')],old:index}));
-          rows.push({pair:[start,end],old:null});
-          rows.sort((a,b)=>clockMinutes(a.pair[0])-clockMinutes(b.pair[0])||clockMinutes(a.pair[1])-clockMinutes(b.pair[1]));
-          const remapped={};
-          for(const [key,value] of Object.entries(next.classes)){
-            const match=/^(\d+)-([0-4])$/.exec(key);if(!match)continue;
-            const newRow=rows.findIndex(item=>item.old===Number(match[1]));if(newRow>=0)remapped[newRow+'-'+match[2]]=value;
+        const next=cloneValue(target.schedule);
+        placeCourse(next,{type:activityType,subject,professor,location,week,note:'',deadline:'',cardColor:'default'},day,start,end);
+        commitScheduleTarget(target,next);
+        return 'Am adăugat '+activityType.toLowerCase()+'ul „'+subject+'” în '+target.name+', '+DAY_NAMES[day]+' '+start+'–'+end+', cu '+professor+', la '+location+'.';
+      }
+      function courseSubjectMatches(actual,requested){
+        const a=norm(actual),b=norm(requested);return Boolean(a&&b&&(a===b||a.includes(b)||b.includes(a)));
+      }
+      function findCourseInSchedule(schedule,targetSpec={}){
+        const subject=String(targetSpec.subject||'').trim(),day=dayIndex(targetSpec.day),start=normalizeClock(targetSpec.start);
+        if(!subject||day<0)throw Error('Pentru modificare trebuie identificate materia, ziua și ora de început.');
+        const rows=schedule.times.map((pair,row)=>({pair,row})).filter(x=>Array.isArray(x.pair)&&x.pair[0]===start);
+        const matches=[];
+        for(const {row} of rows){
+          const key=row+'-'+day,root=schedule.classes[key];if(!root)continue;
+          for(const candidate of [{item:root,alternate:false},{item:root.alternate,alternate:true}]){
+            const item=candidate.item;if(!item||!courseSubjectMatches(item.subject,subject))continue;
+            if(targetSpec.activityType&&normalizeActivityType(targetSpec.activityType)!==normalizeActivityType(item.type))continue;
+            if(targetSpec.week&&normalizeWeek(targetSpec.week)!==normalizeWeek(item.week||'MEREU'))continue;
+            matches.push({key,row,day,item,alternate:candidate.alternate});
           }
-          next.times=rows.map(item=>item.pair);next.classes=remapped;row=rows.findIndex(item=>item.old===null);
         }
-        const key=row+'-'+day,item={type:activityType,subject,professor,location,week,note:'',deadline:'',cardColor:'default'},existing=next.classes[key];
-        if(existing){
-          const existingWeek=normalizeWeek(existing.week||'MEREU');
-          if(!existing.alternate&&week!=='MEREU'&&existingWeek!=='MEREU'&&existingWeek!==week)existing.alternate=item;
-          else throw Error('Intervalul '+DAY_NAMES[day]+' '+start+'–'+end+' este deja ocupat. Alege alt interval sau o paritate compatibilă.');
-        }else next.classes[key]=item;
-        applySchedule(next);
-        return 'Am adăugat '+activityType.toLowerCase()+'ul „'+subject+'” în '+DAY_NAMES[day]+', '+start+'–'+end+', cu '+professor+', la '+location+'.';
+        if(!matches.length)throw Error('Nu am găsit activitatea „'+subject+'” în '+DAY_NAMES[day]+' la '+start+'.');
+        if(matches.length>1)throw Error('Am găsit mai multe activități care corespund. Specifică tipul sau săptămâna pară/impară.');
+        return matches[0];
+      }
+      function removeFoundCourse(schedule,found){
+        const root=schedule.classes[found.key];if(!root)return;
+        if(found.alternate){delete root.alternate;return;}
+        if(root.alternate){const promoted=root.alternate;delete promoted.alternate;schedule.classes[found.key]=promoted;}
+        else delete schedule.classes[found.key];
+      }
+      function updateCourseFromAction(action){
+        const target=resolveScheduleTarget(action.targetSchedule),next=cloneValue(target.schedule);
+        const found=findCourseInSchedule(next,action.target||{}),changes=action.changes&&typeof action.changes==='object'?action.changes:{};
+        if(!Object.keys(changes).length)throw Error('Nu ai specificat ce trebuie modificat.');
+        const originalSubject=found.item.subject,currentTime=next.times[found.row];
+        const updated=cloneValue(found.item);
+        if(Object.prototype.hasOwnProperty.call(changes,'subject')){const value=String(changes.subject||'').trim();if(!value)throw Error('Materia nu poate fi goală.');updated.subject=value;}
+        if(Object.prototype.hasOwnProperty.call(changes,'activityType'))updated.type=normalizeActivityType(changes.activityType);
+        if(Object.prototype.hasOwnProperty.call(changes,'professor'))updated.professor=String(changes.professor||'').trim();
+        if(Object.prototype.hasOwnProperty.call(changes,'location'))updated.location=String(changes.location||'').trim();
+        if(Object.prototype.hasOwnProperty.call(changes,'week'))updated.week=normalizeWeek(changes.week);
+        const newDay=Object.prototype.hasOwnProperty.call(changes,'day')?dayIndex(changes.day):found.day;
+        const newStart=Object.prototype.hasOwnProperty.call(changes,'start')?normalizeClock(changes.start):currentTime[0];
+        const newEnd=Object.prototype.hasOwnProperty.call(changes,'end')?normalizeClock(changes.end):currentTime[1];
+        if(newDay<0)throw Error('Ziua nouă nu este validă.');
+        const moved=newDay!==found.day||newStart!==currentTime[0]||newEnd!==currentTime[1];
+        if(moved){
+          removeFoundCourse(next,found);
+          placeCourse(next,updated,newDay,newStart,newEnd);
+        }else{
+          const root=next.classes[found.key],sibling=found.alternate?root:root.alternate;
+          if(sibling&&Object.prototype.hasOwnProperty.call(changes,'week')){
+            const siblingWeek=normalizeWeek(sibling.week||'MEREU'),newWeek=normalizeWeek(updated.week||'MEREU');
+            if(newWeek==='MEREU'||siblingWeek==='MEREU'||newWeek===siblingWeek)throw Error('Noua paritate intră în conflict cu cealaltă activitate din aceeași celulă.');
+          }
+          Object.assign(found.item,updated);
+        }
+        commitScheduleTarget(target,next);
+        return 'Am modificat „'+originalSubject+'” în '+target.name+'.';
+      }
+      function deleteCourseFromAction(action){
+        const target=resolveScheduleTarget(action.targetSchedule),next=cloneValue(target.schedule);
+        const found=findCourseInSchedule(next,action.target||{}),subject=found.item.subject;
+        removeFoundCourse(next,found);commitScheduleTarget(target,next);
+        return 'Am șters „'+subject+'” din '+target.name+'.';
       }
       function resolveSubjectId(label){
         const raw=String(label||'').trim();if(!raw)return '';
@@ -286,6 +386,8 @@
       function executeAssistantAction(action){
         if(!action||typeof action!=='object')return '';
         if(action.kind==='add_course')return addCourseFromAction(action);
+        if(action.kind==='update_course')return updateCourseFromAction(action);
+        if(action.kind==='delete_course')return deleteCourseFromAction(action);
         if(action.kind==='add_task')return addTaskFromAction(action);
         throw Error('Acțiunea cerută nu este suportată.');
       }
