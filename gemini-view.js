@@ -130,9 +130,31 @@
 
       const iosKeyboardMode=Boolean(window.CSS&&CSS.supports&&CSS.supports('-webkit-touch-callout','none'));
       let geminiUnfocusedViewportHeight=0;
+      let geminiStageHeight=0;
+      let geminiStageWidth=0;
       let geminiViewportRaf=0;
       const geminiViewport=()=>window.visualViewport||null;
       const composerField=()=>page.querySelector('.gemini-composer textarea');
+      const captureGeminiStage=()=>{
+        const rect=page.getBoundingClientRect(),vv=geminiViewport();
+        const height=Math.max(
+          Math.round(rect.height||0),
+          Math.round(window.innerHeight||0),
+          Math.round(vv?(vv.height+Math.max(0,vv.offsetTop)):0)
+        );
+        const width=Math.max(Math.round(rect.width||0),Math.round(window.innerWidth||0));
+        if(height)geminiStageHeight=Math.max(geminiStageHeight,height);
+        if(width)geminiStageWidth=width;
+        if(geminiStageHeight){
+          page.style.setProperty('--gemini-stage-height',geminiStageHeight+'px');
+          document.body.style.setProperty('--gemini-stage-height',geminiStageHeight+'px');
+        }
+        if(geminiStageWidth)page.style.setProperty('--gemini-stage-width',geminiStageWidth+'px');
+      };
+      const setGeminiKeyboardOpen=open=>{
+        document.body.classList.toggle('gemini-keyboard-open',Boolean(open));
+        if(open)captureGeminiStage();
+      };
       const autosizeComposer=(field=composerField())=>{
         if(!field)return;
         field.style.height='0px';
@@ -255,6 +277,7 @@
         requestAnimationFrame(()=>{
           const box=page.querySelector('[data-gemini-conversation]');if(box)box.scrollTop=box.scrollHeight;
           autosizeComposer();
+          if(composerField()!==document.activeElement)captureGeminiStage();
           syncGeminiKeyboard();
         });
       }
@@ -543,6 +566,8 @@
       });
       page.addEventListener('focusin',e=>{
         const field=e.target.closest('.gemini-composer textarea');if(!field)return;
+        captureGeminiStage();
+        setGeminiKeyboardOpen(true);
         const vv=geminiViewport();
         if(vv)geminiUnfocusedViewportHeight=Math.max(geminiUnfocusedViewportHeight,Math.round(vv.height+Math.max(0,vv.offsetTop)));
         autosizeComposer(field);
@@ -555,9 +580,13 @@
         setTimeout(()=>{
           page.style.setProperty('--gemini-keyboard-inset','0px');
           page.style.setProperty('--gemini-viewport-offset','0px');
+          setGeminiKeyboardOpen(false);
+          geminiStageHeight=0;
+          geminiStageWidth=0;
           const vv=geminiViewport();
           if(vv)geminiUnfocusedViewportHeight=Math.max(1,Math.round(vv.height+Math.max(0,vv.offsetTop)));
-        },220);
+          captureGeminiStage();
+        },320);
       });
       page.addEventListener('change',e=>{
         const input=e.target.closest('[data-gemini-files]');if(!input)return;
@@ -587,9 +616,12 @@
         window.addEventListener('orientationchange',()=>{
           page.style.setProperty('--gemini-keyboard-inset','0px');
           page.style.setProperty('--gemini-viewport-offset','0px');
+          setGeminiKeyboardOpen(false);
+          geminiStageHeight=0;geminiStageWidth=0;
           setTimeout(()=>{
             const vv=geminiViewport();
             if(vv)geminiUnfocusedViewportHeight=Math.max(1,Math.round(vv.height+Math.max(0,vv.offsetTop)));
+            captureGeminiStage();
             autosizeComposer();
             syncGeminiKeyboard();
           },320);
@@ -607,8 +639,8 @@
 
       return {
         element:page,
-        show(){chatMenuOpen=false;page.classList.remove('is-entering');void page.offsetWidth;page.classList.add('is-entering');render();page.querySelector('#geminiHeading')?.focus({preventScroll:true});},
-        hide(){},
+        show(){chatMenuOpen=false;setGeminiKeyboardOpen(false);geminiStageHeight=0;geminiStageWidth=0;page.classList.remove('is-entering');void page.offsetWidth;page.classList.add('is-entering');render();requestAnimationFrame(captureGeminiStage);page.querySelector('#geminiHeading')?.focus({preventScroll:true});},
+        hide(){setGeminiKeyboardOpen(false);page.style.setProperty('--gemini-keyboard-inset','0px');page.style.setProperty('--gemini-viewport-offset','0px');},
         openScheduleImport,
         contextSnapshot(){return {chats:chats.map(chat=>({id:chat.id,title:chat.title,updated:chat.updated,messages:chat.messages.slice(-20).map(m=>({role:m.role,text:m.text,attachments:m.attachments}))}))};}
       };
