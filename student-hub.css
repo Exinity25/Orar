@@ -1508,7 +1508,7 @@ body[data-orar-theme="custom"].orar-custom-light{color-scheme:light}
 
 /* Gemini composer: rounded glass field with red glow, never a square focus outline. */
 .gemini-composer{border-radius:29px!important;border:1px solid rgba(255,255,255,.13)!important;box-shadow:0 16px 45px rgba(0,0,0,.24),0 0 18px color-mix(in srgb,var(--accent) 8%,transparent)!important;transition:border-color 160ms ease,box-shadow 180ms ease}
-.gemini-composer:focus-within{border-color:color-mix(in srgb,var(--accent) 68%,rgba(255,255,255,.15))!important;box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 34%,transparent),0 0 16px color-mix(in srgb,var(--accent) 48%,transparent),0 0 34px color-mix(in srgb,var(--accent) 24%,transparent),0 16px 45px rgba(0,0,0,.24)!important}
+.gemini-composer:focus-within{border-color:rgba(255,255,255,.13)!important;box-shadow:0 0 18px color-mix(in srgb,var(--accent) 48%,transparent),0 0 38px color-mix(in srgb,var(--accent) 26%,transparent),0 16px 45px rgba(0,0,0,.24)!important}
 .gemini-composer textarea,.gemini-composer textarea:focus,.gemini-composer textarea:focus-visible{outline:none!important;border:0!important;box-shadow:none!important;border-radius:20px!important}
 
 /* Rich mail follows the current Orar glass theme while preserving real mail logos/images. */
