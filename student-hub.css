@@ -1054,3 +1054,44 @@ body[data-orar-theme] .hub-brand-dot{color:var(--accent-2)!important}
 @media(max-width:750px){
   .hub-search input{font-size:16px!important}
 }
+
+
+/* File viewer: the glass header occupies real layout space so it never covers page 1 / row 1. */
+.classroom-viewer-dialog{
+  padding:24px 10px 0!important;
+  overflow:hidden!important;
+  box-sizing:border-box!important;
+}
+.classroom-viewer-header{
+  position:relative!important;
+  top:auto!important;
+  left:auto!important;
+  right:auto!important;
+  inset:auto!important;
+  transform:none!important;
+  width:100%!important;
+  max-width:760px!important;
+  margin:0 auto 10px!important;
+  flex:0 0 auto!important;
+  box-sizing:border-box!important;
+}
+.classroom-viewer-content{
+  position:relative!important;
+  top:auto!important;
+  left:auto!important;
+  right:auto!important;
+  bottom:auto!important;
+  height:auto!important;
+  min-height:0!important;
+  flex:1 1 auto!important;
+}
+@media(max-width:640px){
+  .classroom-viewer-dialog{
+    padding:max(52px,calc(env(safe-area-inset-top) + 20px)) 10px 0!important;
+  }
+  .classroom-viewer-header{
+    width:100%!important;
+    max-width:none!important;
+    margin-bottom:10px!important;
+  }
+}
