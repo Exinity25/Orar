@@ -73,4 +73,71 @@
       const page=document.createElement('main');
       page.id='hubGeminiPage';
       page.className='hub-page hub-hidden gemini-page';
-      page.setAttribute('aria-labelledby','geminiHeading
+      page.setAttribute('aria-labelledby','geminiHeading');
+      root.append(page);
+
+      const importDialog=document.createElement('dialog');
+      importDialog.className='planner-dialog gemini-import-dialog';
+      root.append(importDialog);
+
+      let chats=readChats();
+      let activeId=chats[0]?.id||'';
+      let collapsed=false;
+      let busy=false;
+      let pendingFiles=[];
+
+      function activeChat(){return chats.find(chat=>chat.id===activeId)||null;}
+      function createChat(){
+        const chat={id:uid(),title:'Chat nou',created:Date.now(),updated:Date.now(),messages:[]};
+        chats.unshift(chat);activeId=chat.id;writeChats(chats);render();
+      }
+      function deleteChat(id){
+        chats=chats.filter(chat=>chat.id!==id);
+        if(activeId===id)activeId=chats[0]?.id||'';
+        writeChats(chats);render();
+      }
+      function titleFrom(text){
+        const value=String(text||'').replace(/\s+/g,' ').trim();
+        return value?value.slice(0,42):'Chat nou';
+      }
+      function appContext(){
+        const base={schedule:getSchedule?.()||null};
+        try{Object.assign(base,getAppContext?.()||{});}catch{}
+        const local={};
+        try{
+          for(let i=0;i<localStorage.length;i++){
+            const key=localStorage.key(i);
+            if(!key||key===API_KEY||/session|token|account/i.test(key))continue;
+            if(!/^(orar_|c11_1_)/.test(key))continue;
+            const value=localStorage.getItem(key);
+            if(value!=null&&value.length<180000)local[key]=value;
+          }
+        }catch{}
+        base.localStorage=local;
+        return base;
+      }
+      const systemPrompt=()=>[
+        'Ești Gemini integrat în aplicația universitară Orar.',
+        'Răspunde implicit în română, clar și practic.',
+        'Ai acces read-only la snapshot-ul curent al aplicației inclus mai jos: orar, planificator, teme, Classroom, Mail și Drive în măsura în care sunt încărcate în aplicație.',
+        'Nu pretinde că vezi informații care nu apar în snapshot.',
+        'Poți analiza fișierele atașate de utilizator.',
+        'Nu modifica datele aplicației din chat; importul automat al orarului se face separat prin funcția Upload.',
+        'SNAPSHOT APLICAȚIE:\n'+JSON.stringify(appContext())
+      ].join('\n\n');
+
+      function messageParts(message,includeAttachments=false){
+        const parts=[{text:String(message.text||'')}];
+        if(includeAttachments&&Array.isArray(message.parts))parts.push(...message.parts);
+        return parts;
+      }
+      function renderMessages(chat){
+        if(!chat||!chat.messages.length)return '<div class="gemini-empty"><span>✦</span><h2>Cu ce te pot ajuta?</h2><p>Gemini poate folosi contextul curent al aplicației și fișierele pe care le atașezi.</p></div>';
+        return chat.messages.map(message=>`<article class="gemini-message is-${message.role==='model'?'model':'user'}"><div class="gemini-message-label">${message.role==='model'?'Gemini':'Tu'}</div><div class="gemini-message-body">${linkify(message.text||'')}</div>${message.attachments?.length?`<div class="gemini-message-files">${message.attachments.map(file=>`<span>▧ ${esc(file.name)}</span>`).join('')}</div>`:''}</article>`).join('');
+      }
+      function render(){
+        const chat=activeChat();
+        page.innerHTML=`<div class="gemini-shell ${collapsed?'is-collapsed':''}">
+          <aside class="gemini-sidebar" aria-label="Chat-uri Gemini">
+            <div class="gemini-sidebar-top">
+              <button class="gemini-collapse" type="button" data-gemini-colla
