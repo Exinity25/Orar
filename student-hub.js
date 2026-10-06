@@ -182,11 +182,13 @@
       const subjects=new Map();
       const add = item => {
         const name=String(item?.subject || '').trim();if(!name)return;
-        const id=normalize(name);if(!subjects.has(id))subjects.set(id,{id,name,count:0,current:true});subjects.get(id).count++;
+        const id=normalize(name),professor=String(item?.professor||'').trim();
+        if(!subjects.has(id))subjects.set(id,{id,name,count:0,current:true,professors:[]});
+        const subject=subjects.get(id);subject.count++;if(professor&&!subject.professors.includes(professor))subject.professors.push(professor);
       };
       Object.values(getSchedule()?.classes || {}).forEach(item=>{add(item);if(item?.alternate)add(item.alternate);});
       Object.entries(store.subjects).forEach(([id,value])=>{
-        if(!subjects.has(id) && Array.isArray(value?.tasks) && value.tasks.length) subjects.set(id,{id,name:String(value.name||id),count:0,current:false});
+        if(!subjects.has(id) && Array.isArray(value?.tasks) && value.tasks.length) subjects.set(id,{id,name:String(value.name||id),count:0,current:false,professors:[]});
       });
       return [...subjects.values()].sort((a,b)=>a.name.localeCompare(b.name,'ro'));
     };
