@@ -96,3 +96,14 @@ html body[data-ui-glass][data-ui-glass] :is(.classroom-viewer-message,.classroom
 
 /* Override the older per-theme cascade consistently. */
 html body[data-ui-glass][data-ui-glass] #plSearchResults button{justify-content:flex-start;text-align:left}
+
+
+/* The timetable note field stays neutral until the user focuses it; focus is glow-only. */
+html body[data-ui-glass][data-ui-glass] .note-area{outline:none!important}
+html body[data-ui-glass][data-ui-glass] .note-area:focus,
+html body[data-ui-glass][data-ui-glass] .note-area:focus-visible{
+  outline:none!important;
+  outline-offset:0!important;
+  border-color:var(--glass-border)!important;
+  box-shadow:inset 0 1px 0 var(--glass-highlight),0 0 14px color-mix(in srgb,var(--accent) 48%,transparent),0 0 28px color-mix(in srgb,var(--accent) 18%,transparent)!important;
+}
