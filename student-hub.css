@@ -1465,3 +1465,76 @@ body[data-orar-theme="custom"].orar-custom-light{color-scheme:light}
 .mail-body.is-html a[href*="classroom.google.com/invite/"]:active,
 .mail-body.is-html a[href*="classroom.google.com/c/"]:active{transform:scale(.98)}
 @media(max-width:600px){.mail-body.is-html{margin-left:-8px;margin-right:-8px;padding:12px}.mail-person-avatar{width:34px;height:34px;flex-basis:34px}}
+
+
+/* Gemini conversations drawer: a second menu under the main hamburger. */
+.gemini-shell{display:block!important;position:relative}
+.gemini-main{width:100%;padding-left:clamp(12px,3vw,34px)!important}
+.gemini-sidebar{
+  position:fixed!important;left:0;top:0;bottom:0;z-index:245;width:280px!important;
+  transform:translateX(calc(-100% - 18px));box-shadow:22px 0 70px rgba(0,0,0,.42);
+  transition:transform 220ms cubic-bezier(.2,.8,.2,1),width 220ms ease,padding 220ms ease!important;
+}
+.gemini-shell.is-chats-open .gemini-sidebar{transform:translateX(0)}
+.gemini-shell.is-collapsed .gemini-sidebar{width:68px!important}
+.gemini-chat-backdrop{position:fixed;inset:0;z-index:235;border:0!important;background:rgba(0,0,0,.34)!important;backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:opacity 180ms ease;padding:0!important}
+.gemini-shell.is-chats-open .gemini-chat-backdrop{opacity:1;pointer-events:auto}
+.gemini-chat-menu-toggle{
+  position:fixed;z-index:255;left:max(18px,env(safe-area-inset-left));
+  top:calc(max(18px,env(safe-area-inset-top)) + 68px);width:54px;height:54px;padding:0!important;
+  display:grid;place-content:center;gap:5px;border-radius:50%!important;
+  border:1px solid var(--glass-border,#ffffff22)!important;
+  background:color-mix(in srgb,var(--glass-surface,rgba(8,11,17,.92)) 94%,transparent)!important;
+  box-shadow:0 12px 34px rgba(0,0,0,.34),inset 0 0 0 1px rgba(255,255,255,.025);
+  backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+}
+.gemini-chat-menu-toggle span{display:block;width:20px;height:2px;border-radius:999px;background:var(--glass-ink,#fff)}
+.gemini-chat-menu-toggle span:nth-child(2){width:15px}
+.gemini-shell.is-chats-open .gemini-chat-menu-toggle{border-color:color-mix(in srgb,var(--accent) 60%,transparent)!important;box-shadow:0 0 20px color-mix(in srgb,var(--accent) 28%,transparent),0 12px 34px rgba(0,0,0,.34)}
+@media(max-width:700px){
+  .gemini-shell,.gemini-shell.is-collapsed{grid-template-columns:1fr!important}
+  .gemini-sidebar{width:min(82vw,310px)!important;padding-left:12px!important;padding-right:12px!important}
+  .gemini-shell.is-collapsed .gemini-sidebar{width:72px!important}
+  .gemini-new-chat{width:auto;padding:0 12px}
+  .gemini-shell:not(.is-collapsed) .gemini-new-chat strong,
+  .gemini-shell:not(.is-collapsed) .gemini-chat-row strong,
+  .gemini-shell:not(.is-collapsed) .gemini-chat-delete,
+  .gemini-shell:not(.is-collapsed) .gemini-key-button strong{display:initial}
+  .gemini-shell:not(.is-collapsed) .gemini-chat-row{grid-template-columns:minmax(0,1fr) 34px}
+  .gemini-shell:not(.is-collapsed) .gemini-chat-row>button:first-child{justify-content:flex-start;padding:10px}
+  .gemini-shell:not(.is-collapsed) .gemini-key-button{justify-content:flex-start;padding:9px 11px}
+}
+
+/* Gemini composer: rounded glass field with red glow, never a square focus outline. */
+.gemini-composer{border-radius:29px!important;border:1px solid rgba(255,255,255,.13)!important;box-shadow:0 16px 45px rgba(0,0,0,.24),0 0 18px color-mix(in srgb,var(--accent) 8%,transparent)!important;transition:border-color 160ms ease,box-shadow 180ms ease}
+.gemini-composer:focus-within{border-color:color-mix(in srgb,var(--accent) 68%,rgba(255,255,255,.15))!important;box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 34%,transparent),0 0 16px color-mix(in srgb,var(--accent) 48%,transparent),0 0 34px color-mix(in srgb,var(--accent) 24%,transparent),0 16px 45px rgba(0,0,0,.24)!important}
+.gemini-composer textarea,.gemini-composer textarea:focus,.gemini-composer textarea:focus-visible{outline:none!important;border:0!important;box-shadow:none!important;border-radius:20px!important}
+
+/* Rich mail follows the current Orar glass theme while preserving real mail logos/images. */
+.mail-body.is-html{white-space:normal!important;overflow:hidden;padding:18px!important;border:1px solid var(--glass-border,#ffffff1b)!important;border-radius:18px!important;background:color-mix(in srgb,var(--glass-surface,rgba(9,13,20,.92)) 96%,transparent)!important;color:var(--glass-ink,#f7f8fb)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.035),0 16px 42px rgba(0,0,0,.2)}
+.mail-body.is-html :is(table,tbody,tr,td,div,p,span,h1,h2,h3,h4,h5,h6){max-width:100%;color:inherit!important;background:transparent!important}
+.mail-body.is-html table{width:100%!important;max-width:100%!important;border-collapse:separate!important;border-spacing:0}
+.mail-body.is-html td{padding:6px!important}
+.mail-body.is-html .mail-rich-image{display:block;max-width:min(100%,560px)!important;height:auto!important;margin:12px auto;border-radius:12px;object-fit:contain}
+.mail-body.is-html a{color:var(--accent)!important;text-decoration:none!important}
+.mail-body.is-html .mail-rich-link{display:inline!important;text-decoration:underline!important;text-underline-offset:3px;overflow-wrap:anywhere}
+.mail-body.is-html .mail-rich-action{display:inline-flex!important;align-items:center;justify-content:center;min-height:44px;max-width:100%;margin:7px 5px 7px 0;padding:10px 16px;border:1px solid color-mix(in srgb,var(--accent) 42%,var(--glass-border));border-radius:13px;background:color-mix(in srgb,var(--accent) 10%,rgba(255,255,255,.035));color:var(--accent)!important;font-weight:800;text-align:center;box-shadow:0 8px 22px rgba(0,0,0,.16)}
+.mail-body.is-html .mail-rich-action.is-primary{background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 92%,#730019),var(--accent));color:#fff!important;border-color:color-mix(in srgb,var(--accent) 75%,#fff 15%);box-shadow:0 0 18px color-mix(in srgb,var(--accent) 24%,transparent),0 10px 26px rgba(0,0,0,.22)}
+.mail-person-avatar{position:relative;overflow:visible}
+.mail-person-avatar.is-classroom{background:linear-gradient(145deg,color-mix(in srgb,#22a565 74%,var(--glass-surface)),color-mix(in srgb,#0d7f4b 68%,var(--glass-surface)));color:white}
+.mail-person-brand{position:absolute;right:-10px;bottom:-7px;padding:2px 5px;border-radius:999px;border:1px solid var(--glass-border,#ffffff24);background:var(--glass-surface,#111722);color:#aef0c9;font-size:6px;font-weight:850;letter-spacing:.04em;box-shadow:0 3px 9px #0006}
+@media(max-width:600px){.mail-body.is-html{margin-left:-4px!important;margin-right:-4px!important;padding:14px!important}}
+
+/* Quick notes are first-class editable Planner items. */
+.pl-notes-panel{margin-top:28px}
+.pl-notes-panel>.pl-row h2{margin:0}
+.pl-note-card{display:grid;gap:12px}
+.pl-note-card p{white-space:pre-wrap;overflow-wrap:anywhere;margin:8px 0}
+
+/* Prevent iOS Safari/PWA from zooming when any editable field receives focus. */
+@supports (-webkit-touch-callout:none){
+  @media(max-width:900px){
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+    textarea,select{font-size:16px!important}
+  }
+}

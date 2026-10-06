@@ -75,6 +75,7 @@
       let chats=readChats();
       let activeId=chats[0]?.id||'';
       let collapsed=false;
+      let chatMenuOpen=false;
       let busy=false;
       let pendingFiles=[];
 
@@ -111,7 +112,7 @@
       const systemPrompt=()=>[
         'Ești Gemini integrat în aplicația universitară Orar.',
         'Răspunde implicit în română, clar și practic.',
-        'Ai acces read-only la snapshot-ul curent al aplicației inclus mai jos: orar, planificator, teme, Classroom, Mail și Drive în măsura în care sunt încărcate în aplicație.',
+        'Ai acces read-only la snapshot-ul curent al aplicației inclus mai jos: orarul complet, materii, profesori, săli, locații și timpi de deplasare, toate task-urile și termenele, notițele, examenele, prezențele, catalogul, sesiunile de studiu/focus, resursele, Classroom, Mail și Drive în măsura în care sunt încărcate în aplicație.',
         'Nu pretinde că vezi informații care nu apar în snapshot.',
         'Poți analiza fișierele atașate de utilizator.',
         'Nu modifica datele aplicației din chat; importul automat al orarului se face separat prin funcția Upload.',
@@ -129,7 +130,9 @@
       }
       function render(){
         const chat=activeChat();
-        page.innerHTML=`<div class="gemini-shell ${collapsed?'is-collapsed':''}">
+        page.innerHTML=`<div class="gemini-shell ${collapsed?'is-collapsed':''} ${chatMenuOpen?'is-chats-open':''}">
+          <button class="gemini-chat-menu-toggle" type="button" data-gemini-chat-menu aria-expanded="${chatMenuOpen?'true':'false'}" aria-label="${chatMenuOpen?'Închide conversațiile Gemini':'Deschide conversațiile Gemini'}"><span></span><span></span><span></span></button>
+          <button class="gemini-chat-backdrop" type="button" data-gemini-chat-backdrop aria-label="Închide lista de conversații"></button>
           <aside class="gemini-sidebar" aria-label="Chat-uri Gemini">
             <div class="gemini-sidebar-top">
               <button class="gemini-collapse" type="button" data-gemini-collapse aria-label="${collapsed?'Extinde lista de chat-uri':'Restrânge lista de chat-uri'}">${collapsed?'›':'‹'}</button>
@@ -236,9 +239,11 @@
       }
 
       page.addEventListener('click',e=>{
+        if(e.target.closest('[data-gemini-chat-menu]')){chatMenuOpen=!chatMenuOpen;render();return;}
+        if(e.target.closest('[data-gemini-chat-backdrop]')){chatMenuOpen=false;render();return;}
         if(e.target.closest('[data-gemini-collapse]')){collapsed=!collapsed;render();return;}
         if(e.target.closest('[data-gemini-new]')){createChat();return;}
-        const chatButton=e.target.closest('[data-gemini-chat]');if(chatButton){activeId=chatButton.dataset.geminiChat;render();return;}
+        const chatButton=e.target.closest('[data-gemini-chat]');if(chatButton){activeId=chatButton.dataset.geminiChat;if(window.innerWidth<=900)chatMenuOpen=false;render();return;}
         const del=e.target.closest('[data-gemini-delete]');if(del){deleteChat(del.dataset.geminiDelete);return;}
         const remove=e.target.closest('[data-gemini-remove-file]');if(remove){pendingFiles.splice(Number(remove.dataset.geminiRemoveFile),1);render();}
       });
@@ -273,7 +278,7 @@
 
       return {
         element:page,
-        show(){page.classList.remove('is-entering');void page.offsetWidth;page.classList.add('is-entering');render();page.querySelector('#geminiHeading')?.focus({preventScroll:true});},
+        show(){chatMenuOpen=false;page.classList.remove('is-entering');void page.offsetWidth;page.classList.add('is-entering');render();page.querySelector('#geminiHeading')?.focus({preventScroll:true});},
         hide(){},
         openScheduleImport,
         contextSnapshot(){return {chats:chats.map(chat=>({id:chat.id,title:chat.title,updated:chat.updated,messages:chat.messages.slice(-20).map(m=>({role:m.role,text:m.text,attachments:m.attachments}))}))};}
