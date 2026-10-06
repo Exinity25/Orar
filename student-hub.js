@@ -347,7 +347,7 @@
       await applyStoredBackground();tell('Fundalul Bleach DEFAULT a fost restaurat.');
     });
     window.addEventListener('orar-drive-section-request',()=>{changeView('drive');});
-    document.addEventListener('click',e=>{const a=e.target.closest('a[href]');if(!a||a.closest('#hubMailPage,#hubDrivePage'))return;const href=a.href||'';if(classroom.openDriveLink?.(href,a.textContent||'Fișier Google Drive')){e.preventDefault();changeView('drive');}});
+    document.addEventListener('click',e=>{const a=e.target.closest('a[href]');if(!a||a.closest('#hubMailPage,#hubDrivePage'))return;const href=a.href||'';if(classroom.openDriveLink?.(href,a.textContent||'Fișier Google Drive'))e.preventDefault();});
         window.addEventListener('orar-mail-unread',e=>{const dot=$('#hubMailDot'),count=Math.max(0,Number(e.detail?.count)||0);if(dot){dot.hidden=!count;dot.title=count?count+' mail-uri necitite':'';}});
     $('#hubSearch').addEventListener('input',e=>{search=e.target.value;renderSubjects();});
     list.addEventListener('input',e=>{
