@@ -1047,3 +1047,10 @@ body[data-orar-theme] .hub-brand-dot{color:var(--accent-2)!important}
 .hub-page{overflow-x:hidden!important;max-width:100vw}
 .hub-content{min-width:0;max-width:100%}
 .hub-heading:focus,.hub-heading:focus-visible{outline:none!important;box-shadow:none!important}
+
+/* Mobile Materii search: no internal vertical separators and no iOS focus zoom. */
+.hub-search{overflow:hidden}
+.hub-search input{-webkit-appearance:none;appearance:none;border-left:0!important;border-right:0!important;box-shadow:none!important}
+@media(max-width:750px){
+  .hub-search input{font-size:16px!important}
+}
