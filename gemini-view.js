@@ -256,4 +256,46 @@
         const chatButton=e.target.closest('[data-gemini-chat]');if(chatButton){activeId=chatButton.dataset.geminiChat;render();return;}
         const del=e.target.closest('[data-gemini-delete]');if(del){deleteChat(del.dataset.geminiDelete);return;}
         if(e.target.closest('[data-gemini-key]')){openKeyDialog();return;}
-        const remove=e.target.closest('[data-gemini-remove-file]');if(remove){pendingFiles.splice(Number(remove.dataset.geminiRemoveFile
+        const remove=e.target.closest('[data-gemini-remove-file]');if(remove){pendingFiles.splice(Number(remove.dataset.geminiRemoveFile),1);render();}
+      });
+      page.addEventListener('change',e=>{
+        const input=e.target.closest('[data-gemini-files]');if(!input)return;
+        const selected=[...input.files].filter(file=>file.size<=MAX_FILE_BYTES).slice(0,8);
+        pendingFiles=[...pendingFiles,...selected].slice(0,8);render();
+      });
+      page.addEventListener('submit',e=>{
+        const form=e.target.closest('[data-gemini-form]');if(!form)return;e.preventDefault();const field=form.elements.message;const text=field.value;field.value='';sendMessage(text);
+      });
+      page.addEventListener('keydown',e=>{
+        const field=e.target.closest('.gemini-composer textarea');if(!field)return;
+        if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();const text=field.value;field.value='';sendMessage(text);}
+      });
+      importDialog.addEventListener('click',e=>{if(e.target.closest('[data-gemini-dialog-close]'))importDialog.close();});
+      importDialog.addEventListener('submit',async e=>{
+        const keyForm=e.target.closest('[data-gemini-key-form]');
+        if(keyForm){e.preventDefault();saveApiKey(new FormData(keyForm).get('key'));importDialog.close();render();tell?.('Cheia Gemini a fost salvată doar pe acest dispozitiv.');return;}
+        const form=e.target.closest('[data-gemini-import-form]');if(!form)return;
+        e.preventDefault();const button=form.querySelector('button[type=submit],button:not([type])'),data=new FormData(form),file=form.elements.file.files[0],group=String(data.get('group')||'').trim();
+        button.disabled=true;button.textContent='Gemini analizează…';
+        try{await importSchedule(file,group);importDialog.close();}
+        catch(error){tell?.(error?.message||'Importul nu a reușit.');button.disabled=false;button.textContent='Importă automat';}
+      });
+
+      const scheduleButton=document.createElement('button');
+      scheduleButton.type='button';scheduleButton.className='schedule-gemini-upload';scheduleButton.innerHTML='<span>✦</span> Upload';
+      scheduleButton.setAttribute('aria-label','Importă orarul din poză sau PDF cu Gemini');
+      scheduleButton.addEventListener('click',openScheduleImport);
+      document.querySelector('.app')?.append(scheduleButton);
+
+      if(!chats.length)createChat();else render();
+
+      return {
+        element:page,
+        show(){page.classList.remove('is-entering');void page.offsetWidth;page.classList.add('is-entering');render();page.querySelector('#geminiHeading')?.focus({preventScroll:true});},
+        hide(){},
+        openScheduleImport,
+        contextSnapshot(){return {chats:chats.map(chat=>({id:chat.id,title:chat.title,updated:chat.updated,messages:chat.messages.slice(-20).map(m=>({role:m.role,text:m.text,attachments:m.attachments}))}))};}
+      };
+    }
+  };
+})();
