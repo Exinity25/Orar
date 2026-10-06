@@ -111,7 +111,7 @@
   }
 
   window.OrarGemini={
-    mount({root,getSchedule,applySchedule,getAppContext,addPlannerTask,getGoogleToken,requestGoogleAccess,changeView,tell}){
+    mount({root,getSchedule,applySchedule,getAppContext,getScheduleTargets,getScheduleById,applyScheduleTo,addPlannerTask,getGoogleToken,requestGoogleAccess,changeView,tell}){
       const page=document.createElement('main');
       page.id='hubGeminiPage';
       page.className='hub-page hub-hidden gemini-page';
@@ -340,11 +340,13 @@
         return {title:String(raw.title||current?.title||'Orar').slice(0,120),subtitle:String(raw.subtitle||current?.subtitle||'').slice(0,180),times,classes};
       }
 
-      async function importSchedule(file,group=''){
+      async function importSchedule(file,group='',targetId=''){
         const accessToken=String(getGoogleToken?.()||'');if(!accessToken){requestGoogleAccess?.();throw Error('Acceptă permisiunea Gemini pentru contul Google conectat, apoi încearcă din nou.');}
         if(!file)throw Error('Alege o poză sau un PDF.');
         if(!/^image\//.test(file.type)&&file.type!=='application/pdf'&&!/\.pdf$/i.test(file.name))throw Error('Pentru importul orarului folosește o fotografie sau un PDF.');
-        const current=getSchedule();
+        const targets=Array.isArray(getScheduleTargets?.())?getScheduleTargets():[];
+        const target=targets.find(item=>item.id===targetId)||targets.find(item=>item.active)||targets[0]||null;
+        const current=target?.id&&getScheduleById?getScheduleById(target.id):getSchedule();
         const hiddenInstruction=[
           'Analizează imaginea/PDF-ul cu orarul universitar și transformă-l în JSON pentru aplicația Orar.',
           'Răspunde EXCLUSIV cu JSON valid, fără markdown și fără explicații.',
@@ -361,17 +363,21 @@
         const result=await generate(accessToken,[{role:'user',parts:[{text:hiddenInstruction},part]}],'Ești un extractor strict de orare universitare. Nu adăuga comentarii.',true);
         let parsed;try{parsed=JSON.parse(result.replace(/^```json\s*|```$/g,'').trim());}catch{throw Error('Gemini a returnat un răspuns care nu poate fi importat. Încearcă din nou cu o poză mai clară.');}
         const schedule=cleanScheduleObject(parsed,current);
-        applySchedule(schedule);
-        tell?.('Orarul a fost importat cu Gemini.');
+        if(target?.id&&typeof applyScheduleTo==='function')applyScheduleTo(target.id,schedule);else applySchedule(schedule);
+        tell?.('Orarul'+(target?.name?' „'+target.name+'”':'')+' a fost importat cu Gemini.');
         return schedule;
       }
 
-      function openScheduleImport(){
+      function openScheduleImport(preselectedId=''){
+        const targets=Array.isArray(getScheduleTargets?.())?getScheduleTargets():[];
+        const selected=targets.some(item=>item.id===preselectedId)?preselectedId:(targets.find(item=>item.active)?.id||targets[0]?.id||'');
+        const targetField=targets.length>1?`<label>În ce orar?<select name="target">${targets.map(item=>`<option value="${esc(item.id)}" ${item.id===selected?'selected':''}>${esc(item.name)}</option>`).join('')}</select></label>`:'';
         importDialog.innerHTML=`<div class="pl-dialog-head"><h2>Importă orarul cu Gemini</h2><button type="button" data-gemini-dialog-close aria-label="Închide">✕</button></div>
           <form data-gemini-import-form>
+            ${targetField}
             <label>Poză sau PDF<input name="file" type="file" accept="image/*,.pdf,application/pdf" required></label>
             <label>Grupă / subgrupă <span class="gemini-optional">(opțional)</span><input name="group" maxlength="80" placeholder="ex. C_11/1"></label>
-            <small>Gemini va încerca să importe materiile, profesorii, sălile și săptămânile pare/impare direct în Orar.</small>
+            <small>Gemini va înlocui doar orarul selectat și va importa materiile, profesorii, sălile și săptămânile pare/impare.</small>
             <button class="hub-primary">Importă automat</button>
           </form>`;
         if(!importDialog.open)importDialog.showModal();
@@ -401,17 +407,18 @@
       importDialog.addEventListener('click',e=>{if(e.target.closest('[data-gemini-dialog-close]'))importDialog.close();});
       importDialog.addEventListener('submit',async e=>{
         const form=e.target.closest('[data-gemini-import-form]');if(!form)return;
-        e.preventDefault();const button=form.querySelector('button[type=submit],button:not([type])'),data=new FormData(form),file=form.elements.file.files[0],group=String(data.get('group')||'').trim();
+        e.preventDefault();const button=form.querySelector('button[type=submit],button:not([type])'),data=new FormData(form),file=form.elements.file.files[0],group=String(data.get('group')||'').trim(),target=String(data.get('target')||'').trim();
         button.disabled=true;button.textContent='Gemini analizează…';
-        try{await importSchedule(file,group);importDialog.close();}
+        try{await importSchedule(file,group,target);importDialog.close();}
         catch(error){tell?.(error?.message||'Importul nu a reușit.');button.disabled=false;button.textContent='Importă automat';}
       });
 
       const scheduleButton=document.createElement('button');
       scheduleButton.type='button';scheduleButton.className='schedule-gemini-upload';scheduleButton.innerHTML='<span>✦</span> Upload';
       scheduleButton.setAttribute('aria-label','Importă orarul din poză sau PDF cu Gemini');
-      scheduleButton.addEventListener('click',openScheduleImport);
+      scheduleButton.addEventListener('click',()=>openScheduleImport());
       document.querySelector('.app')?.append(scheduleButton);
+      window.addEventListener('orar-gemini-import-request',event=>openScheduleImport(String(event.detail?.scheduleId||'')));
 
       if(!chats.length)createChat();else render();
 
