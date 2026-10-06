@@ -140,3 +140,18 @@ html body[data-ui-glass][data-ui-glass] .note-area:focus-visible{
   border-color:var(--glass-border)!important;
   box-shadow:0 0 16px color-mix(in srgb,var(--accent) 58%,transparent),0 0 30px color-mix(in srgb,var(--accent) 26%,transparent)!important;
 }
+
+
+/* Gemini composer owns the only visible focus treatment; suppress the generic inner field outline. */
+html body[data-ui-glass][data-ui-glass] .hub-page .gemini-composer textarea:focus,
+html body[data-ui-glass][data-ui-glass] .hub-page .gemini-composer textarea:focus-visible{
+  outline:none!important;outline-offset:0!important;box-shadow:none!important;border:0!important;background:transparent!important;
+}
+
+/* In combined timetable mode, each schedule keeps its own accent even under glass-theme overrides. */
+html body[data-ui-glass][data-ui-glass] .combined-class-card:not(.card-tone-default){
+  border-left-color:var(--card-custom)!important;
+}
+html body[data-ui-glass][data-ui-glass] .combined-class-card:not(.card-tone-default) :is(.type-row,.type-icon,.meta-icon,.pair-tag,.week-tag,.week-mark,.schedule-source){
+  color:var(--card-custom)!important;
+}
