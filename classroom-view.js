@@ -617,7 +617,7 @@
     }
     function saveSession(){try{localStorage.setItem(SESSION_KEY,JSON.stringify({token,expires,grantedScopes}));}catch{}}
     const CLOUD_FILE='orar-sync.json';
-    const CLOUD_SKIP=new Set([SESSION_KEY,OLD_SESSION_KEY,ACCOUNT_KEY,'orar_google_session_v1','orar_cloud_pending_v1']);
+    const CLOUD_SKIP=new Set([SESSION_KEY,OLD_SESSION_KEY,ACCOUNT_KEY,'orar_google_session_v1','orar_cloud_pending_v1','orar_gemini_api_key_v1']);
     const cloudKeys=()=>Object.keys(localStorage).filter(key=>!CLOUD_SKIP.has(key));
     let cloudFileId='',cloudTimer=0,cloudApplying=false,cloudUploading=false;
     const PENDING_KEY='orar_cloud_pending_v1';
@@ -985,7 +985,15 @@
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&client&&rememberedAccount()&&(!token||expires-Date.now()<2*60*1000))requestAccess(true,true);});
     const restored=restoreSession();renderProfile(rememberedAccount(),restored);if(restored){scheduleExpiry();restoreCloud().catch(()=>{});if(mailScopeOk())refreshMailSummary();}
     render();renderMail();renderDrive();prepareSignIn();setInterval(()=>{if(mailScopeOk())refreshMailSummary();},5*60000);
-    return {element:page,mailElement:mailPage,driveElement:drivePage,syncPlanner,openFile:openViewer,openDriveLink,isConnected:()=>Boolean(token&&Date.now()<expires),showDrive(){driveVisible=true;renderDrive();prepareSignIn();if(driveScopeOk()&&!driveLoading&&!driveItems.length)loadDrive(false);drivePage.classList.remove('is-entering');void drivePage.offsetWidth;drivePage.classList.add('is-entering');drivePage.querySelector('h1')?.focus({preventScroll:true});},showMail(){mailVisible=true;renderMail();prepareSignIn();if(mailScopeOk()&&!mailLoading&&!mailItems.length)refreshMail();mailPage.classList.remove('is-entering');void mailPage.offsetWidth;mailPage.classList.add('is-entering');mailPage.querySelector('h1')?.focus({preventScroll:true});},show(){
+    return {element:page,mailElement:mailPage,driveElement:drivePage,syncPlanner,openFile:openViewer,openDriveLink,
+      contextSnapshot:()=>({
+        googleConnected:Boolean(token&&Date.now()<expires),
+        courses:courses.map(c=>({id:c.id,name:c.name,section:c.section||'',descriptionHeading:c.descriptionHeading||''})),
+        classroomPosts:posts.slice(0,80).map(p=>({id:p.id,kind:p.kind,title:p.title,description:p.description||p.text||'',courseName:p.courseName||selected?.name||'',updated:p.updateTime||p.creationTime||'',attachments:(p.materials||[]).map(m=>m.driveFile?.driveFile?.title||m.youtubeVideo?.title||m.link?.title||'').filter(Boolean)})),
+        mail:{unread:mailUnread,items:mailItems.slice(0,50).map(m=>({subject:m.subject,from:m.from,date:m.date,snippet:m.snippet,unread:m.unread})),open:mailOpen?{...mailOpen,body:mailBody}:null},
+        drive:{folder:driveFolderName||'',query:driveQuery,items:driveItems.slice(0,80).map(file=>({name:file.name,mimeType:file.mimeType,modifiedTime:file.modifiedTime}))}
+      }),
+      isConnected:()=>Boolean(token&&Date.now()<expires),showDrive(){driveVisible=true;renderDrive();prepareSignIn();if(driveScopeOk()&&!driveLoading&&!driveItems.length)loadDrive(false);drivePage.classList.remove('is-entering');void drivePage.offsetWidth;drivePage.classList.add('is-entering');drivePage.querySelector('h1')?.focus({preventScroll:true});},showMail(){mailVisible=true;renderMail();prepareSignIn();if(mailScopeOk()&&!mailLoading&&!mailItems.length)refreshMail();mailPage.classList.remove('is-entering');void mailPage.offsetWidth;mailPage.classList.add('is-entering');mailPage.querySelector('h1')?.focus({preventScroll:true});},show(){
       visible=true;render();prepareSignIn();
       if(token && Date.now()<expires){if(!courses.length&&!loading)loadCourses();}
       page.classList.remove('is-entering');void page.offsetWidth;page.classList.add('is-entering');page.querySelector('h1').focus({preventScroll:true});
