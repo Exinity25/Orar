@@ -1574,3 +1574,31 @@ body[data-orar-theme="custom"].orar-custom-light{color-scheme:light}
   .gemini-sidebar,.gemini-chat-row{transition:none!important}
   .gemini-shell.is-chats-open .gemini-new-chat{animation:none!important}
 }
+
+
+/* iOS/PWA viewport fix: svh can leave the dynamic home-indicator area outside
+   the app after Safari chrome changes size. Pin all top-level views to the
+   fixed visual viewport and paint the safe-area explicitly. */
+@supports (-webkit-touch-callout:none){
+  html,body{
+    width:100%;
+    height:100dvh!important;
+    min-height:100dvh!important;
+    background:var(--bg,#05070c)!important;
+  }
+  body::before,
+  body::after{
+    inset:0!important;
+    width:100vw;
+    height:100dvh!important;
+    min-height:100dvh!important;
+  }
+  .app,
+  .hub-page,
+  .gemini-shell,
+  .gemini-main{
+    height:100dvh!important;
+    min-height:100dvh!important;
+    max-height:100dvh!important;
+  }
+}
