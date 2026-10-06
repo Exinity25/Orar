@@ -26,3 +26,20 @@ body[data-orar-theme=ice] .planner-page{padding:0;color:#17263b}body[data-orar-t
 @media print{body>*{display:none!important}#studentHub{display:block!important}#studentHub>*{display:none!important}#studentHub>.planner-dialog[open]{display:block!important;position:static!important;width:100%;max-height:none;overflow:visible;background:white;color:black;border:0;box-shadow:none}.planner-dialog button,.pl-dialog-head{display:none!important}.pl-event{break-inside:avoid}.planner-dialog::backdrop{display:none}}
 
 .hub-task-actions{flex-wrap:wrap}.hub-task-meta{min-width:0}
+
+
+/* Mobile/PWA polish: pages only scroll vertically and programmatic heading focus stays invisible. */
+.planner-page{overflow-x:hidden!important}
+.pl-content{width:100%;max-width:1200px;min-width:0;box-sizing:border-box}
+.pl-content>*,.pl-columns,.pl-grid,.pl-kanban,.pl-toolbar,.pl-row,.pl-card{min-width:0;max-width:100%}
+.pl-card,.pl-event,.pl-empty{overflow-wrap:anywhere;word-break:break-word}
+.planner-page .pl-header h1:focus,
+.planner-page .pl-header h1:focus-visible{outline:none!important;box-shadow:none!important}
+
+/* Use the extra horizontal room in landscape without introducing sideways page scrolling. */
+@media (orientation:landscape) and (max-height:520px){
+  .pl-content{padding:78px 18px 42px}
+  .pl-header{margin-bottom:18px;gap:12px}
+  .pl-header h1{font-size:32px}
+  .pl-hero{padding:20px;margin:14px 0 20px}
+}
