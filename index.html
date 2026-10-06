@@ -708,6 +708,60 @@
       body.editing .card-color-picker[open] .card-color-menu{right:0}
     }
 
+
+    /* Optional multi-schedule mode. Hidden completely until a second schedule exists. */
+    .schedule-manager-toggle{
+      display:none;position:fixed;z-index:44;top:max(12px,env(safe-area-inset-top));
+      right:calc(max(12px,env(safe-area-inset-right)) + 112px);min-height:44px;padding:0 14px;
+      border:1px solid rgba(255,255,255,.14);border-radius:999px;background:rgba(9,13,21,.9);
+      color:var(--text);font:800 11px/1 system-ui,-apple-system,sans-serif;letter-spacing:.04em;
+      backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);box-shadow:0 10px 28px rgba(0,0,0,.28)
+    }
+    body.editing .schedule-manager-toggle{display:flex;align-items:center;justify-content:center}
+    .schedule-view-bar{
+      width:min(760px,100%);margin:-8px auto 16px;padding:5px;display:flex;gap:5px;overflow-x:auto;
+      border:1px solid rgba(255,255,255,.12);border-radius:999px;background:rgba(8,12,20,.76);
+      backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 10px 30px rgba(0,0,0,.18);
+      scrollbar-width:none
+    }
+    .schedule-view-bar[hidden],body.editing .schedule-view-bar{display:none!important}
+    .schedule-view-bar::-webkit-scrollbar{display:none}
+    .schedule-view-bar button{
+      flex:1 0 auto;min-width:max-content;border:0;border-radius:999px;padding:9px 14px;background:transparent;
+      color:var(--muted);font:800 11px/1 system-ui,-apple-system,sans-serif;white-space:nowrap
+    }
+    .schedule-view-bar button[aria-pressed="true"]{
+      background:color-mix(in srgb,var(--accent) 20%,rgba(255,255,255,.055));color:var(--text);
+      box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 42%,transparent),0 0 18px color-mix(in srgb,var(--accent) 13%,transparent)
+    }
+    .combined-slot{display:grid;align-content:stretch;gap:5px;padding:5px;overflow:visible}
+    .combined-slot .class-card{min-height:0;height:100%;border-radius:8px;padding:8px 10px 8px 12px;cursor:default}
+    .combined-slot .class-card:hover{transform:none}
+    .combined-slot .schedule-source{
+      display:inline-flex;align-items:center;width:max-content;max-width:100%;margin-bottom:4px;padding:3px 6px;border-radius:999px;
+      background:color-mix(in srgb,var(--card-custom,var(--accent)) 12%,transparent);color:var(--card-custom,var(--accent));
+      font-size:7px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis
+    }
+    .combined-overlap{--overlap:#a855f7;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--overlap) 60%,transparent),0 0 18px color-mix(in srgb,var(--overlap) 20%,transparent)}
+    .overlap-tone-red{--overlap:#ef4444}.overlap-tone-green{--overlap:#22c55e}.overlap-tone-blue{--overlap:#3b82f6}
+    .overlap-tone-yellow{--overlap:#facc15}.overlap-tone-orange{--overlap:#f97316}.overlap-tone-violet{--overlap:#a855f7}
+    .schedule-manager-dialog{width:min(680px,calc(100vw - 24px));max-height:min(82dvh,760px)}
+    .schedule-manager-list{display:grid;gap:10px;margin:14px 0}
+    .schedule-manager-row{display:grid;grid-template-columns:minmax(0,1fr) 150px auto;gap:8px;align-items:end;padding:12px;border:1px solid var(--glass-border,#ffffff18);border-radius:15px;background:rgba(255,255,255,.025)}
+    .schedule-manager-row label,.schedule-overlap-setting{display:grid;gap:5px;font-size:10px;color:var(--glass-muted,var(--muted))}
+    .schedule-manager-row input,.schedule-manager-row select,.schedule-overlap-setting select{min-width:0}
+    .schedule-manager-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+    .schedule-manager-active{font-size:9px;font-weight:900;color:var(--accent);letter-spacing:.05em;text-transform:uppercase}
+    .schedule-manager-dialog .schedule-add-button{width:100%;margin-top:8px}
+    @media(max-width:700px){
+      .schedule-manager-toggle{right:calc(max(10px,env(safe-area-inset-right)) + 106px);min-height:42px;padding:0 10px;font-size:10px}
+      .schedule-view-bar{width:calc(100% - 12px);margin-top:-2px;margin-bottom:10px}
+      .schedule-view-bar button{flex:0 0 auto}
+      .schedule-manager-row{grid-template-columns:1fr}
+      .combined-slot{padding:4px;gap:4px}
+      .combined-slot .class-card{padding:7px 8px 7px 10px}
+    }
+
   </style>
   <link rel="stylesheet" href="./student-hub.css">
   <link rel="stylesheet" href="./student-planner.css">
@@ -735,6 +789,7 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M12 2a5 5 0 0 1 0 10a5 5 0 0 0 0 10a10 10 0 0 0 0-20" fill="currentColor"/></svg>
       <span class="week-toggle-label" id="weekLabel">PARĂ</span>
     </button>
+    <button class="schedule-manager-toggle" id="scheduleManagerToggle" type="button" aria-label="Gestionează orarele">Orare</button>
     <header class="topbar">
       <div class="title-wrap">
         <h1 id="scheduleTitle" data-placeholder="Titlu orar">C_11/1</h1>
@@ -744,6 +799,7 @@
       </div>
     </header>
 
+    <nav class="schedule-view-bar" id="scheduleViewBar" aria-label="Alege orarul" hidden></nav>
     <nav class="mobile-tabs" id="mobileTabs" aria-label="Alege ziua">
       <button class="day-tab active" type="button">LUNI</button><button class="day-tab" type="button">MARȚI</button><button class="day-tab" type="button">MIERCURI</button><button class="day-tab" type="button">JOI</button><button class="day-tab" type="button">VINERI</button>
     </nav>
@@ -753,6 +809,7 @@
     </main>
     </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <dialog class="planner-dialog schedule-manager-dialog" id="scheduleManagerDialog"></dialog>
 
   <script src="./classroom-config.js"></script>
   <script src="./classroom-view.js"></script>
@@ -765,6 +822,8 @@
 
     const DAYS = ['LUNI','MARȚI','MIERCURI','JOI','VINERI'];
     const STORAGE_KEY = 'c11_1_bleach_schedule_v3';
+    const MULTI_STORAGE_KEY = 'c11_1_schedule_profiles_v1';
+    const SCHEDULE_ACCENTS = ['red','blue','green','orange','violet','yellow'];
 
     const ICONS = {
       person: `<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3"/><path d="M6.5 20c.5-4 2.3-6 5.5-6s5 2 5.5 6"/></svg>`,
@@ -812,14 +871,12 @@
       try{localStorage.setItem(key,value);window.dispatchEvent(new CustomEvent('orar-local-change',{detail:{key}}));return true;}catch(e){return false;}
     }
 
-    let data = loadData();
-    Object.values(data.classes).forEach(item => {
-      if(!item) return;
-      if(!item.week) item.week = item.pair ? 'PARĂ' : 'MEREU';
-      if(typeof item.deadline !== 'string') item.deadline = '';
-      delete item.pair;
-      delete item.noteKind;
-    });
+    const legacyData = loadData();
+    let scheduleBook = loadScheduleBook(legacyData);
+    let activeScheduleId = scheduleBook.activeId;
+    let data = activeScheduleEntry().schedule;
+    normalizeScheduleData(data);
+    let scheduleViewMode = scheduleBook.schedules.length > 1 && scheduleBook.view === 'combined' ? 'combined' : 'single';
     let selectedWeek = storageGet('c11_1_selected_week') === 'IMPARĂ' ? 'IMPARĂ' : 'PARĂ';
     let editing = false;
     let expandedKey = null;
@@ -833,16 +890,96 @@
     const editToggle = document.getElementById('editToggle');
     const saveState = document.getElementById('saveState');
     const mobileTabs = document.getElementById('mobileTabs');
+    const scheduleViewBar = document.getElementById('scheduleViewBar');
+    const scheduleManagerToggle = document.getElementById('scheduleManagerToggle');
+    const scheduleManagerDialog = document.getElementById('scheduleManagerDialog');
     const toast = document.getElementById('toast');
     let toastTimer;
     let saveTimer;
 
     function clone(obj){ return JSON.parse(JSON.stringify(obj)); }
+    function normalizeScheduleData(schedule){
+      if(!schedule || !Array.isArray(schedule.times) || !schedule.classes || typeof schedule.classes!=='object')return clone(initialData);
+      if(typeof schedule.title!=='string')schedule.title='Orar';
+      if(typeof schedule.subtitle!=='string')schedule.subtitle='';
+      Object.values(schedule.classes).forEach(item=>{
+        for(const value of [item,item?.alternate]){
+          if(!value)continue;
+          if(!value.week)value.week=value.pair?'PARĂ':'MEREU';
+          if(typeof value.deadline!=='string')value.deadline='';
+          if(typeof value.note!=='string')value.note='';
+          delete value.pair;delete value.noteKind;
+        }
+      });
+      return schedule;
+    }
+    function activeScheduleEntry(){
+      return scheduleBook?.schedules?.find(item=>item.id===activeScheduleId) || scheduleBook?.schedules?.[0];
+    }
+    function loadScheduleBook(legacy){
+      try{
+        const raw=storageGet(MULTI_STORAGE_KEY);
+        if(raw){
+          const parsed=JSON.parse(raw);
+          if(parsed?.version===1&&Array.isArray(parsed.schedules)&&parsed.schedules.length){
+            const seen=new Set();
+            parsed.schedules=parsed.schedules.slice(0,6).map((entry,index)=>{
+              let id=String(entry?.id||'schedule-'+(index+1));while(seen.has(id))id+='-'+index;seen.add(id);
+              const schedule=normalizeScheduleData(entry?.schedule&&Array.isArray(entry.schedule.times)?entry.schedule:clone(initialData));
+              const accent=SCHEDULE_ACCENTS.includes(entry?.accent)?entry.accent:SCHEDULE_ACCENTS[index%SCHEDULE_ACCENTS.length];
+              return {id,name:String(entry?.name||schedule.title||('Orar '+(index+1))).trim().slice(0,60)||('Orar '+(index+1)),accent,schedule};
+            });
+            parsed.activeId=parsed.schedules.some(x=>x.id===parsed.activeId)?parsed.activeId:parsed.schedules[0].id;
+            parsed.view=parsed.view==='combined'?'combined':'single';
+            parsed.overlapColor=SCHEDULE_ACCENTS.includes(parsed.overlapColor)?parsed.overlapColor:'violet';
+            return parsed;
+          }
+        }
+      }catch{}
+      const schedule=normalizeScheduleData(clone(legacy||initialData));
+      return {version:1,activeId:'primary',view:'single',overlapColor:'violet',schedules:[{id:'primary',name:String(schedule.title||'Orar 1').slice(0,60),accent:'red',schedule}]};
+    }
+    function syncActiveSchedule(){
+      const entry=activeScheduleEntry();if(entry)entry.schedule=data;
+      scheduleBook.activeId=activeScheduleId;
+      scheduleBook.view=scheduleViewMode;
+    }
+    function persistScheduleBook(){
+      syncActiveSchedule();
+      storageSet(MULTI_STORAGE_KEY,JSON.stringify(scheduleBook));
+      storageSet(STORAGE_KEY,JSON.stringify(data));
+    }
+    function clearScheduleHistory(){undoStack.length=0;redoStack.length=0;updateUndoButton();}
+    function switchActiveSchedule(id,{renderNow=true}={}){
+      const next=scheduleBook.schedules.find(item=>item.id===id);if(!next)return false;
+      syncActiveSchedule();activeScheduleId=next.id;data=next.schedule;scheduleBook.activeId=next.id;
+      scheduleViewMode='single';scheduleBook.view='single';expandedKey=null;clearScheduleHistory();persistScheduleBook();
+      if(renderNow){render();animateSchedule();}
+      return true;
+    }
+    function getScheduleTargets(){
+      return scheduleBook.schedules.map(entry=>({id:entry.id,name:entry.name,accent:entry.accent,active:entry.id===activeScheduleId}));
+    }
+    function scheduleById(id){return scheduleBook.schedules.find(entry=>entry.id===id)?.schedule||null;}
+    function applyScheduleToId(id,next){
+      const entry=scheduleBook.schedules.find(item=>item.id===id);if(!entry)return false;
+      if(entry.id===activeScheduleId)recordUndo();
+      entry.schedule=normalizeScheduleData(clone(next));if(entry.id===activeScheduleId)data=entry.schedule;
+      persistScheduleBook();if(entry.id===activeScheduleId)render();updateUndoButton();return true;
+    }
+    function addBlankSchedule(){
+      if(scheduleBook.schedules.length>=6){showToast('Poți avea maximum 6 orare.');return null;}
+      syncActiveSchedule();
+      const number=scheduleBook.schedules.length+1,name='Orar '+number,id='schedule-'+Date.now().toString(36);
+      const entry={id,name,accent:SCHEDULE_ACCENTS[(number-1)%SCHEDULE_ACCENTS.length],schedule:{title:name,subtitle:'',times:clone(data.times),classes:{}}};
+      scheduleBook.schedules.push(entry);activeScheduleId=id;data=entry.schedule;scheduleBook.activeId=id;scheduleViewMode='single';scheduleBook.view='single';
+      clearScheduleHistory();persistScheduleBook();render();return entry;
+    }
 
     const undoToggle = document.getElementById('undoToggle');
     const redoToggle = document.getElementById('redoToggle');
     const undoStack = [], redoStack = [];
-    const historySnapshot=()=>({data:clone(data),selectedWeek,selectedDay});
+    const historySnapshot=()=>({data:clone(data),activeScheduleId,selectedWeek,selectedDay});
     const historyEntry=()=>{const snapshot=historySnapshot();return {snapshot,signature:JSON.stringify(snapshot)};};
     function updateUndoButton(){
       undoToggle.disabled = undoStack.length === 0;
@@ -859,15 +996,14 @@
       updateUndoButton();
     }
     function applyHistory(entry,message){
-      data=clone(entry.snapshot.data);
-      selectedWeek=entry.snapshot.selectedWeek;
-      selectedDay=entry.snapshot.selectedDay;
-      expandedKey=null;
+      const profile=scheduleBook.schedules.find(item=>item.id===entry.snapshot.activeScheduleId);
+      if(!profile)return;
+      activeScheduleId=profile.id;profile.schedule=clone(entry.snapshot.data);data=profile.schedule;
+      scheduleBook.activeId=activeScheduleId;scheduleViewMode='single';scheduleBook.view='single';
+      selectedWeek=entry.snapshot.selectedWeek;selectedDay=entry.snapshot.selectedDay;expandedKey=null;
       storageSet('c11_1_selected_week',selectedWeek);
       storageSet('c11_1_selected_day',selectedDay);
-      saveData(message);
-      render();
-      updateUndoButton();
+      saveData(message);render();updateUndoButton();
     }
     function undoLastChange(){
       const entry=undoStack.pop();
@@ -908,7 +1044,7 @@
     }
 
     function saveData(message='Salvat'){
-      storageSet(STORAGE_KEY, JSON.stringify(data));
+      persistScheduleBook();
       if(saveState){
         saveState.textContent = '';
       }
@@ -967,6 +1103,51 @@
       return `Termen: ${deadline}`;
     }
 
+    function renderScheduleViewBar(){
+      const multi=scheduleBook.schedules.length>1;
+      scheduleViewBar.hidden=!multi||editing;
+      if(!multi){scheduleViewBar.innerHTML='';return;}
+      const combinedName=scheduleBook.schedules.map(entry=>escapeHtml(entry.name)).join(' • ');
+      scheduleViewBar.innerHTML=`<button type="button" data-schedule-view="combined" aria-pressed="${scheduleViewMode==='combined'}">${combinedName}</button>`+
+        scheduleBook.schedules.map(entry=>`<button type="button" data-schedule-id="${escapeHtml(entry.id)}" aria-pressed="${scheduleViewMode==='single'&&entry.id===activeScheduleId}">${escapeHtml(entry.name)}</button>`).join('');
+    }
+    function activeItemFrom(schedule,key){
+      const item=schedule?.classes?.[key];if(!item)return null;
+      if(item.week==='MEREU'||item.week===selectedWeek)return item;
+      return item.alternate&&item.alternate.week===selectedWeek?item.alternate:null;
+    }
+    function combinedTimes(){
+      const map=new Map();
+      scheduleBook.schedules.forEach(entry=>(entry.schedule.times||[]).forEach(pair=>{
+        if(!Array.isArray(pair)||!pair[0]||!pair[1])return;
+        map.set(pair[0]+'|'+pair[1],[String(pair[0]),String(pair[1])]);
+      }));
+      return [...map.values()].sort((a,b)=>a[0].localeCompare(b[0])||a[1].localeCompare(b[1]));
+    }
+    function combinedItemsAt(time,day){
+      const out=[];
+      scheduleBook.schedules.forEach(entry=>{
+        const row=(entry.schedule.times||[]).findIndex(pair=>pair?.[0]===time[0]&&pair?.[1]===time[1]);
+        if(row<0)return;const key=row+'-'+day,item=activeItemFrom(entry.schedule,key);
+        if(item)out.push({entry,item,key});
+      });
+      return out;
+    }
+    function renderCombinedCard(record){
+      const {entry,item}=record,tone=SCHEDULE_ACCENTS.includes(entry.accent)?entry.accent:'red';
+      return `<article class="class-card combined-class-card card-tone-${tone}">
+        <span class="schedule-source">${escapeHtml(entry.name)}</span>
+        <div class="type-row"><span class="type-icon">${typeIcon(item.type)}</span><span>${escapeHtml(item.type)}</span>${item.week!=='MEREU'?'<span class="pair-dot">•</span><span class="week-tag">'+escapeHtml(item.week)+'</span>':''}</div>
+        <div class="subject">${escapeHtml(item.subject)}</div>
+        <div class="meta-stack"><div class="meta-line"><span class="meta-icon">${ICONS.person}</span><span class="meta-text">${escapeHtml(item.professor)}</span></div><div class="meta-line"><span class="meta-icon">${ICONS.pin}</span><span class="meta-text">${escapeHtml(item.location)}</span></div></div>
+      </article>`;
+    }
+    function renderCombinedSlot(time,day){
+      const items=combinedItemsAt(time,day);
+      if(!items.length)return `<div class="slot-cell empty day-col day-${day}"></div>`;
+      const overlap=items.length>1,tone=SCHEDULE_ACCENTS.includes(scheduleBook.overlapColor)?scheduleBook.overlapColor:'violet';
+      return `<div class="slot-cell combined-slot day-col day-${day} ${overlap?'combined-overlap overlap-tone-'+tone:''}">${items.map(renderCombinedCard).join('')}</div>`;
+    }
     function renderTabs(){
       mobileTabs.innerHTML = DAYS.map((day,i) =>
         `<button class="day-tab ${i===selectedDay?'active':''}" data-day="${i}" type="button">${day}</button>`
@@ -976,25 +1157,28 @@
     }
 
     function render(){
-      if(document.activeElement!==scheduleTitle)scheduleTitle.textContent=data.title;
-      if(document.activeElement!==scheduleSubtitle)scheduleSubtitle.textContent=data.subtitle;
-      renderTabs();
-      document.body.dataset.week = selectedWeek;
-      document.getElementById('weekLabel').textContent = selectedWeek;
+      const combined=scheduleBook.schedules.length>1&&scheduleViewMode==='combined'&&!editing;
+      if(document.activeElement!==scheduleTitle)scheduleTitle.textContent=combined?'Orar combinat':data.title;
+      if(document.activeElement!==scheduleSubtitle)scheduleSubtitle.textContent=combined?scheduleBook.schedules.map(entry=>entry.name).join(' • '):data.subtitle;
+      renderTabs();renderScheduleViewBar();
+      document.body.dataset.week=selectedWeek;
+      document.getElementById('weekLabel').textContent=selectedWeek;
       document.getElementById('weekToggle').setAttribute('aria-label', `Săptămâna ${selectedWeek}. Afișează săptămâna ${oppositeWeek(selectedWeek)}`);
-      let html = `<div class="head-cell time-head">ORA</div>`;
-      DAYS.forEach((day,i) => html += `<div class="head-cell day-col day-${i}">${day}</div>`);
-
-      data.times.forEach((time,row) => {
-        html += renderTimeCell(time,row);
-        DAYS.forEach((_,day) => {
-          const key = `${row}-${day}`;
-          const item = activeItem(key);
-          html += renderSlot(item,key,day);
+      let html=`<div class="head-cell time-head">ORA</div>`;
+      DAYS.forEach((day,i)=>html+=`<div class="head-cell day-col day-${i}">${day}</div>`);
+      if(combined){
+        combinedTimes().forEach((time,row)=>{
+          html+=renderTimeCell(time,row);
+          DAYS.forEach((_,day)=>{html+=renderCombinedSlot(time,day);});
         });
-      });
-      grid.innerHTML = html;
-      attachDynamicHandlers();
+      }else{
+        data.times.forEach((time,row)=>{
+          html+=renderTimeCell(time,row);
+          DAYS.forEach((_,day)=>{const key=`${row}-${day}`,item=activeItem(key);html+=renderSlot(item,key,day);});
+        });
+      }
+      grid.innerHTML=html;
+      if(!combined)attachDynamicHandlers();
     }
 
     function renderTimeCell(time,row){
@@ -1020,12 +1204,7 @@
 
     function oppositeWeek(week){return week === 'PARĂ' ? 'IMPARĂ' : 'PARĂ';}
 
-    function activeItem(key){
-      const item = data.classes[key];
-      if(!item) return null;
-      if(item.week === 'MEREU' || item.week === selectedWeek) return item;
-      return item.alternate && item.alternate.week === selectedWeek ? item.alternate : null;
-    }
+    function activeItem(key){return activeItemFrom(data,key);}
 
     let gridMotion;
     function animateSchedule(direction=0){
@@ -1473,6 +1652,19 @@
       if((field === 'type' || field === 'week' || field === 'cardColor') && e.type === 'change') render();
     }
 
+    function renderScheduleManager(){
+      const colorOptions=SCHEDULE_ACCENTS.map(color=>'<option value="'+color+'">'+CARD_TONE_LABELS[color]+'</option>').join('');
+      scheduleManagerDialog.innerHTML=`<div class="pl-dialog-head"><h2>Orare</h2><button type="button" data-schedule-manager-close aria-label="Închide">✕</button></div>
+        <p>Fiecare orar poate avea propriul nume și accent. În modul combinat, activitățile păstrează accentul orarului din care provin.</p>
+        <div class="schedule-manager-list">${scheduleBook.schedules.map(entry=>`<section class="schedule-manager-row" data-schedule-row="${escapeHtml(entry.id)}">
+          <label>Nume<input data-schedule-name="${escapeHtml(entry.id)}" maxlength="60" value="${escapeHtml(entry.name)}"></label>
+          <label>Accent<select data-schedule-accent="${escapeHtml(entry.id)}">${SCHEDULE_ACCENTS.map(color=>`<option value="${color}" ${entry.accent===color?'selected':''}>${CARD_TONE_LABELS[color]}</option>`).join('')}</select></label>
+          <div class="schedule-manager-actions">${entry.id===activeScheduleId?'<span class="schedule-manager-active">Se editează</span>':`<button type="button" data-schedule-edit="${escapeHtml(entry.id)}">Editează</button>`}<button type="button" data-schedule-gemini="${escapeHtml(entry.id)}">Upload Gemini</button>${scheduleBook.schedules.length>1?`<button type="button" data-schedule-delete="${escapeHtml(entry.id)}">Șterge</button>`:''}</div>
+        </section>`).join('')}</div>
+        <label class="schedule-overlap-setting">Accent pentru suprapuneri<select data-overlap-color>${SCHEDULE_ACCENTS.map(color=>`<option value="${color}" ${scheduleBook.overlapColor===color?'selected':''}>${CARD_TONE_LABELS[color]}</option>`).join('')}</select></label>
+        <button class="hub-primary schedule-add-button" type="button" data-schedule-add>＋ Adaugă încă un orar</button>`;
+    }
+
     const saveHeaderField=(element,field)=>{
       data[field]=(element.textContent||'').replace(/\n+/g,' ').trimStart();
       saveData('Antet salvat');
@@ -1483,6 +1675,36 @@
       element.addEventListener('input',()=>saveHeaderField(element,field));
       element.addEventListener('blur',()=>{data[field]=(element.textContent||'').replace(/\n+/g,' ').trim();element.textContent=data[field];saveData('Antet salvat');});
       element.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();element.blur();}});
+    });
+
+    scheduleViewBar.addEventListener('click',e=>{
+      const combined=e.target.closest('[data-schedule-view="combined"]');
+      if(combined){scheduleViewMode='combined';scheduleBook.view='combined';expandedKey=null;persistScheduleBook();render();animateSchedule();return;}
+      const button=e.target.closest('[data-schedule-id]');if(button)switchActiveSchedule(button.dataset.scheduleId);
+    });
+    scheduleManagerToggle.addEventListener('click',()=>{renderScheduleManager();if(!scheduleManagerDialog.open)scheduleManagerDialog.showModal();});
+    scheduleManagerDialog.addEventListener('click',e=>{
+      if(e.target.closest('[data-schedule-manager-close]')){scheduleManagerDialog.close();return;}
+      if(e.target.closest('[data-schedule-add]')){addBlankSchedule();renderScheduleManager();showToast('Orar nou adăugat');return;}
+      const edit=e.target.closest('[data-schedule-edit]');if(edit){switchActiveSchedule(edit.dataset.scheduleEdit);scheduleManagerDialog.close();showToast('Acum editezi '+activeScheduleEntry().name);return;}
+      const upload=e.target.closest('[data-schedule-gemini]');if(upload){window.dispatchEvent(new CustomEvent('orar-gemini-import-request',{detail:{scheduleId:upload.dataset.scheduleGemini}}));scheduleManagerDialog.close();return;}
+      const del=e.target.closest('[data-schedule-delete]');if(del){
+        if(scheduleBook.schedules.length<=1)return;
+        const id=del.dataset.scheduleDelete,entry=scheduleBook.schedules.find(x=>x.id===id);
+        if(!entry||!confirm('Ștergi orarul „'+entry.name+'”?'))return;
+        scheduleBook.schedules=scheduleBook.schedules.filter(x=>x.id!==id);
+        if(activeScheduleId===id){activeScheduleId=scheduleBook.schedules[0].id;data=scheduleBook.schedules[0].schedule;}
+        scheduleViewMode='single';scheduleBook.activeId=activeScheduleId;scheduleBook.view='single';clearScheduleHistory();persistScheduleBook();render();renderScheduleManager();return;
+      }
+    });
+    scheduleManagerDialog.addEventListener('input',e=>{
+      const name=e.target.closest('[data-schedule-name]');if(!name)return;
+      const entry=scheduleBook.schedules.find(x=>x.id===name.dataset.scheduleName);if(!entry)return;
+      entry.name=String(name.value||'').replace(/\s+/g,' ').slice(0,60);persistScheduleBook();renderScheduleViewBar();
+    });
+    scheduleManagerDialog.addEventListener('change',e=>{
+      const accent=e.target.closest('[data-schedule-accent]');if(accent){const entry=scheduleBook.schedules.find(x=>x.id===accent.dataset.scheduleAccent);if(entry&&SCHEDULE_ACCENTS.includes(accent.value)){entry.accent=accent.value;persistScheduleBook();render();}return;}
+      const overlap=e.target.closest('[data-overlap-color]');if(overlap&&SCHEDULE_ACCENTS.includes(overlap.value)){scheduleBook.overlapColor=overlap.value;persistScheduleBook();render();}
     });
 
     document.getElementById('weekToggle').addEventListener('click', () => selectWeek(oppositeWeek(selectedWeek)));
@@ -1508,6 +1730,7 @@
 
     editToggle.addEventListener('click', () => {
       if(editing) saveData('Salvat');
+      if(!editing && scheduleViewMode==='combined'){scheduleViewMode='single';scheduleBook.view='single';}
       editing = !editing;
       expandedKey = null;
       document.body.classList.toggle('editing', editing);
@@ -1541,7 +1764,13 @@
     updateUndoButton();
     render();
 
-    if(window.OrarStudentHub) window.OrarStudentHub.init({getSchedule:()=>clone(data),applySchedule:next=>{recordUndo();data=clone(next);saveData();render();updateUndoButton();}});
+    if(window.OrarStudentHub) window.OrarStudentHub.init({
+      getSchedule:()=>clone(data),
+      applySchedule:next=>applyScheduleToId(activeScheduleId,next),
+      getSchedules:()=>getScheduleTargets(),
+      getScheduleById:id=>clone(scheduleById(id)||data),
+      applyScheduleTo:(id,next)=>applyScheduleToId(id,next)
+    });
 
     let pendingAppUpdate = false;
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
