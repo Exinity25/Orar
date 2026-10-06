@@ -156,11 +156,16 @@ window.OrarPlanner={mount({root,getSchedule,applySchedule,getSubjects,changeView
   if(/^https?:\/\//i.test(raw)){
    try{
     const u=new URL(raw);short=/(?:maps\.app\.goo\.gl|goo\.gl\/maps)/i.test(u.hostname+u.pathname);
-    if(short){const r=await fetch(raw,{redirect:'follow',cache:'no-store'});if(r?.url&&r.url!==raw)resolved=r.url;}
+    if(short){
+     try{const r=await fetch(raw,{redirect:'follow',cache:'no-store'});if(r?.url&&r.url!==raw)resolved=r.url;}catch{
+      try{const r=await fetch(raw,{mode:'no-cors',redirect:'follow',cache:'no-store'});if(r?.url&&r.url!==raw)resolved=r.url;}catch{}
+     }
+    }
    }catch{}
   }
-  const parsed=mapTarget(resolved,short?'':fallback||raw);
-  return {raw,resolved,target:parsed,shortUnresolved:short&&resolved===raw};
+  if(short&&resolved===raw)return {raw,resolved,target:null,shortUnresolved:true};
+  const parsed=mapTarget(resolved,fallback||raw);
+  return {raw,resolved,target:parsed,shortUnresolved:false};
  }
  function loadMapsJs(){
   if(window.google?.maps)return Promise.resolve(window.google.maps);
