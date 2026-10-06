@@ -170,25 +170,37 @@ window.OrarPlanner={mount({root,getSchedule,applySchedule,getSubjects,changeView
    try{
     const u=new URL(raw);short=/(?:maps\.app\.goo\.gl|goo\.gl\/maps)/i.test(u.hostname+u.pathname);
     if(short){
-     try{const r=await fetch(raw,{redirect:'follow',cache:'no-store'});if(r?.url&&r.url!==raw)resolved=r.url;}
-     catch{try{const r=await fetch(raw,{mode:'no-cors',redirect:'follow',cache:'no-store'});if(r?.url&&r.url!==raw)resolved=r.url;}catch{}}
+     const attempts=[
+      ()=>fetch(raw,{method:'HEAD',redirect:'follow',cache:'no-store'}),
+      ()=>fetch(raw,{redirect:'follow',cache:'no-store'}),
+      ()=>fetch(raw,{mode:'no-cors',redirect:'follow',cache:'no-store'})
+     ];
+     for(const attempt of attempts){try{const r=await attempt();if(r?.url&&r.url!==raw){resolved=r.url;break;}}catch{}}
     }
    }catch{}
   }
-  if(short&&resolved===raw)return {raw,resolved,target:null,shortUnresolved:true};
-  return {raw,resolved,target:mapTarget(resolved,fallback||raw),shortUnresolved:false};
+  const target=mapTarget(resolved,short?'':fallback||raw);
+  return {raw,resolved,target,shortUnresolved:short&&resolved===raw};
+ }
+ function googleMapsEmbedFromResolved(info,fallback=''){
+  try{
+   const u=new URL(info?.resolved||'');
+   const host=u.hostname.toLowerCase();
+   if(/(^|\.)google\.[a-z.]+$/.test(host)&&u.pathname.startsWith('/maps')){
+    u.searchParams.set('output','embed');if(!u.searchParams.has('z'))u.searchParams.set('z','17');return u.href;
+   }
+  }catch{}
+  const query=info?.target?.query||[info?.target?.lat,info?.target?.lng].filter(Number.isFinite).join(',')||String(fallback||'').trim();
+  return query?'https://www.google.com/maps?q='+encodeURIComponent(query)+'&output=embed&z=17':'';
  }
  async function renderCampusMap(container,value,fallback=''){
   const info=await resolveCampusMap(value,fallback);
-  if(!info?.target)throw Error(info?.shortUnresolved?'Linkul Google Maps este unul scurt și browserul nu poate afla automat destinația. Deschide linkul, apoi copiază linkul complet Google Maps și salvează-l aici.':'Locația nu a putut fi identificată din link.');
-  const query=info.target.query||[info.target.lat,info.target.lng].filter(Number.isFinite).join(',');
-  if(!query)throw Error('Locația nu a putut fi identificată din link.');
+  const src=googleMapsEmbedFromResolved(info,info?.shortUnresolved?'':fallback);
+  if(!src)throw Error(info?.shortUnresolved?'Linkul Google Maps scurt nu poate fi rezolvat direct de browser. Deschide-l o dată în Google Maps, apoi copiază linkul complet al locației.':'Locația nu a putut fi identificată din link.');
   const frame=document.createElement('iframe');
-  frame.src='https://www.google.com/maps?q='+encodeURIComponent(query)+'&output=embed&z=17';
-  frame.title='Hartă '+fallback;frame.loading='lazy';frame.referrerPolicy='no-referrer-when-downgrade';frame.allowFullscreen=true;
-  frame.setAttribute('allow','fullscreen');
+  frame.src=src;frame.title='Hartă '+fallback;frame.loading='lazy';frame.referrerPolicy='no-referrer-when-downgrade';frame.allowFullscreen=true;frame.setAttribute('allow','fullscreen');
   container.replaceChildren(frame);
-  return {mode:'embed',info};
+  return {mode:'embed',info,src};
  }
  function mapsExternalUrl(value,fallback=''){const raw=String(value||'').trim();if(/^https?:\/\//i.test(raw))return raw;const q=raw||fallback;return q?'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(q):'';}
  function campusPage(){const rooms=[...new Set(Object.values(getSchedule().classes||{}).flatMap(x=>[x.location,x.alternate?.location]).filter(Boolean))],events=lessons(today(),7);return header('Campus','Leagă sălile de locații și deschide harta direct în aplicație.')+`<div class="pl-grid">${rooms.map(room=>{const l=data.locations[room]||{};return `<form class="pl-card" data-form="room" data-room="${esc(room)}"><h2>${esc(room)}</h2><label>Corp / clădire<input name="building" value="${esc(l.building||'')}" maxlength="100"></label><label>Adresă sau link Google Maps<input name="address" value="${esc(l.address||'')}" maxlength="1000"></label><label>Minute estimate de deplasare către acest corp<input type="number" name="travel" min="0" max="180" value="${Number(l.travel)||10}"></label><div class="pl-row"><button>Salvează</button>${l.address?`<button type="button" data-action="open-campus-map" data-room="${esc(room)}">Vezi harta</button>`:''}</div></form>`;}).join('')}</div><h2>Tranziții între ore</h2>${events.slice(1).map((e,i)=>{const prev=events[i];if(prev.date!==e.date)return '';const a=data.locations[prev.location],b=data.locations[e.location];if(!a?.building||!b?.building||a.building===b.building)return '';const gap=minutes(e.start)-minutes(prev.end),travel=Number(b.travel)||10;return `<article class="pl-card"><strong>${dateLabel(e.date)} · ${esc(prev.location)} → ${esc(e.location)}</strong><p>${gap} minute între ore; ${travel} minute de deplasare estimate de tine. ${gap<travel?'Atenție: timpul poate fi insuficient.':''}</p></article>`;}).join('')||empty('Completează corpurile sălilor pentru a vedea tranzițiile.')}`;}
