@@ -1095,3 +1095,70 @@ body[data-orar-theme] .hub-brand-dot{color:var(--accent-2)!important}
     margin-bottom:10px!important;
   }
 }
+
+
+/* CUSTOM theme */
+.theme-preview-custom i:first-child{background:linear-gradient(135deg,#0b0f18,#202736)}
+.theme-preview-custom i:nth-child(2){background:linear-gradient(135deg,#ff3b78,#7c3aed)}
+.theme-preview-custom i:nth-child(3){background:#f7f8fb}
+.hub-custom-theme-controls{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin-top:14px;padding:14px;border:1px solid var(--glass-border,#ffffff18);border-radius:12px;background:rgba(0,0,0,.12)}
+.hub-custom-theme-controls[hidden]{display:none!important}
+.hub-custom-theme-controls label{display:grid;gap:7px;font-size:11px;font-weight:700}
+.hub-custom-theme-controls input[type=color]{width:100%;height:44px;border:0;border-radius:9px;background:transparent;padding:0}
+.hub-custom-theme-controls select{width:100%;min-height:44px}
+.hub-custom-theme-controls>small{grid-column:1/-1;font-size:10px;line-height:1.55;color:var(--muted,#9aa5b5)}
+body[data-orar-theme="custom"]{color-scheme:dark}
+body[data-orar-theme="custom"].orar-custom-light{color-scheme:light}
+@media(max-width:600px){.hub-custom-theme-controls{grid-template-columns:1fr}}
+
+/* Combined Planner/Materii controls */
+.pl-view-switch{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:5px;border:1px solid var(--glass-border,#ffffff1c);border-radius:14px;background:rgba(0,0,0,.10);margin:0 0 20px}
+.planner-page .pl-view-switch button{border:0;background:transparent;min-height:42px}
+.planner-page .pl-view-switch button.is-active{background:color-mix(in srgb,var(--accent) 18%,rgba(255,255,255,.04));border:1px solid color-mix(in srgb,var(--accent) 52%,transparent);box-shadow:0 0 18px color-mix(in srgb,var(--accent) 18%,transparent)}
+.pl-subject-groups{display:grid;gap:14px}
+.pl-subject-group-head{display:flex;align-items:center;justify-content:space-between;gap:14px}
+.pl-subject-group-head h2{margin:3px 0 0}
+.pl-subject-task-list{display:grid;gap:8px;margin-top:14px}
+.pl-subject-task{display:grid;gap:4px;padding:12px 13px;border:1px solid var(--glass-border,#ffffff16);border-radius:11px;background:rgba(255,255,255,.035)}
+.pl-subject-task span{font-size:11px;color:var(--muted,#aeb7c7)}
+
+/* Mail */
+.hub-nav-dot{width:8px;height:8px;border-radius:50%;background:var(--accent,#ff315d);box-shadow:0 0 10px color-mix(in srgb,var(--accent,#ff315d) 78%,transparent);flex:0 0 8px;margin-left:auto}
+.hub-nav-dot[hidden]{display:none!important}
+.mail-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 18px}
+.mail-list{display:grid;gap:10px}
+.mail-card{position:relative;width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 12px;padding:16px;text-align:left;border:1px solid var(--glass-border,#ffffff1b);border-radius:15px;background:var(--glass-surface,rgba(12,16,25,.92));color:var(--glass-ink,#fff);font:inherit;cursor:pointer;box-shadow:var(--glass-shadow,0 10px 30px #0003)}
+.mail-card.is-unread{border-color:color-mix(in srgb,var(--accent) 56%,var(--glass-border));box-shadow:0 0 20px color-mix(in srgb,var(--accent) 14%,transparent),var(--glass-shadow)}
+.mail-card.is-unread::before{content:"";position:absolute;left:8px;top:50%;width:7px;height:7px;transform:translateY(-50%);border-radius:50%;background:var(--accent);box-shadow:0 0 9px color-mix(in srgb,var(--accent) 70%,transparent)}
+.mail-sender{font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-left:4px}
+.mail-card strong{grid-column:1/2;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-left:4px}
+.mail-snippet{grid-column:1/-1;font-size:11px;color:var(--glass-muted,#aeb7c7);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-left:4px}
+.mail-card time{grid-column:2;grid-row:1/3;font-size:9px;color:var(--glass-muted,#aeb7c7);align-self:center;max-width:150px;text-align:right}
+.mail-detail{display:grid;gap:14px}
+.mail-message{padding:20px;border:1px solid var(--glass-border,#ffffff1b);border-radius:18px;background:var(--glass-surface,rgba(12,16,25,.92));box-shadow:var(--glass-shadow)}
+.mail-message h2{margin:8px 0 12px}
+.mail-meta{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--glass-muted,#aeb7c7);padding-bottom:14px;border-bottom:1px solid var(--glass-border,#ffffff14)}
+.mail-message pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;font-size:13px;line-height:1.65;margin:16px 0 0;color:var(--glass-ink,#fff)}
+.mail-dialog form{display:grid;gap:10px}
+.mail-dialog textarea{min-height:180px}
+@media(max-width:600px){.mail-card{grid-template-columns:1fr}.mail-card time{grid-column:1;grid-row:auto;text-align:left;max-width:none}.mail-snippet{grid-column:1}.mail-meta{display:grid}}
+
+/* Consistent app motion for sections, cards and view changes. */
+@keyframes orar-section-enter{from{opacity:0;transform:translateY(12px) scale(.995)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes orar-card-enter{from{opacity:0;transform:translateY(9px) scale(.99)}to{opacity:1;transform:translateY(0) scale(1)}}
+.hub-page.is-entering .hub-content,.planner-page:not(.hub-hidden) .pl-content{animation:orar-section-enter 260ms cubic-bezier(.2,.78,.2,1) both}
+.hub-page:not(.hub-hidden) :is(.hub-subject,.hub-custom-section,.classroom-course,.classroom-post,.mail-card,.mail-message),
+.planner-page:not(.hub-hidden) :is(.pl-card,.pl-hero,.pl-event,.pl-day,.pl-metrics article,.pl-subject-group){animation:orar-card-enter 240ms cubic-bezier(.2,.78,.2,1) both}
+.hub-page :is(button,a,input,select,textarea,.hub-theme-card,.hub-subject,.classroom-course,.mail-card),
+.planner-page :is(button,a,input,select,textarea,.pl-card,.pl-day){transition:transform 160ms ease,border-color 160ms ease,box-shadow 160ms ease,background-color 160ms ease,opacity 160ms ease}
+.hub-page button:active,.planner-page button:active{transform:scale(.985)}
+@media(prefers-reduced-motion:reduce){
+  .hub-page.is-entering .hub-content,.planner-page:not(.hub-hidden) .pl-content,
+  .hub-page:not(.hub-hidden) :is(.hub-subject,.hub-custom-section,.classroom-course,.classroom-post,.mail-card,.mail-message),
+  .planner-page:not(.hub-hidden) :is(.pl-card,.pl-hero,.pl-event,.pl-day,.pl-metrics article,.pl-subject-group){animation:none!important}
+}
+
+.app:not(.hub-hidden) .class-card{animation:orar-card-enter 230ms cubic-bezier(.2,.78,.2,1) both}
+.app:not(.hub-hidden) .class-card:nth-of-type(2n){animation-delay:18ms}
+.app:not(.hub-hidden) .class-card:nth-of-type(3n){animation-delay:34ms}
+@media(prefers-reduced-motion:reduce){.app:not(.hub-hidden) .class-card{animation:none!important}}
