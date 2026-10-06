@@ -107,3 +107,11 @@ html body[data-ui-glass][data-ui-glass] .note-area:focus-visible{
   border-color:var(--glass-border)!important;
   box-shadow:inset 0 1px 0 var(--glass-highlight),0 0 14px color-mix(in srgb,var(--accent) 48%,transparent),0 0 28px color-mix(in srgb,var(--accent) 18%,transparent)!important;
 }
+
+/* Timetable notes: exterior accent glow only, never an outline/inset ring. */
+html body[data-ui-glass][data-ui-glass] .note-area:focus,
+html body[data-ui-glass][data-ui-glass] .note-area:focus-visible{
+  outline:none!important;
+  border-color:var(--glass-border)!important;
+  box-shadow:0 0 10px color-mix(in srgb,var(--accent) 72%,transparent),0 0 22px color-mix(in srgb,var(--accent) 38%,transparent),0 0 34px color-mix(in srgb,var(--accent) 18%,transparent)!important;
+}
