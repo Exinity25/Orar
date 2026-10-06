@@ -746,51 +746,86 @@
     .overlap-tone-red{--overlap:#ef4444}.overlap-tone-green{--overlap:#22c55e}.overlap-tone-blue{--overlap:#3b82f6}
     .overlap-tone-yellow{--overlap:#facc15}.overlap-tone-orange{--overlap:#f97316}.overlap-tone-violet{--overlap:#a855f7}
 
-    /* Two simultaneous activities share one accent-colored card, divided diagonally. */
+    /* Landscape overlap: one outlined card made from two color-coded triangles.
+       No colored diagonal stroke: the diagonal is only the boundary between surfaces.
+       Portrait combined cards are intentionally left unchanged. */
+    .overlap-accent-red{--piece-accent:#ef4444}
+    .overlap-accent-green{--piece-accent:#22c55e}
+    .overlap-accent-blue{--piece-accent:#3b82f6}
+    .overlap-accent-yellow{--piece-accent:#facc15}
+    .overlap-accent-orange{--piece-accent:#f97316}
+    .overlap-accent-violet{--piece-accent:#a855f7}
+
     .schedule-grid .combined-slot.overlap-diagonal{
       position:relative!important;
       display:block!important;
       min-height:var(--row-height)!important;
       overflow:hidden!important;
       padding:0!important;
-      border-left:4px solid var(--overlap)!important;
-      background:
-        radial-gradient(circle at 12% 12%,color-mix(in srgb,var(--overlap) 18%,transparent),transparent 34%),
-        linear-gradient(180deg,color-mix(in srgb,var(--overlap) 9%,rgba(9,13,22,.97)),rgba(9,13,22,.96))!important;
-      box-shadow:0 0 18px color-mix(in srgb,var(--overlap) 22%,transparent)!important;
+      border-left:0!important;
+      border-color:color-mix(in srgb,var(--overlap) 58%,var(--line))!important;
+      background:rgba(8,12,20,.96)!important;
+      box-shadow:
+        inset 0 0 0 1px color-mix(in srgb,var(--overlap) 68%,transparent),
+        0 0 18px color-mix(in srgb,var(--overlap) 18%,transparent)!important;
     }
-    .schedule-grid .combined-slot.overlap-diagonal::after{
-      content:"";position:absolute;z-index:2;left:-8%;top:50%;width:116%;height:1px;
-      background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--overlap) 88%,white 12%) 14%,color-mix(in srgb,var(--overlap) 88%,white 12%) 86%,transparent);
-      box-shadow:0 0 8px color-mix(in srgb,var(--overlap) 45%,transparent);
-      transform:rotate(-9deg);transform-origin:center;pointer-events:none;
+
+    .overlap-side-bar{
+      position:absolute;z-index:8;left:0;top:0;bottom:0;width:4px;
+      display:grid;grid-template-rows:1fr 1fr;overflow:hidden;
+      border-radius:var(--radius) 0 0 var(--radius);pointer-events:none
     }
+    .overlap-side-half{
+      display:block;min-height:0;background:var(--piece-accent);
+      box-shadow:0 0 10px color-mix(in srgb,var(--piece-accent) 48%,transparent)
+    }
+
     .overlap-piece{
-      position:absolute;z-index:3;left:0;right:0;min-width:0;padding:7px 10px 6px 11px;
-      overflow:hidden;color:var(--text,#fff);
+      position:absolute;z-index:3;inset:0;min-width:0;overflow:hidden;
+      color:var(--text,#fff);pointer-events:none
     }
-    .overlap-piece.is-top{top:0;height:51%;padding-bottom:9px}
-    .overlap-piece.is-bottom{bottom:0;height:51%;padding-top:9px}
-    .overlap-mini-head{display:flex;align-items:center;gap:5px;min-width:0;line-height:1}
+    .overlap-piece.is-top{
+      clip-path:polygon(0 0,100% 0,0 100%);
+      background:
+        radial-gradient(circle at 16% 12%,color-mix(in srgb,var(--piece-accent) 20%,transparent),transparent 43%),
+        linear-gradient(145deg,color-mix(in srgb,var(--piece-accent) 10%,rgba(9,13,22,.98)),rgba(9,13,22,.93) 72%)
+    }
+    .overlap-piece.is-bottom{
+      clip-path:polygon(100% 0,100% 100%,0 100%);
+      background:
+        radial-gradient(circle at 84% 88%,color-mix(in srgb,var(--piece-accent) 20%,transparent),transparent 43%),
+        linear-gradient(325deg,color-mix(in srgb,var(--piece-accent) 10%,rgba(9,13,22,.98)),rgba(9,13,22,.93) 72%)
+    }
+    .overlap-piece-inner{
+      position:absolute;min-width:0;width:64%;display:grid;gap:2px
+    }
+    .overlap-piece.is-top .overlap-piece-inner{left:11px;top:6px}
+    .overlap-piece.is-bottom .overlap-piece-inner{right:8px;bottom:6px}
+
+    .overlap-mini-head{display:flex;align-items:center;gap:4px;min-width:0;line-height:1}
     .overlap-mini-source{
-      flex:0 1 auto;min-width:0;max-width:48%;padding:2px 6px;border-radius:999px;
-      background:color-mix(in srgb,var(--overlap) 15%,transparent);color:var(--overlap);
-      font-size:7px;font-weight:900;letter-spacing:.075em;text-transform:uppercase;
+      flex:0 1 auto;min-width:0;max-width:52%;padding:2px 5px;border-radius:999px;
+      background:color-mix(in srgb,var(--piece-accent) 15%,transparent);color:var(--piece-accent);
+      font-size:6px;font-weight:900;letter-spacing:.075em;text-transform:uppercase;
       white-space:nowrap;overflow:hidden;text-overflow:ellipsis
     }
     .overlap-mini-type{
-      min-width:0;color:var(--overlap);font-size:7px;font-weight:900;letter-spacing:.045em;text-transform:uppercase;
+      min-width:0;color:var(--piece-accent);font-size:6px;font-weight:900;letter-spacing:.045em;text-transform:uppercase;
       white-space:nowrap;overflow:hidden;text-overflow:ellipsis
     }
     .overlap-mini-subject{
-      margin-top:3px;color:var(--text,#fff);font-size:10px;font-weight:850;line-height:1.04;
+      color:var(--text,#fff);font-size:9px;font-weight:850;line-height:1.03;
       white-space:nowrap;overflow:hidden;text-overflow:ellipsis
     }
     .overlap-mini-meta{
-      margin-top:3px;color:var(--glass-muted,var(--muted));font-size:7px;line-height:1.05;
-      white-space:nowrap;overflow:hidden;text-overflow:ellipsis
+      display:flex;align-items:center;gap:3px;min-width:0;color:var(--glass-muted,var(--muted));
+      font-size:6px;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis
     }
-    .overlap-mini-meta .overlap-mini-pin{color:var(--overlap);font-weight:900}
+    .overlap-mini-meta .meta-icon{
+      flex:0 0 auto;width:8px;height:8px;color:var(--piece-accent)
+    }
+    .overlap-mini-meta .meta-icon svg{display:block;width:8px;height:8px;stroke:currentColor}
+    .overlap-mini-meta .overlap-mini-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .schedule-manager-dialog{width:min(680px,calc(100vw - 24px));max-height:min(82dvh,760px)}
     .schedule-manager-list{display:grid;gap:10px;margin:14px 0}
     .schedule-manager-row{display:grid;grid-template-columns:minmax(0,1fr) 150px auto;gap:8px;align-items:end;padding:12px;border:1px solid var(--glass-border,#ffffff18);border-radius:15px;background:rgba(255,255,255,.025)}
@@ -885,14 +920,14 @@
         height:var(--row-height)!important;
         min-height:var(--row-height)!important;
       }
-      .schedule-grid .combined-slot.overlap-diagonal::after{transform:rotate(-7deg)}
-      .overlap-piece{padding:5px 7px 4px 8px}
-      .overlap-piece.is-top{padding-bottom:7px}
-      .overlap-piece.is-bottom{padding-top:7px}
-      .overlap-mini-source{font-size:5.5px;padding:2px 4px;max-width:44%}
+      .overlap-piece-inner{width:66%;gap:1px}
+      .overlap-piece.is-top .overlap-piece-inner{left:9px;top:4px}
+      .overlap-piece.is-bottom .overlap-piece-inner{right:6px;bottom:4px}
+      .overlap-mini-source{font-size:5.5px;padding:2px 4px;max-width:50%}
       .overlap-mini-type{font-size:5.5px}
-      .overlap-mini-subject{font-size:8px;margin-top:2px}
-      .overlap-mini-meta{font-size:5.7px;margin-top:2px}
+      .overlap-mini-subject{font-size:8px}
+      .overlap-mini-meta{font-size:5.5px}
+      .overlap-mini-meta .meta-icon,.overlap-mini-meta .meta-icon svg{width:7px;height:7px}
     }
 
   </style>
@@ -1285,15 +1320,20 @@
         <div class="meta-stack"><div class="meta-line"><span class="meta-icon">${ICONS.person}</span><span class="meta-text">${escapeHtml(item.professor)}</span></div><div class="meta-line"><span class="meta-icon">${ICONS.pin}</span><span class="meta-text">${escapeHtml(item.location)}</span></div></div>
       </article>`;
     }
+    function overlapAccentTone(record){
+      const tone=String(record?.entry?.accent||'red').toLowerCase();
+      return SCHEDULE_ACCENTS.includes(tone)?tone:'red';
+    }
     function renderOverlapPiece(record,position){
-      const {entry,item}=record;
+      const {entry,item}=record,tone=overlapAccentTone(record);
       const parity=item.week!=='MEREU'?' · '+item.week:'';
-      const professor=String(item.professor||'').trim(),location=String(item.location||'').trim();
-      const meta=[professor,location].filter(Boolean).join(' · ');
-      return `<section class="overlap-piece ${position==='top'?'is-top':'is-bottom'}" aria-label="${escapeHtml(entry.name+': '+item.subject)}">
-        <div class="overlap-mini-head"><span class="overlap-mini-source">${escapeHtml(entry.name)}</span><span class="overlap-mini-type">${escapeHtml(item.type+parity)}</span></div>
-        <div class="overlap-mini-subject">${escapeHtml(item.subject)}</div>
-        <div class="overlap-mini-meta"><span class="overlap-mini-pin">⌖</span> ${escapeHtml(meta)}</div>
+      return `<section class="overlap-piece ${position==='top'?'is-top':'is-bottom'} overlap-accent-${tone}" aria-label="${escapeHtml(entry.name+': '+item.subject)}">
+        <div class="overlap-piece-inner">
+          <div class="overlap-mini-head"><span class="overlap-mini-source">${escapeHtml(entry.name)}</span><span class="overlap-mini-type">${escapeHtml(item.type+parity)}</span></div>
+          <div class="overlap-mini-subject">${escapeHtml(item.subject)}</div>
+          <div class="overlap-mini-meta"><span class="meta-icon">${ICONS.person}</span><span class="overlap-mini-text">${escapeHtml(item.professor)}</span></div>
+          <div class="overlap-mini-meta"><span class="meta-icon">${ICONS.pin}</span><span class="overlap-mini-text">${escapeHtml(item.location)}</span></div>
+        </div>
       </section>`;
     }
     function renderCombinedSlot(time,day){
@@ -1301,7 +1341,11 @@
       if(!items.length)return `<div class="slot-cell empty day-col day-${day}"></div>`;
       const tone=SCHEDULE_ACCENTS.includes(scheduleBook.overlapColor)?scheduleBook.overlapColor:'violet';
       if(items.length===2&&isLandscapeOverlapView()){
-        return `<div class="slot-cell combined-slot overlap-diagonal overlap-tone-${tone} day-col day-${day}">${renderOverlapPiece(items[0],'top')}${renderOverlapPiece(items[1],'bottom')}</div>`;
+        const topTone=overlapAccentTone(items[0]),bottomTone=overlapAccentTone(items[1]);
+        return `<div class="slot-cell combined-slot overlap-diagonal overlap-tone-${tone} day-col day-${day}">
+          <span class="overlap-side-bar" aria-hidden="true"><i class="overlap-side-half overlap-accent-${topTone}"></i><i class="overlap-side-half overlap-accent-${bottomTone}"></i></span>
+          ${renderOverlapPiece(items[0],'top')}${renderOverlapPiece(items[1],'bottom')}
+        </div>`;
       }
       const overlap=items.length>1;
       return `<div class="slot-cell combined-slot day-col day-${day} ${overlap?'combined-overlap overlap-tone-'+tone:''}">${items.map(renderCombinedCard).join('')}</div>`;
