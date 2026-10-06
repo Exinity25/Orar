@@ -677,9 +677,9 @@
       window.__orarStorageObserverInstalled=true;
       const proto=Storage.prototype,nativeSet=proto.setItem,nativeRemove=proto.removeItem,nativeClear=proto.clear;
       const emit=key=>queueMicrotask(()=>window.dispatchEvent(new CustomEvent('orar-local-change',{detail:{key}})));
-      proto.setItem=function(key,value){const local=this===window.localStorage,before=local?this.getItem(key):null,result=nativeSet.call(this,key,value);if(local&&before!==String(value))emit(String(key));return result;};
-      proto.removeItem=function(key){const local=this===window.localStorage,had=local&&this.getItem(key)!==null,result=nativeRemove.call(this,key);if(had)emit(String(key));return result;};
-      proto.clear=function(){const local=this===window.localStorage,keys=local?Object.keys(this):[],result=nativeClear.call(this);if(local)keys.forEach(emit);return result;};
+      proto.setItem=function(key,value){const local=this===window.localStorage,before=local?this.getItem(key):null,result=nativeSet.call(this,key,value);if(local&&!cloudApplying&&before!==String(value))emit(String(key));return result;};
+      proto.removeItem=function(key){const local=this===window.localStorage,had=local&&this.getItem(key)!==null,result=nativeRemove.call(this,key);if(had&&!cloudApplying)emit(String(key));return result;};
+      proto.clear=function(){const local=this===window.localStorage,keys=local?Object.keys(this):[],result=nativeClear.call(this);if(local&&!cloudApplying)keys.forEach(emit);return result;};
     }
     window.addEventListener('orar-local-change',event=>{const key=event.detail?.key;if(cloudApplying||!key||CLOUD_SKIP.has(key))return;try{const pending=pendingCloud();pending[key]=Date.now()+':'+Math.random();localStorage.setItem(PENDING_KEY,JSON.stringify(pending));}catch{}scheduleCloudUpload();});
     window.addEventListener('orar-cloud-sync-request',async()=>{
