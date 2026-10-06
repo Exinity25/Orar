@@ -862,7 +862,7 @@
         const results=await Promise.allSettled(defs.map(async([endpoint,field])=>{
           const rows=await listAll('courses/'+encodeURIComponent(course.id)+'/'+endpoint,field,generation);
           return rows.map(row=>{let deadline='';if(row.dueDate){const date=new Date(Date.UTC(row.dueDate.year,row.dueDate.month-1,row.dueDate.day,row.dueTime?.hours||0,row.dueTime?.minutes||0));deadline=date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-'+String(date.getDate()).padStart(2,'0');}
-            return {id:String(row.id),courseId:String(course.id),courseName:course.name,kind:endpoint,title:row.title||row.text||'Material',description:row.description||row.text||'',deadline,url:row.alternateLink||course.alternateLink||'',updated:row.updateTime||row.creationTime||'',files:(row.materials||[]).filter(m=>m.driveFile?.driveFile?.id).map(m=>({id:m.driveFile.driveFile.id,title:m.driveFile.driveFile.title||'Fișier'}))};});
+            return {id:String(row.id),courseId:String(course.id),courseName:course.name,kind:endpoint,title:row.title||row.text||'Material',description:row.description||row.text||'',deadline,url:row.alternateLink||course.alternateLink||'',created:row.creationTime||'',updated:row.updateTime||row.creationTime||'',files:(row.materials||[]).filter(m=>m.driveFile?.driveFile?.id).map(m=>({id:m.driveFile.driveFile.id,title:m.driveFile.driveFile.title||'Fișier'}))};});
         }));
         for(const result of results)if(result.status==='fulfilled')items.push(...result.value);else failures++;
       }
