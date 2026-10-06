@@ -1644,3 +1644,82 @@ body:not([data-orar-theme]):not(.orar-custom-background)::after{
     max-height:none!important;
   }
 }
+
+
+/* v73 iPhone interaction hardening.
+   - Keep schedule controls responsive after landscape edit -> portrait.
+   - Keep the Gemini page visually fixed while only the composer follows the
+     software keyboard.
+   - Let the Gemini textarea grow with multiple lines, up to a comfortable cap. */
+@supports (-webkit-touch-callout:none){
+  /* iOS can retain a zoomed/focused editor state across rotation. Make every
+     editor surface explicitly tappable and let JS rebuild the view on rotate. */
+  body.editing :is(.edit-input,.edit-select,.time-edit input,#scheduleTitle,#scheduleSubtitle),
+  .edit-toggle,
+  .week-toggle,
+  .day-tab,
+  .class-card,
+  .add-class,
+  .delete-class{
+    touch-action:manipulation;
+    -webkit-tap-highlight-color:transparent;
+  }
+
+  @media(max-width:900px){
+    .gemini-main{
+      grid-template-rows:auto minmax(0,1fr)!important;
+      padding-bottom:0!important;
+      overflow:hidden!important;
+    }
+    .gemini-header,
+    .gemini-conversation{
+      translate:0 var(--gemini-viewport-offset,0px);
+    }
+    .gemini-conversation{
+      padding-bottom:calc(var(--gemini-composer-height,58px) + 30px + env(safe-area-inset-bottom))!important;
+      scroll-padding-bottom:calc(var(--gemini-composer-height,58px) + 30px + env(safe-area-inset-bottom));
+    }
+    .gemini-composer{
+      position:fixed!important;
+      z-index:10015!important;
+      left:max(10px,env(safe-area-inset-left))!important;
+      right:max(10px,env(safe-area-inset-right))!important;
+      bottom:calc(max(10px,env(safe-area-inset-bottom)) + var(--gemini-keyboard-inset,0px))!important;
+      width:auto!important;
+      margin:0!important;
+      border-radius:28px!important;
+      transition:bottom 120ms ease-out,box-shadow 180ms ease,border-color 160ms ease!important;
+      -webkit-transform:translateZ(0);
+      transform:translateZ(0);
+    }
+    .gemini-composer textarea,
+    .gemini-composer textarea:focus,
+    .gemini-composer textarea:focus-visible{
+      height:42px;
+      min-height:42px!important;
+      max-height:132px!important;
+      overflow-y:hidden;
+      resize:none!important;
+      line-height:1.35!important;
+      padding-top:10px!important;
+      padding-bottom:10px!important;
+    }
+    .gemini-composer textarea.is-scrollable{
+      overflow-y:auto!important;
+      -webkit-overflow-scrolling:touch;
+    }
+    .gemini-pending-files{
+      position:fixed!important;
+      z-index:10014!important;
+      left:max(14px,env(safe-area-inset-left))!important;
+      right:max(14px,env(safe-area-inset-right))!important;
+      bottom:calc(max(10px,env(safe-area-inset-bottom)) + var(--gemini-keyboard-inset,0px) + var(--gemini-composer-height,58px) + 7px)!important;
+      width:auto!important;
+      max-height:86px;
+      overflow:auto;
+      padding:0 4px!important;
+      -webkit-transform:translateZ(0);
+      transform:translateZ(0);
+    }
+  }
+}
