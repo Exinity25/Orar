@@ -2008,13 +2008,15 @@
     let orientationRecoveryTimer=0;
     const recoverScheduleAfterRotation=()=>{
       clearTimeout(orientationRecoveryTimer);
+      const appScroller=document.querySelector('.app');
+      const previousScrollTop=appScroller?.scrollTop||0;
       orientationRecoveryTimer=setTimeout(()=>{
         blurScheduleEditor();
         resetScheduleInteractionState();
         render();
         requestAnimationFrame(()=>{
           resetScheduleInteractionState();
-          document.querySelector('.app')?.scrollTo({top:0,left:0,behavior:'auto'});
+          appScroller?.scrollTo({top:previousScrollTop,left:0,behavior:'auto'});
         });
       },180);
     };
