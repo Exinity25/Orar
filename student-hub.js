@@ -10,6 +10,7 @@
     book:svg('<path d="M12 5v15M3 4h5a4 4 0 0 1 4 2 4 4 0 0 1 4-2h5v15h-5a5 5 0 0 0-4 2 5 5 0 0 0-4-2H3Z"/>'),
     classroom:svg('<rect x="3" y="4" width="18" height="15" rx="2"/><circle cx="12" cy="10" r="2"/><path d="M8 16c0-4 8-4 8 0M7 22h10"/>'),
     mail:svg('<rect x="3" y="5" width="18" height="14" rx="3"/><path d="m4 7 8 6 8-6"/>'),
+    drive:svg('<path d="M9 3h6l6 10-3 5H6l-3-5L9 3Z"/><path d="m9 3 6 10m6 0H9m-3 5 3-5"/>'),
     customize:svg('<path d="M4 20h4l11-11-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/><path d="M4 16l4 4"/>')
   };
   let initialized = false;
@@ -42,6 +43,7 @@
             <button class="hub-nav-item" data-hub-view="planner:tasks" type="button"><span class="hub-icon">${icons.book}</span><span class="hub-nav-copy"><strong>Planificator</strong><small>Planificator și materii</small></span></button>
             <button class="hub-nav-item" id="hubClassroom" data-hub-view="classroom" type="button"><span class="hub-icon">${icons.classroom}</span><span class="hub-nav-copy"><strong>Classroom</strong><small>Clase și materiale</small></span></button>
             <button class="hub-nav-item" id="hubMailNav" data-hub-view="mail" type="button"><span class="hub-icon">${icons.mail}</span><span class="hub-nav-copy"><strong>Mail</strong><small>Inbox și mesaje</small></span><span class="hub-nav-dot" id="hubMailDot" hidden aria-label="Mail-uri noi"></span></button>
+            <button class="hub-nav-item" id="hubDriveNav" data-hub-view="drive" type="button"><span class="hub-icon">${icons.drive}</span><span class="hub-nav-copy"><strong>Drive</strong><small>Fișiere Google Drive</small></span></button>
             <button class="hub-nav-item" data-hub-view="customize" type="button"><span class="hub-icon">${icons.customize}</span><span class="hub-nav-copy"><strong>Personalizare</strong><small>Temă și fundal</small></span></button>
           </nav>
         </aside>
@@ -296,21 +298,22 @@
 
     const closeMenu = (restore=true) => {
       layer.classList.remove('is-open');layer.setAttribute('aria-hidden','true');layer.inert=true;
-      menu.setAttribute('aria-expanded','false');app.inert=false;page.inert=false;customPage.inert=false;classroom.element.inert=false;if(classroom.mailElement)classroom.mailElement.inert=false;menu.inert=false;if(planner)planner.element.inert=false;
+      menu.setAttribute('aria-expanded','false');app.inert=false;page.inert=false;customPage.inert=false;classroom.element.inert=false;if(classroom.mailElement)classroom.mailElement.inert=false;if(classroom.driveElement)classroom.driveElement.inert=false;menu.inert=false;if(planner)planner.element.inert=false;
       if(restore)menu.focus({preventScroll:true});
     };
     const openMenu = () => {
       layer.inert=false;layer.setAttribute('aria-hidden','false');layer.classList.add('is-open');menu.setAttribute('aria-expanded','true');
-      app.inert=true;page.inert=true;customPage.inert=true;classroom.element.inert=true;if(classroom.mailElement)classroom.mailElement.inert=true;menu.inert=true;if(planner)planner.element.inert=true;$('#hubClose').focus({preventScroll:true});
+      app.inert=true;page.inert=true;customPage.inert=true;classroom.element.inert=true;if(classroom.mailElement)classroom.mailElement.inert=true;if(classroom.driveElement)classroom.driveElement.inert=true;menu.inert=true;if(planner)planner.element.inert=true;$('#hubClose').focus({preventScroll:true});
     };
     const changeView = next => {
       view=next;closeMenu(false);if(planner){planner.hide();if(view.startsWith('planner:'))planner.show(view.slice(8));}
-      app.classList.toggle('hub-hidden',view!=='schedule');page.classList.toggle('hub-hidden',view!=='subjects');customPage.classList.toggle('hub-hidden',view!=='customize');classroom.element.classList.toggle('hub-hidden',view!=='classroom');if(classroom.mailElement)classroom.mailElement.classList.toggle('hub-hidden',view!=='mail');
+      app.classList.toggle('hub-hidden',view!=='schedule');page.classList.toggle('hub-hidden',view!=='subjects');customPage.classList.toggle('hub-hidden',view!=='customize');classroom.element.classList.toggle('hub-hidden',view!=='classroom');if(classroom.mailElement)classroom.mailElement.classList.toggle('hub-hidden',view!=='mail');if(classroom.driveElement)classroom.driveElement.classList.toggle('hub-hidden',view!=='drive');
       root.querySelectorAll('[data-hub-view]').forEach(el=>el.dataset.hubView===view?el.setAttribute('aria-current','page'):el.removeAttribute('aria-current'));
       if(view==='subjects'){
         renderSubjects();page.classList.remove('is-entering');void page.offsetWidth;page.classList.add('is-entering');$('#hubHeading').focus({preventScroll:true});
       } else if(view==='classroom') classroom.show();
       else if(view==='mail') classroom.showMail?.();
+      else if(view==='drive') classroom.showDrive?.();
       else if(view==='customize'){updateThemeButtons();updateBackgroundStatus();customPage.classList.remove('is-entering');void customPage.offsetWidth;customPage.classList.add('is-entering');$('#hubCustomizeHeading').focus({preventScroll:true});}
       else if(!view.startsWith('planner:'))menu.focus({preventScroll:true});
     };
@@ -341,7 +344,9 @@
       try{localStorage.removeItem(BG_MODE_KEY);localStorage.removeItem(BG_NAME_KEY);}catch{}
       await applyStoredBackground();tell('Fundalul Bleach DEFAULT a fost restaurat.');
     });
-    window.addEventListener('orar-mail-unread',e=>{const dot=$('#hubMailDot'),count=Math.max(0,Number(e.detail?.count)||0);if(dot){dot.hidden=!count;dot.title=count?count+' mail-uri necitite':'';}});
+    window.addEventListener('orar-drive-section-request',()=>{changeView('drive');});
+    document.addEventListener('click',e=>{const a=e.target.closest('a[href]');if(!a||a.closest('#hubMailPage,#hubDrivePage'))return;const href=a.href||'';if(classroom.openDriveLink?.(href,a.textContent||'Fișier Google Drive')){e.preventDefault();changeView('drive');}});
+        window.addEventListener('orar-mail-unread',e=>{const dot=$('#hubMailDot'),count=Math.max(0,Number(e.detail?.count)||0);if(dot){dot.hidden=!count;dot.title=count?count+' mail-uri necitite':'';}});
     $('#hubSearch').addEventListener('input',e=>{search=e.target.value;renderSubjects();});
     list.addEventListener('input',e=>{
       const details=e.target.closest('[data-subject-id]');if(!details || !e.target.closest('form'))return;
