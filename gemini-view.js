@@ -128,6 +128,47 @@
       let busy=false;
       let pendingFiles=[];
 
+      const iosKeyboardMode=Boolean(window.CSS&&CSS.supports&&CSS.supports('-webkit-touch-callout','none'));
+      let geminiUnfocusedViewportHeight=0;
+      let geminiViewportRaf=0;
+      const geminiViewport=()=>window.visualViewport||null;
+      const composerField=()=>page.querySelector('.gemini-composer textarea');
+      const autosizeComposer=(field=composerField())=>{
+        if(!field)return;
+        field.style.height='0px';
+        const maxHeight=132;
+        const next=Math.max(42,Math.min(maxHeight,Math.ceil(field.scrollHeight||42)));
+        field.style.height=next+'px';
+        field.classList.toggle('is-scrollable',(field.scrollHeight||0)>maxHeight);
+        requestAnimationFrame(()=>{
+          const composer=field.closest('.gemini-composer');
+          if(composer)page.style.setProperty('--gemini-composer-height',Math.ceil(composer.getBoundingClientRect().height)+'px');
+        });
+      };
+      const syncGeminiKeyboard=()=>{
+        if(!iosKeyboardMode)return;
+        cancelAnimationFrame(geminiViewportRaf);
+        geminiViewportRaf=requestAnimationFrame(()=>{
+          const vv=geminiViewport(),field=composerField(),focused=Boolean(field&&field===document.activeElement);
+          if(!vv){
+            page.style.setProperty('--gemini-keyboard-inset','0px');
+            page.style.setProperty('--gemini-viewport-offset','0px');
+            return;
+          }
+          if(!focused){
+            geminiUnfocusedViewportHeight=Math.max(1,Math.round(vv.height+Math.max(0,vv.offsetTop)));
+            page.style.setProperty('--gemini-keyboard-inset','0px');
+            page.style.setProperty('--gemini-viewport-offset','0px');
+            return;
+          }
+          if(!geminiUnfocusedViewportHeight)geminiUnfocusedViewportHeight=Math.max(1,Math.round(vv.height+Math.max(0,vv.offsetTop)));
+          const visibleBottom=vv.height+Math.max(0,vv.offsetTop);
+          const inset=Math.max(0,Math.round(geminiUnfocusedViewportHeight-visibleBottom));
+          page.style.setProperty('--gemini-keyboard-inset',inset+'px');
+          page.style.setProperty('--gemini-viewport-offset',Math.max(0,Math.round(vv.offsetTop))+'px');
+        });
+      };
+
       function activeChat(){return chats.find(chat=>chat.id===activeId)||null;}
       function createChat(){
         const chat={id:uid(),title:'Chat nou',created:Date.now(),updated:Date.now(),messages:[]};
@@ -213,6 +254,8 @@
         </div>`;
         requestAnimationFrame(()=>{
           const box=page.querySelector('[data-gemini-conversation]');if(box)box.scrollTop=box.scrollHeight;
+          autosizeComposer();
+          syncGeminiKeyboard();
         });
       }
 
@@ -494,17 +537,39 @@
         const del=e.target.closest('[data-gemini-delete]');if(del){deleteChat(del.dataset.geminiDelete);return;}
         const remove=e.target.closest('[data-gemini-remove-file]');if(remove){pendingFiles.splice(Number(remove.dataset.geminiRemoveFile),1);render();}
       });
+      page.addEventListener('input',e=>{
+        const field=e.target.closest('.gemini-composer textarea');if(!field)return;
+        autosizeComposer(field);
+      });
+      page.addEventListener('focusin',e=>{
+        const field=e.target.closest('.gemini-composer textarea');if(!field)return;
+        const vv=geminiViewport();
+        if(vv)geminiUnfocusedViewportHeight=Math.max(geminiUnfocusedViewportHeight,Math.round(vv.height+Math.max(0,vv.offsetTop)));
+        autosizeComposer(field);
+        syncGeminiKeyboard();
+        setTimeout(syncGeminiKeyboard,80);
+        setTimeout(syncGeminiKeyboard,260);
+      });
+      page.addEventListener('focusout',e=>{
+        const field=e.target.closest('.gemini-composer textarea');if(!field)return;
+        setTimeout(()=>{
+          page.style.setProperty('--gemini-keyboard-inset','0px');
+          page.style.setProperty('--gemini-viewport-offset','0px');
+          const vv=geminiViewport();
+          if(vv)geminiUnfocusedViewportHeight=Math.max(1,Math.round(vv.height+Math.max(0,vv.offsetTop)));
+        },220);
+      });
       page.addEventListener('change',e=>{
         const input=e.target.closest('[data-gemini-files]');if(!input)return;
         const selected=[...input.files].filter(file=>file.size<=MAX_FILE_BYTES).slice(0,8);
         pendingFiles=[...pendingFiles,...selected].slice(0,8);render();
       });
       page.addEventListener('submit',e=>{
-        const form=e.target.closest('[data-gemini-form]');if(!form)return;e.preventDefault();const field=form.elements.message;const text=field.value;field.value='';sendMessage(text);
+        const form=e.target.closest('[data-gemini-form]');if(!form)return;e.preventDefault();const field=form.elements.message;const text=field.value;field.value='';autosizeComposer(field);sendMessage(text);
       });
       page.addEventListener('keydown',e=>{
         const field=e.target.closest('.gemini-composer textarea');if(!field)return;
-        if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();const text=field.value;field.value='';sendMessage(text);}
+        if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();const text=field.value;field.value='';autosizeComposer(field);sendMessage(text);}
       });
       importDialog.addEventListener('click',e=>{if(e.target.closest('[data-gemini-dialog-close]'))importDialog.close();});
       importDialog.addEventListener('submit',async e=>{
@@ -514,6 +579,22 @@
         try{await importSchedule(file,group,target);importDialog.close();}
         catch(error){tell?.(error?.message||'Importul nu a reușit.');button.disabled=false;button.textContent='Importă automat';}
       });
+
+      if(iosKeyboardMode&&window.visualViewport){
+        geminiUnfocusedViewportHeight=Math.max(1,Math.round(window.visualViewport.height+Math.max(0,window.visualViewport.offsetTop)));
+        window.visualViewport.addEventListener('resize',syncGeminiKeyboard,{passive:true});
+        window.visualViewport.addEventListener('scroll',syncGeminiKeyboard,{passive:true});
+        window.addEventListener('orientationchange',()=>{
+          page.style.setProperty('--gemini-keyboard-inset','0px');
+          page.style.setProperty('--gemini-viewport-offset','0px');
+          setTimeout(()=>{
+            const vv=geminiViewport();
+            if(vv)geminiUnfocusedViewportHeight=Math.max(1,Math.round(vv.height+Math.max(0,vv.offsetTop)));
+            autosizeComposer();
+            syncGeminiKeyboard();
+          },320);
+        },{passive:true});
+      }
 
       const scheduleButton=document.createElement('button');
       scheduleButton.type='button';scheduleButton.className='schedule-gemini-upload';scheduleButton.innerHTML='<span>✦</span> Upload';
