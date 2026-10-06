@@ -55,7 +55,7 @@
       return {response,payload};
     };
     const plans=[{model:MODEL,attempts:3},{model:FALLBACK_MODEL,attempts:2}];
-    let transient=false,lastMessage='';
+    let transient=false,lastMessage='',saw429=false,sawUnavailable=false;
     for(const plan of plans){
       for(let attempt=0;attempt<plan.attempts;attempt++){
         let result;
@@ -74,14 +74,16 @@
         const message=String(payload?.error?.message||'Gemini nu a răspuns.');lastMessage=message;
         if(response.status===401||response.status===403)throw Error('Gemini nu este autorizat pentru contul Google. Reconectează contul și acceptă permisiunea Gemini.');
         if(response.status===408||response.status===429||response.status>=500){
-          transient=true;
+          transient=true;if(response.status===429)saw429=true;if(response.status>=500)sawUnavailable=true;
           if(attempt<plan.attempts-1)await sleep(700*Math.pow(2,attempt)+Math.floor(Math.random()*250));
           continue;
         }
         throw Error(message);
       }
     }
-    if(transient)throw Error('Gemini este foarte solicitat acum. Am reîncercat automat și am încercat și modelul de rezervă. Încearcă din nou peste puțin timp.');
+    if(sawUnavailable)throw Error('Gemini este foarte solicitat acum. Am reîncercat automat și am încercat și modelul de rezervă. Încearcă din nou peste puțin timp.');
+    if(saw429)throw Error('Ai atins temporar limita Gemini pentru contul/proiectul curent. Încearcă din nou mai târziu.');
+    if(transient)throw Error('Gemini nu este disponibil momentan. Încearcă din nou peste puțin timp.');
     throw Error(lastMessage||'Gemini nu a răspuns.');
   }
 
