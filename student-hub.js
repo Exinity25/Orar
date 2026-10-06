@@ -301,7 +301,7 @@
     if(window.OrarPlanner)planner=window.OrarPlanner.mount({root,getSchedule,applySchedule,getSubjects:collectSubjects,changeView:next=>changeView(next),tell,classroom,applyTheme});
     if(window.OrarGemini)gemini=window.OrarGemini.mount({
       root,getSchedule,applySchedule,
-      getAppContext:()=>({subjects:collectSubjects(),schedules:getSchedules?.()||[],planner:planner?.contextSnapshot?.()||{},classroom:classroom.contextSnapshot?.()||{}}),
+      getAppContext:()=>({subjects:collectSubjects(),schedules:(getSchedules?.()||[]).map(meta=>({...meta,schedule:getScheduleById?.(meta.id)||null})),planner:planner?.contextSnapshot?.()||{},classroom:classroom.contextSnapshot?.()||{}}),
       getScheduleTargets:()=>getSchedules?.()||[],
       getScheduleById:id=>getScheduleById?.(id)||getSchedule(),
       applyScheduleTo:(id,next)=>applyScheduleTo?.(id,next),
