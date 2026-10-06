@@ -1162,3 +1162,28 @@ body[data-orar-theme="custom"].orar-custom-light{color-scheme:light}
 .app:not(.hub-hidden) .class-card:nth-of-type(2n){animation-delay:18ms}
 .app:not(.hub-hidden) .class-card:nth-of-type(3n){animation-delay:34ms}
 @media(prefers-reduced-motion:reduce){.app:not(.hub-hidden) .class-card{animation:none!important}}
+
+
+/* Drive */
+.drive-toolbar{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:9px;margin-bottom:16px}
+.drive-toolbar input{min-width:0}
+.drive-list{display:grid;gap:9px}
+.drive-card{width:100%;display:flex;align-items:center;gap:13px;text-align:left;padding:14px;border:1px solid var(--glass-border,#ffffff1b);border-radius:14px;background:var(--glass-surface,rgba(12,16,25,.92));color:var(--glass-ink,#fff);font:inherit;cursor:pointer}
+.drive-card:hover{border-color:color-mix(in srgb,var(--accent) 45%,var(--glass-border));transform:translateY(-1px)}
+.drive-card>span:last-child{min-width:0;display:grid;gap:5px}
+.drive-card strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.drive-card small{font-size:10px;color:var(--glass-muted,#aeb7c7);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.drive-file-icon{display:grid;place-items:center;width:38px;height:38px;flex:0 0 38px;border-radius:11px;background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent);font-size:20px}
+.drive-more,.mail-more{margin-top:14px}
+
+/* Mail links and attachments */
+.mail-body{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.65;margin:16px 0 0;color:var(--glass-ink,#fff)}
+.mail-body a{color:var(--accent);text-decoration:underline;text-underline-offset:3px;overflow-wrap:anywhere}
+.mail-attachment-picker input[type=file]{padding:10px;border:1px dashed color-mix(in srgb,var(--accent) 40%,var(--glass-border));border-radius:10px}
+.mail-attachment-note{font-size:10px;color:var(--glass-muted,#aeb7c7);line-height:1.5}
+
+/* Campus map */
+.pl-campus-map-modern{position:relative;overflow:hidden;border-radius:16px;background:var(--glass-surface)}
+.pl-campus-map-modern iframe{display:block;width:100%;height:min(68dvh,620px);border:0;touch-action:auto}
+.pl-map-external{position:absolute;right:12px;bottom:12px;z-index:2;background:var(--glass-surface,rgba(12,16,25,.94))!important;backdrop-filter:blur(12px)}
+@media(max-width:600px){.drive-toolbar{grid-template-columns:1fr 1fr}.drive-toolbar input{grid-column:1/-1}.pl-campus-map-modern iframe{height:62dvh}}
