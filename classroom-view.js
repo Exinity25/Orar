@@ -572,13 +572,15 @@
       profile.classList.remove('hub-hidden');
     }
     function saveSession(){try{localStorage.setItem(SESSION_KEY,JSON.stringify({token,expires,grantedScopes}));}catch{}}
-    const CLOUD_FILE='orar-sync.json',SYNC_KEYS=['orar_planner_v1','c11_1_bleach_schedule_v3','orar_subject_homework_v1','c11_1_selected_week','c11_1_selected_day','orar_theme_v1'];
+    const CLOUD_FILE='orar-sync.json';
+    const CLOUD_SKIP=new Set(['orar_google_session_v1','orar_cloud_pending_v1']);
+    const cloudKeys=()=>Object.keys(localStorage).filter(key=>!CLOUD_SKIP.has(key));
     let cloudFileId='',cloudTimer=0,cloudApplying=false,cloudUploading=false;
     const PENDING_KEY='orar_cloud_pending_v1';
     const pendingCloud=()=>{try{return JSON.parse(localStorage.getItem(PENDING_KEY)||'{}');}catch{return {};}};
     function acknowledgeCloud(sent){const pending=pendingCloud();for(const key of Object.keys(sent))if(pending[key]===sent[key])delete pending[key];localStorage.setItem(PENDING_KEY,JSON.stringify(pending));if(Object.keys(pending).length)scheduleCloudUpload();}
 
-    const cloudPayload=()=>{const values={};for(const key of SYNC_KEYS){const value=localStorage.getItem(key);if(value!==null)values[key]=value;}return {version:1,updatedAt:Date.now(),values};};
+    const cloudPayload=()=>{const values={};for(const key of cloudKeys()){const value=localStorage.getItem(key);if(value!==null)values[key]=value;}return {version:2,updatedAt:Date.now(),values};};
     async function findCloudFile(){
       if(cloudFileId)return cloudFileId;
       const q=encodeURIComponent("name='"+CLOUD_FILE+"' and 'appDataFolder' in parents and trashed=false");
@@ -596,7 +598,7 @@
       if(cloudUploading)return;cloudUploading=true;
       try{
       const sent=pendingCloud(),payload=cloudPayload(),id=await findCloudFile();
-      if(id){const previous=await fetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(id)+'?alt=media',{headers:{Authorization:'Bearer '+token},cache:'no-store'});if(!previous.ok)throw Error('Nu s-a putut verifica backup-ul existent.');const remote=await previous.json();for(const key of SYNC_KEYS)if(!sent[key]&&typeof remote.values?.[key]==='string')payload.values[key]=remote.values[key];}
+      if(id){const previous=await fetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(id)+'?alt=media',{headers:{Authorization:'Bearer '+token},cache:'no-store'});if(!previous.ok)throw Error('Nu s-a putut verifica backup-ul existent.');const remote=await previous.json();for(const [key,value] of Object.entries(remote.values||{}))if(!sent[key]&&typeof value==='string'&&!Object.prototype.hasOwnProperty.call(payload.values,key))payload.values[key]=value;}
       const body=JSON.stringify(payload);
       if(id){const r=await fetch('https://www.googleapis.com/upload/drive/v3/files/'+encodeURIComponent(id)+'?uploadType=media',{method:'PATCH',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body});if(!r.ok)throw Error('Nu s-a putut sincroniza orarul.');acknowledgeCloud(sent);return;}
       const boundary='orar_sync_boundary',meta=JSON.stringify({name:CLOUD_FILE,parents:['appDataFolder']});
@@ -613,7 +615,7 @@
       const r=await fetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(id)+'?alt=media',{headers:{Authorization:'Bearer '+token},cache:'no-store'});if(!r.ok)return;
       const remote=await r.json();if(!remote?.values)return;
       cloudApplying=true;let changed=false,needsBackfill=false;
-      for(const key of SYNC_KEYS){
+      for(const key of new Set([...cloudKeys(),...Object.keys(remote.values||{})])){
         if(pendingCloud()[key])continue;
         const hasRemote=Object.prototype.hasOwnProperty.call(remote.values,key),local=localStorage.getItem(key);
         if(hasRemote){
@@ -626,7 +628,7 @@
       if(needsBackfill)scheduleCloudUpload();
       return false;
     }
-    window.addEventListener('orar-local-change',event=>{const key=event.detail?.key;if(cloudApplying||!SYNC_KEYS.includes(key))return;try{const pending=pendingCloud();pending[key]=Date.now()+':'+Math.random();localStorage.setItem(PENDING_KEY,JSON.stringify(pending));}catch{}scheduleCloudUpload();});
+    window.addEventListener('orar-local-change',event=>{const key=event.detail?.key;if(cloudApplying||!key||CLOUD_SKIP.has(key))return;try{const pending=pendingCloud();pending[key]=Date.now()+':'+Math.random();localStorage.setItem(PENDING_KEY,JSON.stringify(pending));}catch{}scheduleCloudUpload();});
     window.addEventListener('orar-cloud-sync-request',async()=>{
       try{
         if(!token||Date.now()>=expires||!grantedScopes.includes('drive.appdata')){
