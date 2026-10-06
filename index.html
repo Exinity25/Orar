@@ -762,6 +762,80 @@
       .combined-slot .class-card{padding:7px 8px 7px 10px}
     }
 
+    /* Combined multi-schedule view: landscape gets a true split-cell layout.
+       This keeps the portrait layout untouched while preventing stacked cards
+       from overflowing into the next timetable row on iPhone landscape. */
+    @media (max-width:960px) and (orientation:landscape){
+      .schedule-view-bar{
+        width:min(720px,calc(100% - 190px));
+        margin:2px auto 10px;
+        padding:4px;
+        gap:4px;
+      }
+      .schedule-view-bar button{padding:7px 11px;font-size:9px}
+
+      .schedule-grid .combined-slot{
+        display:grid!important;
+        align-content:stretch!important;
+        padding:3px!important;
+        gap:3px!important;
+        overflow:hidden!important;
+      }
+
+      /* The common two-faculty case: both schedules share one row side-by-side. */
+      .schedule-grid .combined-slot:has(> .class-card:nth-child(2)):not(:has(> .class-card:nth-child(3))){
+        grid-template-columns:repeat(2,minmax(0,1fr))!important;
+        height:var(--row-height)!important;
+        min-height:var(--row-height)!important;
+      }
+      .schedule-grid .combined-slot:has(> .class-card:nth-child(2)):not(:has(> .class-card:nth-child(3))) > .class-card{
+        min-width:0!important;
+        width:auto!important;
+        height:100%!important;
+        min-height:0!important;
+        padding:5px 5px 4px 7px!important;
+        border-radius:7px!important;
+        overflow:hidden!important;
+      }
+
+      .combined-slot .schedule-source{
+        max-width:100%;
+        margin-bottom:2px;
+        padding:2px 5px;
+        font-size:6px;
+        line-height:1.1;
+      }
+      .combined-slot .type-row{min-height:10px;font-size:6px;gap:2px}
+      .combined-slot .type-icon{width:9px;height:9px}
+      .combined-slot .type-icon svg{width:9px;height:9px}
+      .combined-slot .subject{
+        margin-top:1px;
+        font-size:8px;
+        line-height:1.03;
+        display:-webkit-box;
+        -webkit-box-orient:vertical;
+        -webkit-line-clamp:2;
+        overflow:hidden;
+      }
+      .combined-slot .meta-stack{margin-top:4px;gap:1px}
+      .combined-slot .meta-line{font-size:6px;gap:2px;min-width:0}
+      .combined-slot .meta-icon{width:8px;height:8px}
+      .combined-slot .meta-icon svg{width:8px;height:8px}
+      .combined-slot .meta-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+      /* More than two schedules may wrap, but the row grows instead of overlapping. */
+      .schedule-grid .combined-slot:has(> .class-card:nth-child(3)){
+        grid-template-columns:repeat(2,minmax(0,1fr))!important;
+        height:auto!important;
+        min-height:var(--row-height)!important;
+        overflow:visible!important;
+      }
+      .schedule-grid .combined-slot:has(> .class-card:nth-child(3)) > .class-card{
+        height:auto!important;
+        min-height:82px!important;
+      }
+    }
+
   </style>
   <link rel="stylesheet" href="./student-hub.css">
   <link rel="stylesheet" href="./student-planner.css">
