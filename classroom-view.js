@@ -15,8 +15,9 @@
   const linkifyText = value => String(value||'').split(/(https?:\/\/[^\s]+|www\.[^\s]+)/gi).map(part=>{
     if(!/^(https?:\/\/|www\.)/i.test(part))return esc(part);
     let clean=part,trailing='';while(/[),.;!?]$/.test(clean)){trailing=clean.slice(-1)+trailing;clean=clean.slice(0,-1);}
-    const href=safeURL(/^www\./i.test(clean)?'https://'+clean:clean);
-    return href?`<a class="classroom-inline-link" href="${esc(href)}" target="_blank" rel="noopener noreferrer">${esc(clean)}</a>${esc(trailing)}`:esc(part);
+    const href=safeURL(/^www\./i.test(clean)?'https://'+clean:clean);if(!href)return esc(part);
+    let driveId='';try{const u=new URL(href);if(/(^|\.)drive\.google\.com$/.test(u.hostname)||/(^|\.)docs\.google\.com$/.test(u.hostname)){const m=u.pathname.match(/\/(?:file\/d|document\/d|spreadsheets\/d|presentation\/d)\/([A-Za-z0-9_-]+)/);driveId=m?.[1]||u.searchParams.get('id')||'';}}catch{}
+    return driveId?`<a class="classroom-inline-link" href="${esc(href)}" data-orar-drive-id="${esc(driveId)}">${esc(clean)}</a>${esc(trailing)}`:`<a class="classroom-inline-link" href="${esc(href)}" target="_blank" rel="noopener noreferrer">${esc(clean)}</a>${esc(trailing)}`;
   }).join('');
   const previewable = title => /\.(pdf|docx?|xlsx?|xlsm|csv|pptx?|odt|ods|odp|rtf|pages|numbers|key|zip|rar|7z|jpe?g|png|gif|webp|bmp|svg|avif|heic|heif|txt|md|json|xml|log|html?|css|js|ts|py|java|c|cpp|h|mp3|m4a|aac|flac|wav|ogg|mp4|m4v|mov|webm)$/i.test(String(title||'').trim());
   const previewButton = file => {
