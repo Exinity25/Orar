@@ -170,7 +170,8 @@ window.OrarPlanner={mount({root,getSchedule,applySchedule,getSubjects,changeView
    try{
     const u=new URL(raw);short=/(?:maps\.app\.goo\.gl|goo\.gl\/maps)/i.test(u.hostname+u.pathname);
     if(short){
-     try{const r=await fetch(raw,{redirect:'follow',cache:'no-store'});if(r?.url&&r.url!==raw)resolved=r.url;}catch{}
+     try{const r=await fetch(raw,{redirect:'follow',cache:'no-store'});if(r?.url&&r.url!==raw)resolved=r.url;}
+     catch{try{const r=await fetch(raw,{mode:'no-cors',redirect:'follow',cache:'no-store'});if(r?.url&&r.url!==raw)resolved=r.url;}catch{}}
     }
    }catch{}
   }
