@@ -562,7 +562,7 @@
     viewer.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();closeViewer();}});
     const SESSION_KEY='orar_classroom_session_v2',OLD_SESSION_KEY='orar_classroom_session_v1';
     const ACCOUNT_KEY='orar_classroom_account_v1';
-    let token='',expires=0,grantedScopes='',client=null,courses=[],posts=[],selected=null,loading=false,message='',warning='',generation=0,session=0,expireTimer,visible=false,reauthenticating=false;
+    let token='',expires=0,grantedScopes='',client=null,courses=[],posts=[],selected=null,loading=false,message='',warning='',generation=0,session=0,expireTimer,visible=false,reauthenticating=false,silentRenewing=false,authRequestSilent=false;
     let mailItems=[],mailLoading=false,mailMessage='',mailOpen=null,mailBody='',mailUnread=0,mailVisible=false,mailNext='';
     let driveItems=[],driveLoading=false,driveMessage='',driveVisible=false,driveNext='',driveQuery='';
     let courseToggleMotion=0;
@@ -581,7 +581,7 @@
     }
     function saveSession(){try{localStorage.setItem(SESSION_KEY,JSON.stringify({token,expires,grantedScopes}));}catch{}}
     const CLOUD_FILE='orar-sync.json';
-    const CLOUD_SKIP=new Set(['orar_google_session_v1','orar_cloud_pending_v1']);
+    const CLOUD_SKIP=new Set([SESSION_KEY,OLD_SESSION_KEY,ACCOUNT_KEY,'orar_google_session_v1','orar_cloud_pending_v1']);
     const cloudKeys=()=>Object.keys(localStorage).filter(key=>!CLOUD_SKIP.has(key));
     let cloudFileId='',cloudTimer=0,cloudApplying=false,cloudUploading=false;
     const PENDING_KEY='orar_cloud_pending_v1';
@@ -606,7 +606,7 @@
       if(cloudUploading)return;cloudUploading=true;
       try{
       const sent=pendingCloud(),payload=cloudPayload(),id=await findCloudFile();
-      if(id){const previous=await fetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(id)+'?alt=media',{headers:{Authorization:'Bearer '+token},cache:'no-store'});if(!previous.ok)throw Error('Nu s-a putut verifica backup-ul existent.');const remote=await previous.json();for(const [key,value] of Object.entries(remote.values||{}))if(!sent[key]&&typeof value==='string'&&!Object.prototype.hasOwnProperty.call(payload.values,key))payload.values[key]=value;}
+      if(id){const previous=await fetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(id)+'?alt=media',{headers:{Authorization:'Bearer '+token},cache:'no-store'});if(!previous.ok)throw Error('Nu s-a putut verifica backup-ul existent.');const remote=await previous.json();for(const [key,value] of Object.entries(remote.values||{})){if(CLOUD_SKIP.has(key))continue;if(!sent[key]&&typeof value==='string'&&!Object.prototype.hasOwnProperty.call(payload.values,key))payload.values[key]=value;}}
       const body=JSON.stringify(payload);
       if(id){const r=await fetch('https://www.googleapis.com/upload/drive/v3/files/'+encodeURIComponent(id)+'?uploadType=media',{method:'PATCH',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body});if(!r.ok)throw Error('Nu s-a putut sincroniza orarul.');acknowledgeCloud(sent);return;}
       const boundary='orar_sync_boundary',meta=JSON.stringify({name:CLOUD_FILE,parents:['appDataFolder']});
@@ -624,7 +624,7 @@
       const remote=await r.json();if(!remote?.values)return;
       cloudApplying=true;let changed=false,needsBackfill=false;
       for(const key of new Set([...cloudKeys(),...Object.keys(remote.values||{})])){
-        if(pendingCloud()[key])continue;
+        if(CLOUD_SKIP.has(key)||pendingCloud()[key])continue;
         const hasRemote=Object.prototype.hasOwnProperty.call(remote.values,key),local=localStorage.getItem(key);
         if(hasRemote){
           const value=String(remote.values[key]);
@@ -654,12 +654,24 @@
       try{localStorage.removeItem(OLD_SESSION_KEY);const saved=JSON.parse(localStorage.getItem(SESSION_KEY)||'null');if(saved?.token && Number(saved.expires)>Date.now()+5000){token=saved.token;expires=Number(saved.expires);grantedScopes=String(saved.grantedScopes||'');return true;}forgetSession();}catch{forgetSession();}
       return false;
     }
-    function scheduleExpiry(){clearTimeout(expireTimer);if(token&&expires>Date.now())expireTimer=setTimeout(()=>clearSession('Sesiunea Google trebuie reînnoită.',false),Math.max(0,expires-Date.now()));}
+    function scheduleExpiry(){
+      clearTimeout(expireTimer);if(!token||expires<=Date.now())return;
+      const renewAt=Math.max(1000,expires-Date.now()-2*60*1000);
+      expireTimer=setTimeout(()=>{
+        if(client&&rememberedAccount())requestAccess(true,true);
+        else if(Date.now()>=expires)clearSession('Sesiunea Google trebuie reînnoită.',false);
+      },renewAt);
+    }
+    function scheduleHardExpiry(){
+      clearTimeout(expireTimer);
+      if(token&&expires>Date.now())expireTimer=setTimeout(()=>clearSession('Sesiunea Google trebuie reînnoită.',false),Math.max(1000,expires-Date.now()));
+      else if(token)clearSession('Sesiunea Google trebuie reînnoită.',false);
+    }
     function clearSession(text='',forgetAccount=false){
-      closeViewer(false);generation++;session++;clearTimeout(expireTimer);token='';expires=0;grantedScopes='';forgetSession();courses=[];posts=[];selected=null;loading=false;message=text;warning='';reauthenticating=false;mailItems=[];mailOpen=null;mailBody='';mailUnread=0;mailMessage='';window.dispatchEvent(new CustomEvent('orar-mail-unread',{detail:{count:0}}));
+      closeViewer(false);generation++;session++;clearTimeout(expireTimer);token='';expires=0;grantedScopes='';forgetSession();courses=[];posts=[];selected=null;loading=false;message=text;warning='';reauthenticating=false;silentRenewing=false;authRequestSilent=false;mailItems=[];mailOpen=null;mailBody='';mailUnread=0;mailMessage='';driveItems=[];driveMessage='';window.dispatchEvent(new CustomEvent('orar-mail-unread',{detail:{count:0}}));
       if(forgetAccount){try{localStorage.removeItem(ACCOUNT_KEY);}catch{}}
       renderProfile(rememberedAccount(),false);
-      render();renderMail();
+      render();renderMail();renderDrive();
     }
     function logout(){const old=token;clearSession('',true);if(old && window.google?.accounts?.oauth2)window.google.accounts.oauth2.revoke(old,()=>{});}
     profile.addEventListener('click',e=>{
