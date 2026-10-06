@@ -673,6 +673,14 @@
       if(needsBackfill)scheduleCloudUpload();
       return false;
     }
+    if(!window.__orarStorageObserverInstalled){
+      window.__orarStorageObserverInstalled=true;
+      const proto=Storage.prototype,nativeSet=proto.setItem,nativeRemove=proto.removeItem,nativeClear=proto.clear;
+      const emit=key=>queueMicrotask(()=>window.dispatchEvent(new CustomEvent('orar-local-change',{detail:{key}})));
+      proto.setItem=function(key,value){const local=this===window.localStorage,before=local?this.getItem(key):null,result=nativeSet.call(this,key,value);if(local&&before!==String(value))emit(String(key));return result;};
+      proto.removeItem=function(key){const local=this===window.localStorage,had=local&&this.getItem(key)!==null,result=nativeRemove.call(this,key);if(had)emit(String(key));return result;};
+      proto.clear=function(){const local=this===window.localStorage,keys=local?Object.keys(this):[],result=nativeClear.call(this);if(local)keys.forEach(emit);return result;};
+    }
     window.addEventListener('orar-local-change',event=>{const key=event.detail?.key;if(cloudApplying||!key||CLOUD_SKIP.has(key))return;try{const pending=pendingCloud();pending[key]=Date.now()+':'+Math.random();localStorage.setItem(PENDING_KEY,JSON.stringify(pending));}catch{}scheduleCloudUpload();});
     window.addEventListener('orar-cloud-sync-request',async()=>{
       try{
@@ -779,7 +787,23 @@
     function decodeMailData(data=''){try{const normalized=String(data).replace(/-/g,'+').replace(/_/g,'/'),pad='='.repeat((4-normalized.length%4)%4),binary=atob(normalized+pad),bytes=Uint8Array.from(binary,c=>c.charCodeAt(0));return new TextDecoder().decode(bytes);}catch{return '';}}
     function mailPlain(payload){if(!payload)return '';const parts=payload.parts||[],plain=parts.find(p=>p.mimeType==='text/plain'&&p.body?.data);if(plain)return decodeMailData(plain.body.data);for(const part of parts){const nested=mailPlain(part);if(nested)return nested;}if(payload.mimeType==='text/plain'&&payload.body?.data)return decodeMailData(payload.body.data);if(payload.mimeType==='text/html'&&payload.body?.data){const doc=new DOMParser().parseFromString(decodeMailData(payload.body.data),'text/html');return doc.body?.textContent||'';}return '';}
     function mailHtml(payload){if(!payload)return '';if(payload.mimeType==='text/html'&&payload.body?.data)return decodeMailData(payload.body.data);for(const part of payload.parts||[]){const html=mailHtml(part);if(html)return html;}return '';}
-    function safeMailHtml(html=''){
+    const mailPartHeader=(part,name)=>part?.headers?.find(h=>String(h.name).toLowerCase()===String(name).toLowerCase())?.value||'';
+    const mailBase64=value=>{const normalized=String(value||'').replace(/-/g,'+').replace(/_/g,'/');return normalized+'='.repeat((4-normalized.length%4)%4);};
+    async function mailInlineImages(messageId,payload){
+      const parts=[];const walk=part=>{if(!part)return;parts.push(part);for(const child of part.parts||[])walk(child);};walk(payload);
+      const map={};
+      for(const part of parts){
+        if(!String(part.mimeType||'').startsWith('image/'))continue;
+        const rawCid=mailPartHeader(part,'Content-ID').replace(/[<>]/g,'').trim();if(!rawCid)continue;
+        let data=part.body?.data||'';
+        if(!data&&part.body?.attachmentId&&Number(part.body?.size||0)<=4*1024*1024){
+          try{data=(await gmailApi('messages/'+encodeURIComponent(messageId)+'/attachments/'+encodeURIComponent(part.body.attachmentId)))?.data||'';}catch{}
+        }
+        if(data)map[rawCid]='data:'+(part.mimeType||'image/*')+';base64,'+mailBase64(data);
+      }
+      return map;
+    }
+    function safeMailHtml(html='',cidMap={}){
       if(!html)return '';
       const doc=new DOMParser().parseFromString(html,'text/html');
       doc.querySelectorAll('script,style,link,meta,base,iframe,object,embed,form,input,textarea,select,button').forEach(node=>node.remove());
@@ -787,17 +811,50 @@
         [...node.attributes].forEach(attr=>{
           const name=attr.name.toLowerCase(),value=attr.value||'';
           if(name.startsWith('on')||name==='srcset'||name==='background'||name==='style')node.removeAttribute(attr.name);
-          else if(name==='src'){if(!/^cid:/i.test(value)&&!/^data:image\//i.test(value))node.removeAttribute(attr.name);}
-          else if(name==='href'){const href=safeURL(value);if(href){node.setAttribute('href',href);node.setAttribute('target','_blank');node.setAttribute('rel','noopener noreferrer');}else node.removeAttribute('href');}
-          else if(!['href','src','alt','title','width','height','align','valign','cellpadding','cellspacing','colspan','rowspan','border','role','aria-label'].includes(name))node.removeAttribute(attr.name);
+          else if(name==='src'){
+            if(/^cid:/i.test(value)){
+              const cid=value.replace(/^cid:/i,'').replace(/[<>]/g,'').trim(),resolved=cidMap[cid]||cidMap[decodeURIComponent(cid)]||'';
+              if(resolved)node.setAttribute('src',resolved);else node.removeAttribute('src');
+            }else if(/^data:image\//i.test(value))node.setAttribute('src',value);
+            else{
+              const src=safeURL(value);
+              if(src&&src.startsWith('https:'))node.setAttribute('src',src);else node.removeAttribute('src');
+            }
+          }else if(name==='href'){
+            const href=safeURL(value);
+            if(href){node.setAttribute('href',href);node.setAttribute('target','_blank');node.setAttribute('rel','noopener noreferrer');}
+            else node.removeAttribute('href');
+          }else if(!['href','src','alt','title','width','height','align','valign','cellpadding','cellspacing','colspan','rowspan','border','role','aria-label'].includes(name))node.removeAttribute(attr.name);
         });
+      });
+      doc.querySelectorAll('img').forEach(img=>{
+        const w=Number(img.getAttribute('width')||0),h=Number(img.getAttribute('height')||0);
+        if(w>0&&h>0&&w<=2&&h<=2){img.remove();return;}
+        img.loading='lazy';img.decoding='async';img.referrerPolicy='no-referrer';img.classList.add('mail-rich-image');
+        if(!img.alt)img.alt='Imagine din e-mail';
+      });
+      doc.querySelectorAll('a[href]').forEach(a=>{
+        const href=a.getAttribute('href')||'',label=(a.textContent||'').replace(/\s+/g,' ').trim();
+        let host='';try{host=new URL(href).hostname.toLowerCase();}catch{}
+        const classroomLink=/classroom\.google\.com/i.test(host)||/classroom\.google\.com/i.test(href);
+        const actionText=/înscrie|inscrie|join|accept|confirm|deschide|open|view|particip|setează|setari|settings/i.test(label);
+        a.classList.add(classroomLink||actionText?'mail-rich-action':'mail-rich-link');
+        if(classroomLink&&/invite|accept/i.test(href+' '+label))a.classList.add('is-primary');
+        const drive=driveTargetFromUrl(href);if(drive){a.dataset.orarDriveId=drive.id;a.dataset.orarDriveType=drive.type;}
       });
       return doc.body?.innerHTML||'';
     }
+    async function mailRichHtml(row){
+      const html=mailHtml(row?.payload);if(!html)return '';
+      const cidMap=await mailInlineImages(row.id,row.payload);
+      return safeMailHtml(html,cidMap);
+    }
     function mailSenderMarkup(from=''){
-      const raw=String(from||''),match=raw.match(/^\s*"?([^"<]*)"?\s*<([^>]+)>\s*$/),name=(match?.[1]||raw.split('<')[0]||raw).trim()||'Expeditor',email=(match?.[2]||raw.match(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/)?.[0]||'').trim();
+      const raw=String(from||''),match=raw.match(/^\s*"?([^"<]*)"?\s*<([^>]+)>\s*$/),original=(match?.[1]||raw.split('<')[0]||raw).trim()||'Expeditor',email=(match?.[2]||raw.match(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/)?.[0]||'').trim();
+      const classroom=/classroom/i.test(original)||/@classroom\.google\.com$/i.test(email),name=original.replace(/\s*\(Classroom\)\s*$/i,'').trim()||original;
       const initials=name.split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]).join('').toUpperCase()||'✉';
-      return '<div class="mail-person"><span class="mail-person-avatar">'+esc(initials)+'</span><span><strong>'+esc(name)+'</strong>'+(email?'<small>'+esc(email)+'</small>':'')+'</span></div>';
+      const badge=classroom?'<span class="mail-person-brand" aria-label="Google Classroom">Classroom</span>':'';
+      return '<div class="mail-person"><span class="mail-person-avatar '+(classroom?'is-classroom':'')+'">'+esc(initials)+badge+'</span><span><strong>'+esc(name)+'</strong>'+(email?'<small>'+(classroom?'Google Classroom · ':'')+esc(email)+'</small>':'')+'</span></div>';
     }
     function encodeMailRaw(text){const bytes=new TextEncoder().encode(text);let binary='';for(const b of bytes)binary+=String.fromCharCode(b);return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}
     async function refreshMailSummary(){if(!mailScopeOk())return;try{const label=await gmailApi('labels/INBOX');mailUnread=Number(label?.messagesUnread)||0;window.dispatchEvent(new CustomEvent('orar-mail-unread',{detail:{count:mailUnread}}));}catch{}}
@@ -810,7 +867,7 @@
       if(!mailScopeOk()){mailLoading=false;mailItems=[];mailNext='';mailMessage='Pentru Mail, reconectează contul Google și acceptă accesul Gmail.';renderMail();return;}
       mailNext='';await loadMailBatch(false);
     }
-    async function openMail(id){if(!mailScopeOk())return;mailLoading=true;renderMail();try{const row=await gmailApi('messages/'+encodeURIComponent(id)+'?format=full');mailOpen={id:row.id,subject:mailHeader(row,'Subject')||'(fără subiect)',from:mailHeader(row,'From')||'',date:mailHeader(row,'Date')||''};mailBody=mailPlain(row.payload)||row.snippet||'(Mesaj fără conținut text.)';mailBodyHtml=safeMailHtml(mailHtml(row.payload));if((row.labelIds||[]).includes('UNREAD')){await gmailApi('messages/'+encodeURIComponent(id)+'/modify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({removeLabelIds:['UNREAD']})});const item=mailItems.find(x=>x.id===id);if(item)item.unread=false;await refreshMailSummary();}}catch(e){mailMessage=e.message||'Mesajul nu a putut fi deschis.';}finally{mailLoading=false;renderMail();}}
+    async function openMail(id){if(!mailScopeOk())return;mailLoading=true;renderMail();try{const row=await gmailApi('messages/'+encodeURIComponent(id)+'?format=full');mailOpen={id:row.id,subject:mailHeader(row,'Subject')||'(fără subiect)',from:mailHeader(row,'From')||'',date:mailHeader(row,'Date')||''};mailBody=mailPlain(row.payload)||row.snippet||'(Mesaj fără conținut text.)';mailBodyHtml=await mailRichHtml(row);if((row.labelIds||[]).includes('UNREAD')){await gmailApi('messages/'+encodeURIComponent(id)+'/modify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({removeLabelIds:['UNREAD']})});const item=mailItems.find(x=>x.id===id);if(item)item.unread=false;await refreshMailSummary();}}catch(e){mailMessage=e.message||'Mesajul nu a putut fi deschis.';}finally{mailLoading=false;renderMail();}}
     function renderMail(){
       const connected=Boolean(token&&Date.now()<expires),gmail=mailScopeOk(),account=rememberedAccount();let body='';
       if(!connected)body='<div class="classroom-welcome"><h2>Conectează contul Google</h2><p>Mail folosește același cont conectat pentru Classroom și Drive.</p><button class="hub-primary" data-mail-connect>Conectează contul Google</button></div>';
