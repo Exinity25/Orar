@@ -4,9 +4,13 @@
   "description": "Orar interactiv",
   "start_url": "./",
   "scope": "./",
-  "display": "standalone",
+  "display": "fullscreen",
   "orientation": "any",
   "background_color": "#05070c",
   "theme_color": "#080b12",
-  "lang": "ro"
+  "lang": "ro",
+  "display_override": [
+    "fullscreen",
+    "standalone"
+  ]
 }
