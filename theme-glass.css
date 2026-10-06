@@ -115,3 +115,28 @@ html body[data-ui-glass][data-ui-glass] .note-area:focus-visible{
   border-color:var(--glass-border)!important;
   box-shadow:0 0 10px color-mix(in srgb,var(--accent) 72%,transparent),0 0 22px color-mix(in srgb,var(--accent) 38%,transparent),0 0 34px color-mix(in srgb,var(--accent) 18%,transparent)!important;
 }
+
+
+/* Materii search: one outer theme glow only; the input itself never draws vertical focus bars. */
+html body[data-ui-glass][data-ui-glass] .hub-search:focus-within{
+  outline:none!important;
+  outline-offset:0!important;
+  border-color:var(--glass-border)!important;
+  box-shadow:0 0 12px color-mix(in srgb,var(--accent) 62%,transparent),0 0 26px color-mix(in srgb,var(--accent) 28%,transparent)!important;
+}
+html body[data-ui-glass][data-ui-glass] .hub-search input,
+html body[data-ui-glass][data-ui-glass] .hub-search input:focus,
+html body[data-ui-glass][data-ui-glass] .hub-search input:focus-visible{
+  outline:none!important;
+  outline-offset:0!important;
+  border:0!important;
+  box-shadow:none!important;
+}
+
+/* Timetable note: neutral border plus a soft theme-accent glow, with no sharp ring. */
+html body[data-ui-glass][data-ui-glass] .note-area:focus,
+html body[data-ui-glass][data-ui-glass] .note-area:focus-visible{
+  outline:none!important;
+  border-color:var(--glass-border)!important;
+  box-shadow:0 0 16px color-mix(in srgb,var(--accent) 58%,transparent),0 0 30px color-mix(in srgb,var(--accent) 26%,transparent)!important;
+}
