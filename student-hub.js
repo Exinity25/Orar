@@ -326,6 +326,7 @@
       if(leavingGemini&&gemini?.element?.contains(document.activeElement)){
         try{document.activeElement.blur();}catch{}
       }
+      if(leavingGemini)gemini?.hide?.();
       view=next;closeMenu(false);if(planner){planner.hide();if(view.startsWith('planner:'))planner.show(view.slice(8));}
       app.classList.toggle('hub-hidden',view!=='schedule');page.classList.toggle('hub-hidden',view!=='subjects');customPage.classList.toggle('hub-hidden',view!=='customize');classroom.element.classList.toggle('hub-hidden',view!=='classroom');if(classroom.mailElement)classroom.mailElement.classList.toggle('hub-hidden',view!=='mail');if(classroom.driveElement)classroom.driveElement.classList.toggle('hub-hidden',view!=='drive');if(gemini)gemini.element.classList.toggle('hub-hidden',view!=='gemini');
       root.querySelectorAll('[data-hub-view]').forEach(el=>el.dataset.hubView===view?el.setAttribute('aria-current','page'):el.removeAttribute('aria-current'));
@@ -340,6 +341,19 @@
     };
     menu.addEventListener('click',openMenu);$('#hubClose').addEventListener('click',()=>closeMenu());$('#hubBackdrop').addEventListener('click',()=>closeMenu());
     root.querySelectorAll('[data-hub-view]').forEach(el=>el.addEventListener('click',()=>changeView(el.dataset.hubView)));
+    window.addEventListener('orar-orientation-recover',()=>{
+      closeMenu(false);
+      app.inert=false;
+      page.inert=false;
+      customPage.inert=false;
+      classroom.element.inert=false;
+      if(classroom.mailElement)classroom.mailElement.inert=false;
+      if(classroom.driveElement)classroom.driveElement.inert=false;
+      if(gemini)gemini.element.inert=false;
+      if(planner)planner.element.inert=false;
+      menu.inert=false;
+      try{document.activeElement?.blur?.();}catch{}
+    });
     layer.addEventListener('keydown',e=>{
       if(e.key==='Escape'){e.preventDefault();closeMenu();}
       if(e.key==='Tab'){
