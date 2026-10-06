@@ -11,6 +11,7 @@
     classroom:svg('<rect x="3" y="4" width="18" height="15" rx="2"/><circle cx="12" cy="10" r="2"/><path d="M8 16c0-4 8-4 8 0M7 22h10"/>'),
     mail:svg('<rect x="3" y="5" width="18" height="14" rx="3"/><path d="m4 7 8 6 8-6"/>'),
     drive:svg('<path d="M9 3h6l6 10-3 5H6l-3-5L9 3Z"/><path d="m9 3 6 10m6 0H9m-3 5 3-5"/>'),
+    gemini:svg('<path d="M12 2c.8 5.2 4 8.3 9 9-5 .8-8.2 3.9-9 9-.8-5.1-4-8.2-9-9 5-.7 8.2-3.8 9-9Z"/><path d="M19 3c.25 1.8 1.3 2.85 3 3.1-1.7.25-2.75 1.3-3 3.1-.25-1.8-1.3-2.85-3-3.1 1.7-.25 2.75-1.3 3-3.1Z"/>'),
     customize:svg('<path d="M4 20h4l11-11-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/><path d="M4 16l4 4"/>')
   };
   let initialized = false;
@@ -44,6 +45,7 @@
             <button class="hub-nav-item" id="hubClassroom" data-hub-view="classroom" type="button"><span class="hub-icon">${icons.classroom}</span><span class="hub-nav-copy"><strong>Classroom</strong><small>Clase și materiale</small></span></button>
             <button class="hub-nav-item" id="hubMailNav" data-hub-view="mail" type="button"><span class="hub-icon">${icons.mail}</span><span class="hub-nav-copy"><strong>Mail</strong><small>Inbox și mesaje</small></span><span class="hub-nav-dot" id="hubMailDot" hidden aria-label="Mail-uri noi"></span></button>
             <button class="hub-nav-item" id="hubDriveNav" data-hub-view="drive" type="button"><span class="hub-icon">${icons.drive}</span><span class="hub-nav-copy"><strong>Drive</strong><small>Fișiere Google Drive</small></span></button>
+            <button class="hub-nav-item" id="hubGeminiNav" data-hub-view="gemini" type="button"><span class="hub-icon">${icons.gemini}</span><span class="hub-nav-copy"><strong>Gemini</strong><small>Chat și import AI</small></span></button>
             <button class="hub-nav-item" data-hub-view="customize" type="button"><span class="hub-icon">${icons.customize}</span><span class="hub-nav-copy"><strong>Personalizare</strong><small>Temă și fundal</small></span></button>
           </nav>
         </aside>
@@ -89,7 +91,7 @@
       <div class="hub-status" id="hubStatus" role="status" aria-live="polite"></div>`;
     document.body.append(root);
     const classroom = window.OrarClassroom.mount(root);
-    let planner=null;
+    let planner=null,gemini=null;
     const $ = selector => root.querySelector(selector);
     const menu=$('#hubMenu'), layer=$('#hubLayer'), page=$('#hubSubjects'), customPage=$('#hubCustomize'), list=$('#hubSubjectList');
     layer.inert = true;
@@ -297,25 +299,31 @@
     }
 
     if(window.OrarPlanner)planner=window.OrarPlanner.mount({root,getSchedule,applySchedule,getSubjects:collectSubjects,changeView:next=>changeView(next),tell,classroom,applyTheme});
+    if(window.OrarGemini)gemini=window.OrarGemini.mount({
+      root,getSchedule,applySchedule,
+      getAppContext:()=>({subjects:collectSubjects(),classroom:classroom.contextSnapshot?.()||{}}),
+      changeView:next=>changeView(next),tell
+    });
 
     const closeMenu = (restore=true) => {
       layer.classList.remove('is-open');layer.setAttribute('aria-hidden','true');layer.inert=true;
-      menu.setAttribute('aria-expanded','false');app.inert=false;page.inert=false;customPage.inert=false;classroom.element.inert=false;if(classroom.mailElement)classroom.mailElement.inert=false;if(classroom.driveElement)classroom.driveElement.inert=false;menu.inert=false;if(planner)planner.element.inert=false;
+      menu.setAttribute('aria-expanded','false');app.inert=false;page.inert=false;customPage.inert=false;classroom.element.inert=false;if(classroom.mailElement)classroom.mailElement.inert=false;if(classroom.driveElement)classroom.driveElement.inert=false;if(gemini)gemini.element.inert=false;menu.inert=false;if(planner)planner.element.inert=false;
       if(restore)menu.focus({preventScroll:true});
     };
     const openMenu = () => {
       layer.inert=false;layer.setAttribute('aria-hidden','false');layer.classList.add('is-open');menu.setAttribute('aria-expanded','true');
-      app.inert=true;page.inert=true;customPage.inert=true;classroom.element.inert=true;if(classroom.mailElement)classroom.mailElement.inert=true;if(classroom.driveElement)classroom.driveElement.inert=true;menu.inert=true;if(planner)planner.element.inert=true;$('#hubClose').focus({preventScroll:true});
+      app.inert=true;page.inert=true;customPage.inert=true;classroom.element.inert=true;if(classroom.mailElement)classroom.mailElement.inert=true;if(classroom.driveElement)classroom.driveElement.inert=true;if(gemini)gemini.element.inert=true;menu.inert=true;if(planner)planner.element.inert=true;$('#hubClose').focus({preventScroll:true});
     };
     const changeView = next => {
       view=next;closeMenu(false);if(planner){planner.hide();if(view.startsWith('planner:'))planner.show(view.slice(8));}
-      app.classList.toggle('hub-hidden',view!=='schedule');page.classList.toggle('hub-hidden',view!=='subjects');customPage.classList.toggle('hub-hidden',view!=='customize');classroom.element.classList.toggle('hub-hidden',view!=='classroom');if(classroom.mailElement)classroom.mailElement.classList.toggle('hub-hidden',view!=='mail');if(classroom.driveElement)classroom.driveElement.classList.toggle('hub-hidden',view!=='drive');
+      app.classList.toggle('hub-hidden',view!=='schedule');page.classList.toggle('hub-hidden',view!=='subjects');customPage.classList.toggle('hub-hidden',view!=='customize');classroom.element.classList.toggle('hub-hidden',view!=='classroom');if(classroom.mailElement)classroom.mailElement.classList.toggle('hub-hidden',view!=='mail');if(classroom.driveElement)classroom.driveElement.classList.toggle('hub-hidden',view!=='drive');if(gemini)gemini.element.classList.toggle('hub-hidden',view!=='gemini');
       root.querySelectorAll('[data-hub-view]').forEach(el=>el.dataset.hubView===view?el.setAttribute('aria-current','page'):el.removeAttribute('aria-current'));
       if(view==='subjects'){
         renderSubjects();page.classList.remove('is-entering');void page.offsetWidth;page.classList.add('is-entering');$('#hubHeading').focus({preventScroll:true});
       } else if(view==='classroom') classroom.show();
       else if(view==='mail') classroom.showMail?.();
       else if(view==='drive') classroom.showDrive?.();
+      else if(view==='gemini') gemini?.show();
       else if(view==='customize'){updateThemeButtons();updateBackgroundStatus();customPage.classList.remove('is-entering');void customPage.offsetWidth;customPage.classList.add('is-entering');$('#hubCustomizeHeading').focus({preventScroll:true});}
       else if(!view.startsWith('planner:'))menu.focus({preventScroll:true});
     };
