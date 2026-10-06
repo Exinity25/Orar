@@ -138,17 +138,30 @@ window.OrarPlanner={mount({root,getSchedule,applySchedule,getSubjects,changeView
  function resourcesPage(){const notes=data.notes.filter(n=>!resourceSubject||n.subject===resourceSubject),res=data.resources.filter(r=>!resourceSubject||r.subject===resourceSubject);return header('Resurse și notițe','Dosarul materiei: documente, linkuri, formule și notițe rapide.')+`<div class="pl-toolbar"><select data-control="resource-subject" aria-label="Materia">${subjectOptions(resourceSubject,true)}</select><button data-action="new-resource">+ Resursă</button><button data-action="new-note">+ Notiță</button></div><div class="pl-grid">${res.map(r=>`<article class="pl-card"><span class="pl-eyebrow">${esc(subjectName(r.subject))}</span><h3>${esc(r.title)}</h3><p class="pl-pre">${esc(r.text||'')}</p>${safe(r.url)?`<a href="${esc(safe(r.url))}" target="_blank" rel="noopener noreferrer">Deschide linkul ↗</a>`:''}${r.fileId?`<button data-action="resource-file" data-id="${esc(r.id)}">Deschide / descarcă ${esc(r.fileName)}</button><small>Fișier păstrat pe dispozitivul pe care a fost încărcat.</small>`:''}<button data-action="delete-resource" data-id="${esc(r.id)}">Șterge resursa</button></article>`).join('')}${notes.map(n=>`<article class="pl-card"><span class="pl-eyebrow">${esc(subjectName(n.subject))} · ${dateLabel(n.deadline)}</span><p class="pl-pre">${esc(n.text)}</p><div class="pl-row">${(n.tags||[]).map(t=>`<span class="pl-tag">${esc(t)}</span>`).join('')}<button data-action="edit-note" data-id="${esc(n.id)}">Editează</button><button data-action="delete-note" data-id="${esc(n.id)}">Șterge</button></div></article>`).join('')}</div><h2>Classroom · grupat după materia asociată</h2><div class="pl-grid">${data.classroom.posts.filter(m=>!resourceSubject||data.courseMap[m.courseId]===resourceSubject).sort((a,b)=>subjectName(data.courseMap[a.courseId]).localeCompare(subjectName(data.courseMap[b.courseId]))).map(materialCard).join('')}</div>`;}
  function insightsPage(){const ts=tasks(),completed=ts.filter(t=>t.status==='done').length,late=ts.filter(t=>t.deadline&&t.deadline<today()&&t.status!=='done').length,start=monday(today()),ev=busyEvents(start,7).filter(e=>e.date>=start&&e.date<addDays(start,7)),dates=Array.from({length:7},(_,i)=>addDays(start,i));return header('Statistici și timp liber','Încărcarea săptămânii și ferestrele disponibile pentru studiu.')+`<div class="pl-metrics"><article><strong>${completed}</strong><span>Teme finalizate</span></article><article><strong>${late}</strong><span>Termene depășite, încă nefinalizate</span></article><article><strong>${data.focusSessions.reduce((n,s)=>n+s.minutes,0)}</strong><span>Minute de focus încheiate</span></article></div><h2>Heatmap · săptămâna curentă</h2><div class="pl-heatmap"><span>Ora</span>${dates.map(d=>`<strong>${day(d).toLocaleDateString('ro-RO',{weekday:'short'})}</strong>`).join('')}${Array.from({length:14},(_,i)=>i+8).map(h=>`<span>${h}:00</span>${dates.map(d=>{const busy=ev.filter(e=>e.date===d&&minutes(e.start)<(h+1)*60&&minutes(e.end)>h*60);return `<div class="pl-heat ${busy.length?'pl-busy':''}" title="${esc(busy.map(e=>e.subject).join(', ')||'Liber')}">${busy.length?'●':'·'}</div>`;}).join('')}`).join('')}</div><h2>Deadline-uri pe materie</h2>${subjects().map(s=>{const n=agenda().filter(e=>e.subject===s.id&&e.date>=today()&&e.status!=='done').length;return `<div class="pl-row"><span>${esc(s.name)}</span><meter min="0" max="${Math.max(1,agenda().length)}" value="${n}"></meter><strong>${n}</strong></div>`;}).join('')}<h2>Zilele cele mai încărcate</h2>${dates.map(date=>({date,count:agenda().filter(e=>e.date===date).length+ev.filter(e=>e.date===date).length})).sort((a,b)=>b.count-a.count).map(x=>`<p>${dateLabel(x.date)}: ${x.count} activități / termene</p>`).join('')}<h2>Găsește timp liber</h2><label>Minimum minute <input data-control="free-duration" type="number" min="15" max="600" step="15" value="${roomDuration}"></label><small>Ferestre între 08:00 și 22:00, în următoarele 7 zile. Sunt excluse orele, examenele cu oră și sesiunile planificate.</small><div class="pl-grid">${Array.from({length:7},(_,i)=>addDays(today(),i)).flatMap(d=>freeSlots(busyEvents(today(),7),d,roomDuration)).map(x=>`<article class="pl-card">${dateLabel(x.date)} · ${x.start}–${x.end}</article>`).join('')||empty('Nu există ferestre suficient de lungi.')}</div>`;}
  function busyEvents(start,count){return [...lessons(start,count),...data.studySessions,...data.exams.filter(e=>e.time).map(e=>({...e,start:e.time,end:clock(Math.min(1440,minutes(e.time)+(e.duration||120)))}))];}
- let mapsLoader=null;
  function mapTarget(raw,fallback=''){
   try{
-   const u=new URL(raw),params=['query','q','destination','daddr','ll'];
-   for(const key of params){const q=u.searchParams.get(key);if(q){const coords=String(q).match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/);return coords?{lat:Number(coords[1]),lng:Number(coords[2]),query:q}:{query:q};}}
-   const href=decodeURIComponent(u.href),coord=href.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/)||href.match(/!3d(-?\d+(?:\.\d+)?).*?!4d(-?\d+(?:\.\d+)?)/);
-   if(coord)return {lat:Number(coord[1]),lng:Number(coord[2]),query:coord[1]+','+coord[2]};
-   const decoded=decodeURIComponent(u.pathname.replace(/\+/g,' ')),pathMatch=decoded.match(/\/(?:place|search)\/([^/]+)/i);
+   const u=new URL(raw),params=['query','q','destination','daddr','ll','center'];
+   for(const key of params){
+    const q=u.searchParams.get(key);
+    if(q){
+     const coords=String(q).match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/);
+     return coords?{lat:Number(coords[1]),lng:Number(coords[2]),query:q}:{query:q};
+    }
+   }
+   const href=decodeURIComponent(u.href);
+   const coord=href.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/)
+    ||href.match(/!3d(-?\d+(?:\.\d+)?).*?!4d(-?\d+(?:\.\d+)?)/)
+    ||href.match(/!2d(-?\d+(?:\.\d+)?).*?!3d(-?\d+(?:\.\d+)?)/);
+   if(coord){
+    const a=Number(coord[1]),b=Number(coord[2]);
+    const lat=Math.abs(a)<=90?a:b,lng=Math.abs(a)<=90?b:a;
+    return {lat,lng,query:lat+','+lng};
+   }
+   const decoded=decodeURIComponent(u.pathname.replace(/\+/g,' '));
+   const pathMatch=decoded.match(/\/(?:place|search)\/([^/]+)/i);
    if(pathMatch?.[1])return {query:pathMatch[1]};
   }catch{}
-  const query=String(fallback||raw||'').trim();return query?{query}:null;
+  const query=String(fallback||'').trim();return query?{query}:null;
  }
  async function resolveCampusMap(value,fallback=''){
   const raw=String(value||'').trim();if(!raw)return null;
@@ -157,46 +170,25 @@ window.OrarPlanner={mount({root,getSchedule,applySchedule,getSubjects,changeView
    try{
     const u=new URL(raw);short=/(?:maps\.app\.goo\.gl|goo\.gl\/maps)/i.test(u.hostname+u.pathname);
     if(short){
-     try{const r=await fetch(raw,{redirect:'follow',cache:'no-store'});if(r?.url&&r.url!==raw)resolved=r.url;}catch{
-      try{const r=await fetch(raw,{mode:'no-cors',redirect:'follow',cache:'no-store'});if(r?.url&&r.url!==raw)resolved=r.url;}catch{}
-     }
+     try{const r=await fetch(raw,{redirect:'follow',cache:'no-store'});if(r?.url&&r.url!==raw)resolved=r.url;}
+     catch{try{const r=await fetch(raw,{mode:'no-cors',redirect:'follow',cache:'no-store'});if(r?.url&&r.url!==raw)resolved=r.url;}catch{}}
     }
    }catch{}
   }
   if(short&&resolved===raw)return {raw,resolved,target:null,shortUnresolved:true};
-  const parsed=mapTarget(resolved,fallback||raw);
-  return {raw,resolved,target:parsed,shortUnresolved:false};
- }
- function loadMapsJs(){
-  if(window.google?.maps)return Promise.resolve(window.google.maps);
-  if(mapsLoader)return mapsLoader;
-  const key=String(window.ORAR_GOOGLE_MAPS_API_KEY||'').trim();
-  if(!key)return Promise.reject(Error('MAPS_API_KEY_MISSING'));
-  mapsLoader=new Promise((resolve,reject)=>{
-   const existing=document.querySelector('script[data-orar-google-maps]');
-   if(existing){existing.addEventListener('load',()=>resolve(window.google?.maps),{once:true});existing.addEventListener('error',()=>reject(Error('Google Maps nu s-a încărcat.')),{once:true});return;}
-   const script=document.createElement('script');script.dataset.orarGoogleMaps='1';script.async=true;script.src='https://maps.googleapis.com/maps/api/js?key='+encodeURIComponent(key)+'&v=weekly&loading=async';script.onload=()=>window.google?.maps?resolve(window.google.maps):reject(Error('Google Maps nu s-a inițializat.'));script.onerror=()=>reject(Error('Google Maps nu s-a încărcat.'));document.head.append(script);
-  }).catch(error=>{mapsLoader=null;throw error;});
-  return mapsLoader;
+  return {raw,resolved,target:mapTarget(resolved,fallback||raw),shortUnresolved:false};
  }
  async function renderCampusMap(container,value,fallback=''){
-  const info=await resolveCampusMap(value,fallback);if(!info?.target)throw Error(info?.shortUnresolved?'Linkul Google Maps scurt nu a putut fi rezolvat. Deschide linkul în browser și salvează linkul complet al locației.':'Locația nu a putut fi identificată din link.');
-  const key=String(window.ORAR_GOOGLE_MAPS_API_KEY||'').trim();
-  if(!key){
-   const query=info.target.query||[info.target.lat,info.target.lng].filter(Number.isFinite).join(',');
-   const frame=document.createElement('iframe');frame.src='https://www.google.com/maps?q='+encodeURIComponent(query)+'&output=embed&z=17';frame.title='Hartă '+fallback;frame.loading='lazy';frame.referrerPolicy='no-referrer-when-downgrade';frame.allowFullscreen=true;container.replaceChildren(frame);return {mode:'embed',info};
-  }
-  await loadMapsJs();
-  let center=Number.isFinite(info.target.lat)&&Number.isFinite(info.target.lng)?{lat:info.target.lat,lng:info.target.lng}:null;
-  if(!center){
-   const geocoder=new google.maps.Geocoder(),result=await geocoder.geocode({address:info.target.query});
-   center=result.results?.[0]?.geometry?.location||null;
-  }
-  if(!center)throw Error('Google Maps nu a găsit această locație.');
-  container.replaceChildren();
-  const map=new google.maps.Map(container,{center,zoom:17,gestureHandling:'greedy',mapTypeControl:false,fullscreenControl:true,streetViewControl:true,zoomControl:true,clickableIcons:true});
-  try{new google.maps.Marker({position:center,map,title:fallback});}catch{}
-  return {mode:'api',info,map};
+  const info=await resolveCampusMap(value,fallback);
+  if(!info?.target)throw Error(info?.shortUnresolved?'Linkul Google Maps este unul scurt și browserul nu poate afla automat destinația. Deschide linkul, apoi copiază linkul complet Google Maps și salvează-l aici.':'Locația nu a putut fi identificată din link.');
+  const query=info.target.query||[info.target.lat,info.target.lng].filter(Number.isFinite).join(',');
+  if(!query)throw Error('Locația nu a putut fi identificată din link.');
+  const frame=document.createElement('iframe');
+  frame.src='https://www.google.com/maps?q='+encodeURIComponent(query)+'&output=embed&z=17';
+  frame.title='Hartă '+fallback;frame.loading='lazy';frame.referrerPolicy='no-referrer-when-downgrade';frame.allowFullscreen=true;
+  frame.setAttribute('allow','fullscreen');
+  container.replaceChildren(frame);
+  return {mode:'embed',info};
  }
  function mapsExternalUrl(value,fallback=''){const raw=String(value||'').trim();if(/^https?:\/\//i.test(raw))return raw;const q=raw||fallback;return q?'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(q):'';}
  function campusPage(){const rooms=[...new Set(Object.values(getSchedule().classes||{}).flatMap(x=>[x.location,x.alternate?.location]).filter(Boolean))],events=lessons(today(),7);return header('Campus','Leagă sălile de locații și deschide harta direct în aplicație.')+`<div class="pl-grid">${rooms.map(room=>{const l=data.locations[room]||{};return `<form class="pl-card" data-form="room" data-room="${esc(room)}"><h2>${esc(room)}</h2><label>Corp / clădire<input name="building" value="${esc(l.building||'')}" maxlength="100"></label><label>Adresă sau link Google Maps<input name="address" value="${esc(l.address||'')}" maxlength="1000"></label><label>Minute estimate de deplasare către acest corp<input type="number" name="travel" min="0" max="180" value="${Number(l.travel)||10}"></label><div class="pl-row"><button>Salvează</button>${l.address?`<button type="button" data-action="open-campus-map" data-room="${esc(room)}">Vezi harta</button>`:''}</div></form>`;}).join('')}</div><h2>Tranziții între ore</h2>${events.slice(1).map((e,i)=>{const prev=events[i];if(prev.date!==e.date)return '';const a=data.locations[prev.location],b=data.locations[e.location];if(!a?.building||!b?.building||a.building===b.building)return '';const gap=minutes(e.start)-minutes(prev.end),travel=Number(b.travel)||10;return `<article class="pl-card"><strong>${dateLabel(e.date)} · ${esc(prev.location)} → ${esc(e.location)}</strong><p>${gap} minute între ore; ${travel} minute de deplasare estimate de tine. ${gap<travel?'Atenție: timpul poate fi insuficient.':''}</p></article>`;}).join('')||empty('Completează corpurile sălilor pentru a vedea tranzițiile.')}`;}

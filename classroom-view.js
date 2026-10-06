@@ -187,6 +187,7 @@
         const nativeGoogleDoc=mime==='application/vnd.google-apps.document'||mime==='application/vnd.google-apps.spreadsheet'||mime==='application/vnd.google-apps.presentation';
         const officeMimeDownloadable=/application\/(?:vnd\.openxmlformats-officedocument\.(?:wordprocessingml\.document|spreadsheetml\.sheet)|vnd\.ms-(?:excel|word)|msword)/i.test(mime);
         const downloadableOffice=/\.(docx?|xlsx?|xlsm|csv)$/i.test(driveName)||officeMimeDownloadable;
+        const embeddedOffice=/\.(doc|ppt|pptx|pps|ppsx|odp)$/i.test(driveName)||/(?:ms-powerpoint|presentationml\.presentation|vnd\.ms-word)(?:$|;)/i.test(mime);
         let renderName=driveName,renderMime=mime,response;
         const downloadAllowed=metadata?.capabilities?.canDownload!==false;
         downloadButton.title=downloadAllowed?'Descarcă fișierul':'Proprietarul a dezactivat descărcarea';
@@ -203,6 +204,14 @@
           viewerDownload={name:renderName,url:base+'/export?mimeType='+encodeURIComponent(target.mime),objectUrl:''};
           response=await fetch(base+'/export?mimeType='+encodeURIComponent(target.mime),{headers:{Authorization:'Bearer '+token},cache:'no-store',credentials:'omit'});
         }else{
+          if(embeddedOffice){
+            const driveBox=viewer.querySelector('[data-cr-viewer-content]');
+            const frame=document.createElement('iframe');frame.className='classroom-drive-office-preview';frame.title='Previzualizare '+driveName;
+            frame.src='https://drive.google.com/file/d/'+encodeURIComponent(fileId)+'/preview';
+            frame.setAttribute('allow','clipboard-read; clipboard-write; fullscreen');frame.setAttribute('allowfullscreen','');
+            frame.setAttribute('referrerpolicy','no-referrer-when-downgrade');
+            driveBox.replaceChildren(frame);disableViewerZoom();downloadButton.disabled=!viewerDownload;return;
+          }
           if((archive && !downloadableOffice) || (!localSupported && !downloadableOffice && !officeDocument)){
             const driveBox=viewer.querySelector('[data-cr-viewer-content]');
             const frame=document.createElement('iframe');frame.className='classroom-drive-office-preview';frame.title='Previzualizare '+driveName;
@@ -518,9 +527,36 @@
         if(/\.(mp4|m4v|mov|webm)$/i.test(name)){
           const blob=await response.blob();if(generation!==viewerGeneration)return;
           viewerObjectUrl=URL.createObjectURL(blob);
-          const wrap=document.createElement('div');wrap.className='classroom-media-stage';
-          const video=document.createElement('video');video.controls=true;video.playsInline=true;video.preload='metadata';video.src=viewerObjectUrl;wrap.append(video);
-          viewer.querySelector('[data-cr-viewer-content]').replaceChildren(wrap);disableViewerZoom();return;
+          const wrap=document.createElement('div');wrap.className='classroom-media-stage classroom-video-stage';
+          const shell=document.createElement('div');shell.className='classroom-video-shell';
+          const video=document.createElement('video');video.controls=false;video.playsInline=true;video.preload='metadata';video.src=viewerObjectUrl;video.setAttribute('webkit-playsinline','');
+          const controls=document.createElement('div');controls.className='classroom-video-controls';
+          controls.innerHTML='<button type="button" class="classroom-video-button classroom-video-play" aria-label="Redă">▶</button><span class="classroom-video-time" data-video-current>0:00</span><input class="classroom-video-progress" type="range" min="0" max="1000" value="0" step="1" aria-label="Poziția în videoclip"><span class="classroom-video-time" data-video-duration>0:00</span><button type="button" class="classroom-video-button" data-video-mute aria-label="Dezactivează sunetul">◖</button><button type="button" class="classroom-video-button classroom-video-fullscreen" data-video-fullscreen aria-label="Ecran complet">⛶</button>';
+          shell.append(video,controls);wrap.append(shell);
+          viewer.querySelector('[data-cr-viewer-content]').replaceChildren(wrap);disableViewerZoom();
+          const play=controls.querySelector('.classroom-video-play'),progress=controls.querySelector('.classroom-video-progress'),current=controls.querySelector('[data-video-current]'),duration=controls.querySelector('[data-video-duration]'),mute=controls.querySelector('[data-video-mute]'),fullscreen=controls.querySelector('[data-video-fullscreen]');
+          const mediaTime=value=>{const seconds=Math.max(0,Math.floor(Number(value)||0)),m=Math.floor(seconds/60),s=String(seconds%60).padStart(2,'0');return m+':'+s;};
+          const updatePlay=()=>{play.textContent=video.paused?'▶':'❚❚';play.setAttribute('aria-label',video.paused?'Redă':'Pauză');shell.classList.toggle('is-playing',!video.paused);};
+          const updateTime=()=>{current.textContent=mediaTime(video.currentTime);duration.textContent=mediaTime(video.duration);progress.value=Number.isFinite(video.duration)&&video.duration>0?Math.round(video.currentTime/video.duration*1000):0;};
+          play.addEventListener('click',()=>video.paused?video.play().catch(()=>{}):video.pause());
+          video.addEventListener('click',()=>video.paused?video.play().catch(()=>{}):video.pause());
+          video.addEventListener('play',updatePlay);video.addEventListener('pause',updatePlay);video.addEventListener('timeupdate',updateTime);video.addEventListener('loadedmetadata',updateTime);video.addEventListener('durationchange',updateTime);video.addEventListener('ended',updatePlay);
+          progress.addEventListener('input',()=>{if(Number.isFinite(video.duration)&&video.duration>0)video.currentTime=video.duration*Number(progress.value)/1000;});
+          mute.addEventListener('click',()=>{video.muted=!video.muted;mute.textContent=video.muted?'⌁':'◖';mute.setAttribute('aria-label',video.muted?'Activează sunetul':'Dezactivează sunetul');});
+          fullscreen.addEventListener('click',async()=>{
+            try{
+              if(typeof video.webkitEnterFullscreen==='function'){video.webkitEnterFullscreen();return;}
+              if(document.fullscreenElement){await document.exitFullscreen?.();return;}
+              if(shell.requestFullscreen){await shell.requestFullscreen();return;}
+              if(video.requestFullscreen){await video.requestFullscreen();return;}
+              throw Error('Fullscreen indisponibil');
+            }catch{
+              try{if(typeof video.webkitRequestFullscreen==='function')video.webkitRequestFullscreen();}catch{}
+            }
+          });
+          const syncFullscreen=()=>fullscreen.setAttribute('aria-label',document.fullscreenElement?'Ieși din ecran complet':'Ecran complet');
+          document.addEventListener('fullscreenchange',syncFullscreen,{once:false});
+          updatePlay();updateTime();return;
         }
         throw Error('Acest tip de fișier nu are încă viewer local.');
       }catch(error){if(generation===viewerGeneration)viewerMessage(error?.message||'Nu am putut afișa fișierul.','alert');}
