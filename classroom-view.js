@@ -685,7 +685,7 @@
       if(!token||Date.now()>=expires)throw Error('Sesiunea Google trebuie reînnoită.');
       const response=await fetch('https://gmail.googleapis.com/gmail/v1/users/me/'+path,{...options,headers:{Authorization:'Bearer '+token,...(options.headers||{})},cache:'no-store',credentials:'omit'});
       if(response.status===401){clearSession('Sesiunea Google trebuie reînnoită.',false);throw Error('Sesiunea Google trebuie reînnoită.');}
-      if(!response.ok){let payload=null;try{payload=await response.clone().json();}catch{}throw Error(payload?.error?.message||'Gmail nu a putut fi accesat.');}
+      if(!response.ok){let payload=null;try{payload=await response.clone().json();}catch{}const reason=String(payload?.error?.errors?.[0]?.reason||payload?.error?.status||''),msg=String(payload?.error?.message||''),hay=(reason+' '+msg).toLowerCase();if(hay.includes('accessnotconfigured')||hay.includes('api has not been used')||hay.includes('service disabled'))throw Error('Gmail API nu este activată pentru proiectul Google al aplicației.');if(hay.includes('insufficient')||hay.includes('scope'))throw Error('Reconectează contul Google și acceptă permisiunile pentru Mail.');throw Error(msg||'Gmail nu a putut fi accesat.');}
       if(response.status===204)return null;return response.json();
     }
     const mailHeader=(row,name)=>row?.payload?.headers?.find(h=>String(h.name).toLowerCase()===name.toLowerCase())?.value||'';
