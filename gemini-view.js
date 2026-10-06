@@ -15,7 +15,7 @@
     }catch{return [];}
   }
   function writeChats(chats){
-    const trimmed=chats.slice(0,30).map(chat=>({...chat,messages:(chat.messages||[]).slice(-120)}));
+    const trimmed=chats.slice(0,30).map(chat=>({...chat,messages:(chat.messages||[]).slice(-120).map(message=>{const {parts,...safe}=message;return safe;})}));
     localStorage.setItem(CHAT_KEY,JSON.stringify(trimmed));
     window.dispatchEvent(new CustomEvent('orar-local-change',{detail:{key:CHAT_KEY}}));
   }
@@ -107,7 +107,7 @@
         try{
           for(let i=0;i<localStorage.length;i++){
             const key=localStorage.key(i);
-            if(!key||key===API_KEY||/session|token|account/i.test(key))continue;
+            if(!key||key===API_KEY||key===CHAT_KEY||/session|token|account/i.test(key))continue;
             if(!/^(orar_|c11_1_)/.test(key))continue;
             const value=localStorage.getItem(key);
             if(value!=null&&value.length<180000)local[key]=value;
@@ -206,7 +206,7 @@
             return {type,subject,professor:String(item.professor||'').trim(),location:String(item.location||'').trim(),week,note:'',deadline:'',cardColor:'default'};
           };
           const item=normalizeItem(value);if(!item)continue;
-          const alt=normalizeItem(value.alternate);if(alt){item.alternate=alt;if(item.week==='MEREU')item.week='PARĂ';if(alt.week==='MEREU')alt.week=item.week==='PARĂ'?'IMPARĂ':'PARĂ';}
+          const alt=normalizeItem(value.alternate);if(alt){item.alternate=alt;if(item.week==='MEREU')item.week='IMPARĂ';if(alt.week==='MEREU')alt.week=item.week==='IMPARĂ'?'PARĂ':'IMPARĂ';}
           classes[key]=item;
         }
         if(!Object.keys(classes).length)throw Error('Nu am identificat nicio activitate în imagine/PDF.');
@@ -225,7 +225,7 @@
           'Cheia classes este "rand-zi": ziua 0=Luni, 1=Marți, 2=Miercuri, 3=Joi, 4=Vineri; randul corespunde poziției în vectorul times.',
           'Importă obligatoriu materia, profesorul și locația exact cum apar. Tipul trebuie să fie CURS, SEMINAR sau LABORATOR.',
           'Dacă nu este specificată săptămâna pară/impară pentru o activitate, folosește MEREU.',
-          'Dacă o celulă este împărțită printr-o diagonală și nu există etichete text pentru paritate, interpretează activitatea de DEASUPRA diagonalei ca PARĂ și activitatea de SUB diagonală ca IMPARĂ și pune a doua activitate în alternate. Dacă imaginea are etichete explicite, urmează etichetele în locul acestei convenții.',
+          'Dacă o celulă este împărțită printr-o diagonală și nu există etichete text pentru paritate, interpretează activitatea de DEASUPRA diagonalei ca IMPARĂ și activitatea de SUB diagonală ca PARĂ și pune a doua activitate în alternate. Dacă imaginea are etichete explicite, urmează etichetele în locul acestei convenții.',
           'Nu inventa profesori, săli sau materii care nu sunt lizibile. Pentru câmpurile nelizibile folosește șir gol, cu excepția subject care trebuie să existe.',
           group?('Utilizatorul a indicat grupa: '+group+'. Dacă documentul conține mai multe grupe/subgrupe, importă activitățile relevante acestei grupe și activitățile comune.'):'Nu a fost specificată o grupă; importă programul principal vizibil în document.',
           'Orarul curent este furnizat doar ca reper pentru titlu/subtitlu, nu copia clase vechi care nu apar în fișier: '+JSON.stringify({title:current.title,subtitle:current.subtitle,times:current.times})
