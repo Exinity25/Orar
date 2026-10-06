@@ -651,7 +651,11 @@
     });
     function forgetSession(){try{localStorage.removeItem(SESSION_KEY);}catch{}}
     function restoreSession(){
-      try{localStorage.removeItem(OLD_SESSION_KEY);const saved=JSON.parse(localStorage.getItem(SESSION_KEY)||'null');if(saved?.token && Number(saved.expires)>Date.now()+5000){token=saved.token;expires=Number(saved.expires);grantedScopes=String(saved.grantedScopes||'');return true;}forgetSession();}catch{forgetSession();}
+      try{
+        localStorage.removeItem(OLD_SESSION_KEY);
+        const saved=JSON.parse(localStorage.getItem(SESSION_KEY)||'null');
+        if(saved){grantedScopes=String(saved.grantedScopes||'');const savedExpires=Number(saved.expires)||0;if(saved.token&&savedExpires>Date.now()+5000){token=saved.token;expires=savedExpires;return true;}localStorage.setItem(SESSION_KEY,JSON.stringify({token:'',expires:0,grantedScopes}));}
+      }catch{forgetSession();grantedScopes='';}
       return false;
     }
     function scheduleExpiry(){
@@ -873,23 +877,48 @@
         await loadGoogle();
         client=window.google.accounts.oauth2.initTokenClient({client_id:window.ORAR_CLASSROOM_CLIENT_ID,scope:scopes.join(' '),include_granted_scopes:true,
           callback:async response=>{
-            if(response.error || !response.access_token){reauthenticating=false;message='Conectarea nu a fost finalizată. Poți încerca din nou.';renderProfile(rememberedAccount(),false);render();return;}
-            reauthenticating=false;token=response.access_token;expires=Date.now()+Number(response.expires_in||3600)*1000;grantedScopes=String(response.scope||'');saveSession();scheduleExpiry();const authSession=++session;
+            const wasSilent=authRequestSilent;authRequestSilent=false;silentRenewing=false;
+            if(response.error || !response.access_token){
+              reauthenticating=false;
+              if(wasSilent){scheduleHardExpiry();return;}
+              message='Conectarea nu a fost finalizată. Poți încerca din nou.';renderProfile(rememberedAccount(),false);render();renderMail();renderDrive();return;
+            }
+            reauthenticating=false;token=response.access_token;expires=Date.now()+Number(response.expires_in||3600)*1000;grantedScopes=String(response.scope||grantedScopes||'');saveSession();scheduleExpiry();const authSession=++session;
+            message='';renderProfile(rememberedAccount(),true);render();renderMail();renderDrive();
+            if(wasSilent){
+              if(mailScopeOk()){refreshMailSummary();if(mailVisible&&!mailLoading)refreshMail();}
+              if(driveVisible&&driveScopeOk()&&!driveLoading&&!driveItems.length)loadDrive(false);
+              return;
+            }
             loadCourses();
             try{const user=await api('https://openidconnect.googleapis.com/v1/userinfo');if(authSession!==session || !token)return;
               const account={name:user.name||'Cont Google',email:user.email||'',picture:safeURL(user.picture)||''};
-              if(account.email){try{localStorage.setItem(ACCOUNT_KEY,JSON.stringify(account));}catch{}renderProfile(account,true);} restoreCloud().catch(()=>{});if(mailScopeOk()){refreshMailSummary();if(mailVisible)refreshMail();}else if(mailVisible)renderMail();
+              if(account.email){try{localStorage.setItem(ACCOUNT_KEY,JSON.stringify(account));}catch{}renderProfile(account,true);} restoreCloud().catch(()=>{});if(mailScopeOk()){refreshMailSummary();if(mailVisible)refreshMail();}else if(mailVisible)renderMail();if(driveVisible&&driveScopeOk())loadDrive(false);
             }catch{renderProfile(rememberedAccount(),true);}
-          },error_callback:()=>{reauthenticating=false;message='Reconectarea Google nu a putut fi făcută automat. Apasă din nou pe conectare.';renderProfile(rememberedAccount(),false);render();}});
+          },error_callback:()=>{
+            const wasSilent=authRequestSilent;authRequestSilent=false;silentRenewing=false;reauthenticating=false;
+            if(wasSilent){scheduleHardExpiry();return;}
+            message='Reconectarea Google nu a putut fi făcută automat. Apasă din nou pe conectare.';renderProfile(rememberedAccount(),false);render();renderMail();renderDrive();
+          }});
         renderProfile(rememberedAccount(),Boolean(token&&Date.now()<expires));
-        render();
-      }catch(e){message=e.message;renderProfile(rememberedAccount(),Boolean(token&&Date.now()<expires));render();}
+        render();renderMail();renderDrive();
+        if(!token&&rememberedAccount())setTimeout(()=>requestAccess(true,true),0);
+      }catch(e){message=e.message;renderProfile(rememberedAccount(),Boolean(token&&Date.now()<expires));render();renderMail();renderDrive();}
     }
-    function requestAccess(preferRemembered=false){
-      if(!client || reauthenticating)return;
-      const remembered=rememberedAccount();reauthenticating=true;message='';renderProfile(remembered,Boolean(token&&Date.now()<expires));render();
-      const options=preferRemembered&&remembered?{prompt:'',login_hint:remembered.email}:{prompt:'select_account'};
-      try{client.requestAccessToken(options);}catch{reauthenticating=false;renderProfile(rememberedAccount(),false);render();}
+    function hasAllRequestedScopes(){
+      const granted=new Set(String(grantedScopes||'').split(/\s+/).filter(Boolean));
+      return scopes.every(scope=>granted.has(scope));
+    }
+    function requestAccess(preferRemembered=false,silent=false){
+      if(!client||reauthenticating||silentRenewing)return;
+      const remembered=rememberedAccount();authRequestSilent=silent;
+      if(silent)silentRenewing=true;else{reauthenticating=true;message='';renderProfile(remembered,Boolean(token&&Date.now()<expires));render();}
+      const options=silent&&remembered?{prompt:'',login_hint:remembered.email}:preferRemembered&&remembered?{prompt:hasAllRequestedScopes()?'':'consent',login_hint:remembered.email}:{prompt:'select_account'};
+      try{client.requestAccessToken(options);}catch{
+        authRequestSilent=false;silentRenewing=false;reauthenticating=false;
+        if(silent){scheduleHardExpiry();return;}
+        renderProfile(rememberedAccount(),false);render();
+      }
     }
     page.addEventListener('click',e=>{
       const preview=e.target.closest('[data-cr-preview]');if(preview){openViewer(preview.dataset.crPreview,preview.dataset.crPreviewTitle);return;}
@@ -919,6 +948,7 @@
       return {courses:courseList.map(c=>({id:String(c.id),name:c.name})),posts:items,updated:new Date().toISOString()};
     }
     window.addEventListener('orar-open-drive',e=>{const id=String(e.detail?.id||''),title=String(e.detail?.title||'Fișier Google Drive');if(id)openViewer(id,title);});
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&client&&rememberedAccount()&&(!token||expires-Date.now()<2*60*1000))requestAccess(true,true);});
     const restored=restoreSession();renderProfile(rememberedAccount(),restored);if(restored){scheduleExpiry();restoreCloud().catch(()=>{});if(mailScopeOk())refreshMailSummary();}
     render();renderMail();renderDrive();prepareSignIn();setInterval(()=>{if(mailScopeOk())refreshMailSummary();},5*60000);
     return {element:page,mailElement:mailPage,driveElement:drivePage,syncPlanner,openFile:openViewer,openDriveLink,isConnected:()=>Boolean(token&&Date.now()<expires),showDrive(){driveVisible=true;renderDrive();prepareSignIn();if(driveScopeOk()&&!driveLoading&&!driveItems.length)loadDrive(false);drivePage.classList.remove('is-entering');void drivePage.offsetWidth;drivePage.classList.add('is-entering');drivePage.querySelector('h1')?.focus({preventScroll:true});},showMail(){mailVisible=true;renderMail();prepareSignIn();if(mailScopeOk()&&!mailLoading&&!mailItems.length)refreshMail();mailPage.classList.remove('is-entering');void mailPage.offsetWidth;mailPage.classList.add('is-entering');mailPage.querySelector('h1')?.focus({preventScroll:true});},show(){
