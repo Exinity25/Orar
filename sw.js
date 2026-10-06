@@ -1,4 +1,4 @@
-const CACHE = 'orar-v65-overlap-liquid-glass';
+const CACHE = 'orar-v66-mobile-full-bleed';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './student-hub.css', './student-hub.js', './classroom-config.js', './classroom-view.js', './student-planner.js', './gemini-view.js', './student-planner.css', './theme-glass.css'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
