@@ -2010,15 +2010,22 @@
       clearTimeout(orientationRecoveryTimer);
       const appScroller=document.querySelector('.app');
       const previousScrollTop=appScroller?.scrollTop||0;
+      document.body.classList.add('orientation-recovering');
+      window.dispatchEvent(new CustomEvent('orar-orientation-recover'));
+      blurScheduleEditor();
       orientationRecoveryTimer=setTimeout(()=>{
-        blurScheduleEditor();
         resetScheduleInteractionState();
         render();
         requestAnimationFrame(()=>{
           resetScheduleInteractionState();
+          void document.documentElement.offsetHeight;
           appScroller?.scrollTo({top:previousScrollTop,left:0,behavior:'auto'});
+          requestAnimationFrame(()=>{
+            document.body.classList.remove('orientation-recovering');
+            window.dispatchEvent(new CustomEvent('orar-orientation-recover'));
+          });
         });
-      },180);
+      },220);
     };
     window.addEventListener('orientationchange',recoverScheduleAfterRotation,{passive:true});
     window.addEventListener('resize',()=>{
