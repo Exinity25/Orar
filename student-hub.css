@@ -1577,10 +1577,11 @@ body[data-orar-theme="custom"].orar-custom-light{color-scheme:light}
 
 
 
-/* v71 iOS keyboard isolation.
-   Normal app pages keep the pre-keyboard viewport height. Only Gemini is
-   allowed to follow 100dvh while its keyboard is visible, so leaving Gemini
-   cannot carry a shortened viewport into the rest of the app. */
+/* v72 iOS Home Screen fullscreen geometry.
+   Do not derive the app root from vh/dvh or JS measurements. Installed iOS
+   web apps can change those values after launch and after the keyboard closes.
+   A fixed inset root tracks the actual WebKit viewport and paints through the
+   home-indicator region when viewport-fit=cover is active. */
 body:not([data-orar-theme]):not(.orar-custom-background)::before{
   background-image:none!important;
   background-color:var(--bg,#05070c)!important;
@@ -1590,13 +1591,31 @@ body:not([data-orar-theme]):not(.orar-custom-background)::after{
 }
 
 @supports (-webkit-touch-callout:none){
-  html,body{background-color:var(--bg,#05070c)!important}
+  html{
+    width:100%;
+    height:100%;
+    min-height:100%;
+    overflow:hidden;
+    background:var(--bg,#05070c)!important;
+  }
+  body{
+    position:fixed!important;
+    inset:0!important;
+    width:auto!important;
+    height:auto!important;
+    min-height:0!important;
+    max-height:none!important;
+    overflow:hidden!important;
+    background:var(--bg,#05070c)!important;
+  }
   body::before,
   body::after{
-    top:0!important;
-    bottom:auto!important;
-    height:calc(var(--ios-stable-viewport-height,100lvh) + env(safe-area-inset-bottom))!important;
+    position:fixed!important;
+    inset:0!important;
+    width:auto!important;
+    height:auto!important;
     min-height:0!important;
+    max-height:none!important;
     border-radius:0!important;
     -webkit-mask-image:none!important;
     mask-image:none!important;
@@ -1604,22 +1623,22 @@ body:not([data-orar-theme]):not(.orar-custom-background)::after{
     transform:translateZ(0);
   }
 
-  /* Pages outside Gemini never inherit the keyboard-shortened dvh. */
   .app,
-  .hub-page:not(.gemini-page){
-    height:var(--ios-stable-viewport-height,100lvh)!important;
-    min-height:var(--ios-stable-viewport-height,100lvh)!important;
-    max-height:var(--ios-stable-viewport-height,100lvh)!important;
+  .hub-page{
+    position:fixed!important;
+    inset:0!important;
+    width:auto!important;
+    height:auto!important;
+    min-height:0!important;
+    max-height:none!important;
   }
 
-  /* Gemini alone tracks the live keyboard viewport. */
   .gemini-page{
-    height:100dvh!important;
-    min-height:100dvh!important;
-    max-height:100dvh!important;
+    overflow:hidden!important;
   }
   .gemini-shell,
   .gemini-main{
+    width:100%!important;
     height:100%!important;
     min-height:0!important;
     max-height:none!important;
