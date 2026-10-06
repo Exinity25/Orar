@@ -1948,23 +1948,47 @@
       showToast(detail.message||(detail.ok?'Sincronizare finalizată':'Sincronizarea nu a reușit'));
     });
 
-    editToggle.addEventListener('click', () => {
-      if(editing) saveData('Salvat');
-      if(!editing && scheduleViewMode==='combined'){scheduleViewMode='single';scheduleBook.view='single';}
-      editing = !editing;
-      expandedKey = null;
-      document.body.classList.toggle('editing', editing);
-      editToggle.setAttribute('aria-pressed', String(editing));
-      editToggle.setAttribute('aria-label', editing ? 'Salvează și revino la modul vizualizare' : 'Activează modul de editare');
-      editToggle.title = editing ? 'Salvează' : 'Editează orarul';
+    const blurScheduleEditor=()=>{
+      const active=document.activeElement;
+      if(!active)return;
+      if(active===scheduleTitle||active===scheduleSubtitle||active.closest?.('#scheduleGrid')){
+        try{active.blur();}catch{}
+      }
+    };
+    const resetScheduleInteractionState=()=>{
+      document.body.classList.toggle('editing',editing);
       [scheduleTitle,scheduleSubtitle].forEach(el=>{
         el.contentEditable=editing?'true':'false';
         el.setAttribute('aria-label',el===scheduleTitle?'Titlul orarului':'Subtitlul orarului');
         el.spellcheck=false;
+        if(!editing)delete el.dataset.undoCaptured;
       });
-      if(!editing)[scheduleTitle,scheduleSubtitle].forEach(el=>delete el.dataset.undoCaptured);
+      grid.querySelectorAll('.card-color-picker[open]').forEach(picker=>picker.open=false);
+      if(gridMotion){try{gridMotion.cancel();}catch{}gridMotion=null;}
+      try{grid.getAnimations().forEach(animation=>animation.cancel());}catch{}
+      grid.style.removeProperty('transform');
+      grid.style.removeProperty('opacity');
+      grid.style.removeProperty('pointer-events');
+    };
+
+    editToggle.addEventListener('click', () => {
+      const leavingEdit=editing;
+      if(leavingEdit){
+        blurScheduleEditor();
+        saveData('Salvat');
+      }
+      if(!editing && scheduleViewMode==='combined'){scheduleViewMode='single';scheduleBook.view='single';}
+      editing = !editing;
+      expandedKey = null;
+      resetScheduleInteractionState();
+      editToggle.setAttribute('aria-pressed', String(editing));
+      editToggle.setAttribute('aria-label', editing ? 'Salvează și revino la modul vizualizare' : 'Activează modul de editare');
+      editToggle.title = editing ? 'Salvează' : 'Editează orarul';
       render();
-      animateSchedule();
+      requestAnimationFrame(()=>{
+        resetScheduleInteractionState();
+        animateSchedule();
+      });
       showToast(editing ? 'Mod editare activ' : 'Orarul a fost salvat');
       if(!editing && pendingAppUpdate) location.reload();
     });
@@ -1980,11 +2004,30 @@
 
 
     let lastCompactOverlapView=isCompactOverlapView();
+    let lastLandscapePhone=isLandscapePhone();
+    let orientationRecoveryTimer=0;
+    const recoverScheduleAfterRotation=()=>{
+      clearTimeout(orientationRecoveryTimer);
+      orientationRecoveryTimer=setTimeout(()=>{
+        blurScheduleEditor();
+        resetScheduleInteractionState();
+        render();
+        requestAnimationFrame(()=>{
+          resetScheduleInteractionState();
+          document.querySelector('.app')?.scrollTo({top:0,left:0,behavior:'auto'});
+        });
+      },180);
+    };
+    window.addEventListener('orientationchange',recoverScheduleAfterRotation,{passive:true});
     window.addEventListener('resize',()=>{
       const nextCompactOverlapView=isCompactOverlapView();
-      if(nextCompactOverlapView===lastCompactOverlapView)return;
+      const nextLandscapePhone=isLandscapePhone();
+      const layoutModeChanged=nextCompactOverlapView!==lastCompactOverlapView;
+      const orientationChanged=nextLandscapePhone!==lastLandscapePhone;
       lastCompactOverlapView=nextCompactOverlapView;
-      if(!editing)render();
+      lastLandscapePhone=nextLandscapePhone;
+      if(orientationChanged){recoverScheduleAfterRotation();return;}
+      if(layoutModeChanged&&!editing)render();
     },{passive:true});
 
     scheduleTitle.textContent=data.title;
