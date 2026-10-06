@@ -2006,6 +2006,26 @@
     let lastCompactOverlapView=isCompactOverlapView();
     let lastLandscapePhone=isLandscapePhone();
     let orientationRecoveryTimer=0;
+    const forceIosTapGeometryRebuild=()=>{
+      const isiOS=Boolean(window.CSS&&CSS.supports&&CSS.supports('-webkit-touch-callout','none'));
+      if(!isiOS)return;
+      const nodes=[document.querySelector('.app'),document.getElementById('studentHub')].filter(Boolean);
+      const saved=nodes.map(node=>({
+        node,
+        display:node.style.display,
+        visibility:node.style.visibility
+      }));
+      nodes.forEach(node=>{node.style.visibility='hidden';node.style.display='none';});
+      void document.body.offsetHeight;
+      requestAnimationFrame(()=>{
+        saved.forEach(({node,display})=>{node.style.display=display;});
+        void document.body.offsetHeight;
+        requestAnimationFrame(()=>{
+          saved.forEach(({node,visibility})=>{node.style.visibility=visibility;});
+          void document.body.offsetHeight;
+        });
+      });
+    };
     const recoverScheduleAfterRotation=()=>{
       clearTimeout(orientationRecoveryTimer);
       const appScroller=document.querySelector('.app');
@@ -2023,6 +2043,7 @@
           requestAnimationFrame(()=>{
             document.body.classList.remove('orientation-recovering');
             window.dispatchEvent(new CustomEvent('orar-orientation-recover'));
+            forceIosTapGeometryRebuild();
           });
         });
       },220);
