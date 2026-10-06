@@ -96,44 +96,6 @@
     const menu=$('#hubMenu'), layer=$('#hubLayer'), page=$('#hubSubjects'), customPage=$('#hubCustomize'), list=$('#hubSubjectList');
     layer.inert = true;
 
-    /* Keep the painted iOS viewport stable while the software keyboard resizes
-       the visual viewport. The value is allowed to grow during keyboard close,
-       but it never shrinks unless the device orientation really changes. */
-    const hasIosViewportQuirk=Boolean(window.CSS&&CSS.supports&&CSS.supports('-webkit-touch-callout','none'));
-    let iosStableViewportHeight=0,iosStableViewportWidth=0,iosViewportTimer=0;
-    const measuredViewportHeight=()=>{
-      const vv=window.visualViewport;
-      return Math.max(
-        Math.round(window.innerHeight||0),
-        Math.round(document.documentElement.clientHeight||0),
-        Math.round(vv?(vv.height+vv.offsetTop):0)
-      );
-    };
-    const syncIosViewport=(reset=false)=>{
-      if(!hasIosViewportQuirk)return;
-      const width=Math.round(window.innerWidth||document.documentElement.clientWidth||0),height=measuredViewportHeight();
-      if(!height)return;
-      const orientationChanged=iosStableViewportWidth&&Math.abs(width-iosStableViewportWidth)>80;
-      if(reset||orientationChanged||!iosStableViewportHeight)iosStableViewportHeight=height;
-      else iosStableViewportHeight=Math.max(iosStableViewportHeight,height);
-      iosStableViewportWidth=width;
-      document.documentElement.style.setProperty('--ios-stable-viewport-height',iosStableViewportHeight+'px');
-    };
-    const settleIosViewport=()=>{
-      if(!hasIosViewportQuirk)return;
-      syncIosViewport();
-      clearTimeout(iosViewportTimer);
-      iosViewportTimer=setTimeout(()=>syncIosViewport(),260);
-    };
-    if(hasIosViewportQuirk){
-      syncIosViewport(true);
-      window.addEventListener('resize',settleIosViewport,{passive:true});
-      window.visualViewport?.addEventListener('resize',settleIosViewport,{passive:true});
-      window.visualViewport?.addEventListener('scroll',settleIosViewport,{passive:true});
-      window.addEventListener('orientationchange',()=>setTimeout(()=>syncIosViewport(true),320),{passive:true});
-      window.addEventListener('pageshow',()=>setTimeout(()=>syncIosViewport(true),0),{passive:true});
-      document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(()=>syncIosViewport(true),0);});
-    }
     const THEME_KEY='orar_theme_v1',BG_MODE_KEY='orar_background_mode_v1',BG_NAME_KEY='orar_background_name_v1',CUSTOM_ACCENT_KEY='orar_custom_accent_v1',CUSTOM_APPEARANCE_KEY='orar_custom_appearance_v1';
     const THEMES=new Set(['default','ice','ocean','forest','violet','custom']);
     const themeMeta={default:'#080b12',ice:'#f4f8ff',ocean:'#071626',forest:'#07130e',violet:'#120b1d',custom:'#080b12'};
@@ -363,18 +325,9 @@
       const leavingGemini=view==='gemini'&&next!=='gemini';
       if(leavingGemini&&gemini?.element?.contains(document.activeElement)){
         try{document.activeElement.blur();}catch{}
-        settleIosViewport();
-        setTimeout(settleIosViewport,80);
       }
       view=next;closeMenu(false);if(planner){planner.hide();if(view.startsWith('planner:'))planner.show(view.slice(8));}
       app.classList.toggle('hub-hidden',view!=='schedule');page.classList.toggle('hub-hidden',view!=='subjects');customPage.classList.toggle('hub-hidden',view!=='customize');classroom.element.classList.toggle('hub-hidden',view!=='classroom');if(classroom.mailElement)classroom.mailElement.classList.toggle('hub-hidden',view!=='mail');if(classroom.driveElement)classroom.driveElement.classList.toggle('hub-hidden',view!=='drive');if(gemini)gemini.element.classList.toggle('hub-hidden',view!=='gemini');
-      if(leavingGemini&&hasIosViewportQuirk){
-        requestAnimationFrame(()=>{
-          settleIosViewport();
-          void document.documentElement.offsetHeight;
-          requestAnimationFrame(settleIosViewport);
-        });
-      }
       root.querySelectorAll('[data-hub-view]').forEach(el=>el.dataset.hubView===view?el.setAttribute('aria-current','page'):el.removeAttribute('aria-current'));
       if(view==='subjects'){
         renderSubjects();page.classList.remove('is-entering');void page.offsetWidth;page.classList.add('is-entering');$('#hubHeading').focus({preventScroll:true});
@@ -387,11 +340,6 @@
     };
     menu.addEventListener('click',openMenu);$('#hubClose').addEventListener('click',()=>closeMenu());$('#hubBackdrop').addEventListener('click',()=>closeMenu());
     root.querySelectorAll('[data-hub-view]').forEach(el=>el.addEventListener('click',()=>changeView(el.dataset.hubView)));
-    if(hasIosViewportQuirk&&gemini?.element){
-      gemini.element.addEventListener('focusout',event=>{
-        if(event.target.closest?.('.gemini-composer textarea'))setTimeout(settleIosViewport,80);
-      },true);
-    }
     layer.addEventListener('keydown',e=>{
       if(e.key==='Escape'){e.preventDefault();closeMenu();}
       if(e.key==='Tab'){
