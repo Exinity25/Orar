@@ -418,17 +418,18 @@ body::before{min-height:calc(100dvh + env(safe-area-inset-bottom))}
 }
 
 
-/* Requested polish: bottom blend, liquid glass, ICE details, compact color grid. */
+/* Requested polish: full-bleed mobile background, liquid glass, ICE details, compact color grid. */
 
-/* Soften the hand-off into the iPhone's black bottom area without touching the existing top fade. */
+/* Keep every section full-bleed through the iPhone home-indicator safe area.
+   Do not mask or round the bottom edge: that exposed the body's dark background
+   as a persistent black strip below the active view. */
 @media (max-width:900px), (hover:none) and (pointer:coarse){
-  body{background:#020409!important}
   body::before{
-    border-radius:0 0 26px 26px;
-    -webkit-mask-image:linear-gradient(to bottom,#000 0%,#000 calc(100% - 72px),rgba(0,0,0,.94) calc(100% - 52px),rgba(0,0,0,.52) calc(100% - 24px),transparent 100%);
-    mask-image:linear-gradient(to bottom,#000 0%,#000 calc(100% - 72px),rgba(0,0,0,.94) calc(100% - 52px),rgba(0,0,0,.52) calc(100% - 24px),transparent 100%);
+    border-radius:0;
+    -webkit-mask-image:none;
+    mask-image:none;
   }
-  .app,.hub-page{border-radius:0 0 26px 26px}
+  .app,.hub-page{border-radius:0}
 }
 
 /* Apple-like liquid glass for Subjects and Classroom cards. */
