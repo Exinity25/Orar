@@ -735,7 +735,7 @@
       box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 42%,transparent),0 0 18px color-mix(in srgb,var(--accent) 13%,transparent)
     }
     .combined-slot{display:grid;align-content:stretch;gap:5px;padding:5px;overflow:visible}
-    .combined-slot .class-card{min-height:0;height:100%;border-radius:8px;padding:8px 10px 8px 12px;cursor:default}
+    .combined-slot .class-card{min-height:0;height:auto;border-radius:8px;padding:8px 10px 8px 12px;cursor:default}
     .combined-slot .class-card:hover{transform:none}
     .combined-slot .schedule-source{
       display:inline-flex;align-items:center;width:max-content;max-width:100%;margin-bottom:4px;padding:3px 6px;border-radius:999px;
@@ -1663,7 +1663,6 @@
     }
 
     function renderScheduleManager(){
-      const colorOptions=SCHEDULE_ACCENTS.map(color=>'<option value="'+color+'">'+CARD_TONE_LABELS[color]+'</option>').join('');
       scheduleManagerDialog.innerHTML=`<div class="pl-dialog-head"><h2>Orare</h2><button type="button" data-schedule-manager-close aria-label="Închide">✕</button></div>
         <p>Fiecare orar poate avea propriul nume și accent. În modul combinat, activitățile păstrează accentul orarului din care provin.</p>
         <div class="schedule-manager-list">${scheduleBook.schedules.map(entry=>`<section class="schedule-manager-row" data-schedule-row="${escapeHtml(entry.id)}">
