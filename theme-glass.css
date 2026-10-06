@@ -171,3 +171,17 @@ html body[data-ui-glass][data-ui-glass] .overlap-piece .overlap-mini-meta .meta-
   color:inherit!important;
   stroke:currentColor!important;
 }
+
+/* Combined timetable only: keep the same accent-tinted surface and 4px bar on every occupied card. */
+html body[data-ui-glass][data-ui-glass] .combined-class-card{
+  --piece-accent:var(--card-custom,var(--accent));
+  border-left:0!important;
+  background:
+    radial-gradient(circle at 14% 14%,color-mix(in srgb,var(--piece-accent) 18%,transparent),transparent 46%),
+    linear-gradient(145deg,color-mix(in srgb,var(--piece-accent) 9%,rgba(var(--glass-raised),.84)),rgba(var(--glass-base),.74) 74%)!important;
+  box-shadow:inset 0 1px 0 var(--glass-highlight)!important;
+}
+html body[data-ui-glass][data-ui-glass] .combined-class-card::before{
+  background:var(--piece-accent)!important;
+  box-shadow:0 0 10px color-mix(in srgb,var(--piece-accent) 42%,transparent)!important;
+}
