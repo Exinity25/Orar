@@ -676,6 +676,7 @@
       if(forgetAccount){try{localStorage.removeItem(ACCOUNT_KEY);}catch{}}
       renderProfile(rememberedAccount(),false);
       render();renderMail();renderDrive();
+      if(!forgetAccount&&client&&rememberedAccount())setTimeout(()=>requestAccess(true,true),250);
     }
     function logout(){const old=token;clearSession('',true);if(old && window.google?.accounts?.oauth2)window.google.accounts.oauth2.revoke(old,()=>{});}
     profile.addEventListener('click',e=>{
@@ -902,7 +903,7 @@
           }});
         renderProfile(rememberedAccount(),Boolean(token&&Date.now()<expires));
         render();renderMail();renderDrive();
-        if(!token&&rememberedAccount())setTimeout(()=>requestAccess(true,true),0);
+        if(token)scheduleExpiry();else if(rememberedAccount())setTimeout(()=>requestAccess(true,true),0);
       }catch(e){message=e.message;renderProfile(rememberedAccount(),Boolean(token&&Date.now()<expires));render();renderMail();renderDrive();}
     }
     function hasAllRequestedScopes(){
