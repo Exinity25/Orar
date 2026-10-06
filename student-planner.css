@@ -61,3 +61,7 @@ body[data-orar-theme=ice] .planner-page{padding:0;color:#17263b}body[data-orar-t
   #plSearchResults button{padding:8px 11px;min-height:34px}
   .pl-campus-map{height:56dvh}
 }
+
+.pl-attendance-toggle{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0}
+.pl-attendance-toggle button{width:100%}
+.pl-attendance-toggle button.is-active{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent),0 0 12px color-mix(in srgb,var(--accent) 28%,transparent)}
