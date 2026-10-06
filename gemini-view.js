@@ -221,4 +221,39 @@
         const hiddenInstruction=[
           'Analizează imaginea/PDF-ul cu orarul universitar și transformă-l în JSON pentru aplicația Orar.',
           'Răspunde EXCLUSIV cu JSON valid, fără markdown și fără explicații.',
-          'Schema exactă: {"title":"...","subtitle":"...","times":[["08:00","09:30"]],"classes":{"0-0":{"type":"CURS","subject":"...","professor":"...","location":"...","week":"MEREU","alternate":{"type":"LABORATOR","
+          'Schema exactă: {"title":"...","subtitle":"...","times":[["08:00","09:30"]],"classes":{"0-0":{"type":"CURS","subject":"...","professor":"...","location":"...","week":"MEREU","alternate":{"type":"LABORATOR","subject":"...","professor":"...","location":"...","week":"IMPARĂ"}}}}.',
+          'Cheia classes este "rand-zi": ziua 0=Luni, 1=Marți, 2=Miercuri, 3=Joi, 4=Vineri; randul corespunde poziției în vectorul times.',
+          'Importă obligatoriu materia, profesorul și locația exact cum apar. Tipul trebuie să fie CURS, SEMINAR sau LABORATOR.',
+          'Dacă nu este specificată săptămâna pară/impară pentru o activitate, folosește MEREU.',
+          'Dacă o celulă este împărțită printr-o diagonală și nu există etichete text pentru paritate, interpretează activitatea de DEASUPRA diagonalei ca PARĂ și activitatea de SUB diagonală ca IMPARĂ și pune a doua activitate în alternate. Dacă imaginea are etichete explicite, urmează etichetele în locul acestei convenții.',
+          'Nu inventa profesori, săli sau materii care nu sunt lizibile. Pentru câmpurile nelizibile folosește șir gol, cu excepția subject care trebuie să existe.',
+          group?('Utilizatorul a indicat grupa: '+group+'. Dacă documentul conține mai multe grupe/subgrupe, importă activitățile relevante acestei grupe și activitățile comune.'):'Nu a fost specificată o grupă; importă programul principal vizibil în document.',
+          'Orarul curent este furnizat doar ca reper pentru titlu/subtitlu, nu copia clase vechi care nu apar în fișier: '+JSON.stringify({title:current.title,subtitle:current.subtitle,times:current.times})
+        ].join('\n');
+        const part=await filePart(file);
+        const result=await generate(key,[{role:'user',parts:[{text:hiddenInstruction},part]}],'Ești un extractor strict de orare universitare. Nu adăuga comentarii.',true);
+        let parsed;try{parsed=JSON.parse(result.replace(/^```json\s*|```$/g,'').trim());}catch{throw Error('Gemini a returnat un răspuns care nu poate fi importat. Încearcă din nou cu o poză mai clară.');}
+        const schedule=cleanScheduleObject(parsed,current);
+        applySchedule(schedule);
+        tell?.('Orarul a fost importat cu Gemini.');
+        return schedule;
+      }
+
+      function openScheduleImport(){
+        importDialog.innerHTML=`<div class="pl-dialog-head"><h2>Importă orarul cu Gemini</h2><button type="button" data-gemini-dialog-close aria-label="Închide">✕</button></div>
+          <form data-gemini-import-form>
+            <label>Poză sau PDF<input name="file" type="file" accept="image/*,.pdf,application/pdf" required></label>
+            <label>Grupă / subgrupă <span class="gemini-optional">(opțional)</span><input name="group" maxlength="80" placeholder="ex. C_11/1"></label>
+            <small>Gemini va încerca să importe materiile, profesorii, sălile și săptămânile pare/impare direct în Orar.</small>
+            <button class="hub-primary">Importă automat</button>
+          </form>`;
+        if(!importDialog.open)importDialog.showModal();
+      }
+
+      page.addEventListener('click',e=>{
+        if(e.target.closest('[data-gemini-collapse]')){collapsed=!collapsed;render();return;}
+        if(e.target.closest('[data-gemini-new]')){createChat();return;}
+        const chatButton=e.target.closest('[data-gemini-chat]');if(chatButton){activeId=chatButton.dataset.geminiChat;render();return;}
+        const del=e.target.closest('[data-gemini-delete]');if(del){deleteChat(del.dataset.geminiDelete);return;}
+        if(e.target.closest('[data-gemini-key]')){openKeyDialog();return;}
+        const remove=e.target.closest('[data-gemini-remove-file]');if(remove){pendingFiles.splice(Number(remove.dataset.geminiRemoveFile
