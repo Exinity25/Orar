@@ -2,7 +2,6 @@
   'use strict';
 
   const CHAT_KEY='orar_gemini_chats_v1';
-  const API_KEY='orar_gemini_api_key_v1';
   const MODEL='gemini-2.5-flash';
   const MAX_FILE_BYTES=12*1024*1024;
   const esc=(value='')=>String(value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -18,13 +17,6 @@
     const trimmed=chats.slice(0,30).map(chat=>({...chat,messages:(chat.messages||[]).slice(-120).map(message=>{const {parts,...safe}=message;return safe;})}));
     localStorage.setItem(CHAT_KEY,JSON.stringify(trimmed));
     window.dispatchEvent(new CustomEvent('orar-local-change',{detail:{key:CHAT_KEY}}));
-  }
-  const apiKey=()=>{try{return String(localStorage.getItem(API_KEY)||'').trim();}catch{return '';}};
-  function saveApiKey(value){
-    try{
-      const clean=String(value||'').trim();
-      if(clean)localStorage.setItem(API_KEY,clean);else localStorage.removeItem(API_KEY);
-    }catch{}
   }
   function linkify(text=''){
     return esc(text).replace(/(https?:\/\/[^\s<]+)/g,'<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
@@ -46,10 +38,10 @@
     const parts=payload?.candidates?.[0]?.content?.parts||[];
     return parts.map(part=>part?.text||'').filter(Boolean).join('\n').trim();
   }
-  async function generate(key,contents,systemText='',json=false){
+  async function generate(accessToken,contents,systemText='',json=false){
     const response=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(MODEL)+':generateContent',{
       method:'POST',
-      headers:{'Content-Type':'application/json','x-goog-api-key':key},
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+accessToken},
       body:JSON.stringify({
         systemInstruction:systemText?{parts:[{text:systemText}]}:undefined,
         contents,
@@ -59,7 +51,7 @@
     let payload=null;try{payload=await response.json();}catch{}
     if(!response.ok){
       const message=String(payload?.error?.message||'Gemini nu a răspuns.');
-      if(response.status===400&&/api key/i.test(message))throw Error('Cheia Gemini nu este validă.');
+      if(response.status===401||response.status===403)throw Error('Gemini nu este autorizat pentru contul Google. Reconectează contul și acceptă permisiunea Gemini.');
       if(response.status===429)throw Error('Ai atins limita Gemini Free Tier. Încearcă din nou mai târziu.');
       throw Error(message);
     }
@@ -69,7 +61,7 @@
   }
 
   window.OrarGemini={
-    mount({root,getSchedule,applySchedule,getAppContext,changeView,tell}){
+    mount({root,getSchedule,applySchedule,getAppContext,getGoogleToken,requestGoogleAccess,changeView,tell}){
       const page=document.createElement('main');
       page.id='hubGeminiPage';
       page.className='hub-page hub-hidden gemini-page';
@@ -107,7 +99,7 @@
         try{
           for(let i=0;i<localStorage.length;i++){
             const key=localStorage.key(i);
-            if(!key||key===API_KEY||key===CHAT_KEY||/session|token|account/i.test(key))continue;
+            if(!key||key==='orar_gemini_api_key_v1'||key===CHAT_KEY||/session|token|account/i.test(key))continue;
             if(!/^(orar_|c11_1_)/.test(key))continue;
             const value=localStorage.getItem(key);
             if(value!=null&&value.length<180000)local[key]=value;
@@ -144,10 +136,10 @@
               <button class="hub-primary gemini-new-chat" type="button" data-gemini-new><span>＋</span><strong>Chat nou</strong></button>
             </div>
             <div class="gemini-chat-list">${chats.map(item=>`<div class="gemini-chat-row ${item.id===activeId?'is-active':''}"><button type="button" data-gemini-chat="${esc(item.id)}"><span>◌</span><strong>${esc(item.title||'Chat nou')}</strong></button><button type="button" class="gemini-chat-delete" data-gemini-delete="${esc(item.id)}" aria-label="Șterge chat">×</button></div>`).join('')}</div>
-            <button class="gemini-key-button" type="button" data-gemini-key title="Cheie Gemini"><span>⌘</span><strong>${apiKey()?'Cheie configurată':'Configurează cheia'}</strong></button>
+            <div class="gemini-key-button" title="Gemini folosește contul Google conectat"><span>G</span><strong>Cont Google</strong></div>
           </aside>
           <section class="gemini-main">
-            <header class="gemini-header"><div><span class="hub-eyebrow">AI</span><h1 id="geminiHeading" tabindex="-1">Gemini</h1></div><small>gemini-2.5-flash · Free Tier</small></header>
+            <header class="gemini-header"><div><span class="hub-eyebrow">AI</span><h1 id="geminiHeading" tabindex="-1">Gemini</h1></div><small>gemini-2.5-flash · Cont Google</small></header>
             <div class="gemini-conversation" data-gemini-conversation>${renderMessages(chat)}${busy?'<div class="gemini-thinking"><i></i><i></i><i></i></div>':''}</div>
             <div class="gemini-pending-files">${pendingFiles.map((file,index)=>`<span>▧ ${esc(file.name)} <button type="button" data-gemini-remove-file="${index}" aria-label="Elimină fișierul">×</button></span>`).join('')}</div>
             <form class="gemini-composer" data-gemini-form>
@@ -165,7 +157,7 @@
       async function sendMessage(text){
         const clean=String(text||'').trim();
         if(!clean&&pendingFiles.length===0)return;
-        const key=apiKey();if(!key){openKeyDialog();return;}
+        const accessToken=String(getGoogleToken?.()||'');if(!accessToken){requestGoogleAccess?.();tell?.('Acceptă permisiunea Gemini pentru contul Google conectat, apoi încearcă din nou.');return;}
         if(!activeChat())createChat();
         const chat=activeChat(),files=pendingFiles.slice();pendingFiles=[];
         const attachmentParts=[];
@@ -176,18 +168,11 @@
           for(const file of files)attachmentParts.push(await filePart(file));
           const recent=chat.messages.slice(-24);
           const history=recent.map((message,index)=>({role:message.role,parts:messageParts(message,index===recent.length-1)}));
-          const answer=await generate(key,history,systemPrompt(),false);
+          const answer=await generate(accessToken,history,systemPrompt(),false);
           chat.messages.push({role:'model',text:answer,attachments:[]});chat.updated=Date.now();writeChats(chats);
         }catch(error){
           chat.messages.push({role:'model',text:'Eroare: '+(error?.message||'Gemini nu a răspuns.'),attachments:[]});writeChats(chats);
         }finally{busy=false;render();}
-      }
-
-      function openKeyDialog(){
-        importDialog.innerHTML=`<div class="pl-dialog-head"><h2>Cheie Gemini API</h2><button type="button" data-gemini-dialog-close aria-label="Închide">✕</button></div>
-          <p>Cheia este păstrată numai pe acest dispozitiv și nu este inclusă în Cloud sync.</p>
-          <form data-gemini-key-form><label>API key<input name="key" type="password" value="${esc(apiKey())}" autocomplete="off" placeholder="AIza…"></label><button>Salvează cheia</button></form>`;
-        if(!importDialog.open)importDialog.showModal();
       }
 
       function cleanScheduleObject(raw,current){
@@ -214,7 +199,7 @@
       }
 
       async function importSchedule(file,group=''){
-        const key=apiKey();if(!key){openKeyDialog();throw Error('Configurează mai întâi cheia Gemini.');}
+        const accessToken=String(getGoogleToken?.()||'');if(!accessToken){requestGoogleAccess?.();throw Error('Acceptă permisiunea Gemini pentru contul Google conectat, apoi încearcă din nou.');}
         if(!file)throw Error('Alege o poză sau un PDF.');
         if(!/^image\//.test(file.type)&&file.type!=='application/pdf'&&!/\.pdf$/i.test(file.name))throw Error('Pentru importul orarului folosește o fotografie sau un PDF.');
         const current=getSchedule();
@@ -231,7 +216,7 @@
           'Orarul curent este furnizat doar ca reper pentru titlu/subtitlu, nu copia clase vechi care nu apar în fișier: '+JSON.stringify({title:current.title,subtitle:current.subtitle,times:current.times})
         ].join('\n');
         const part=await filePart(file);
-        const result=await generate(key,[{role:'user',parts:[{text:hiddenInstruction},part]}],'Ești un extractor strict de orare universitare. Nu adăuga comentarii.',true);
+        const result=await generate(accessToken,[{role:'user',parts:[{text:hiddenInstruction},part]}],'Ești un extractor strict de orare universitare. Nu adăuga comentarii.',true);
         let parsed;try{parsed=JSON.parse(result.replace(/^```json\s*|```$/g,'').trim());}catch{throw Error('Gemini a returnat un răspuns care nu poate fi importat. Încearcă din nou cu o poză mai clară.');}
         const schedule=cleanScheduleObject(parsed,current);
         applySchedule(schedule);
@@ -255,7 +240,6 @@
         if(e.target.closest('[data-gemini-new]')){createChat();return;}
         const chatButton=e.target.closest('[data-gemini-chat]');if(chatButton){activeId=chatButton.dataset.geminiChat;render();return;}
         const del=e.target.closest('[data-gemini-delete]');if(del){deleteChat(del.dataset.geminiDelete);return;}
-        if(e.target.closest('[data-gemini-key]')){openKeyDialog();return;}
         const remove=e.target.closest('[data-gemini-remove-file]');if(remove){pendingFiles.splice(Number(remove.dataset.geminiRemoveFile),1);render();}
       });
       page.addEventListener('change',e=>{
@@ -272,8 +256,6 @@
       });
       importDialog.addEventListener('click',e=>{if(e.target.closest('[data-gemini-dialog-close]'))importDialog.close();});
       importDialog.addEventListener('submit',async e=>{
-        const keyForm=e.target.closest('[data-gemini-key-form]');
-        if(keyForm){e.preventDefault();saveApiKey(new FormData(keyForm).get('key'));importDialog.close();render();tell?.('Cheia Gemini a fost salvată doar pe acest dispozitiv.');return;}
         const form=e.target.closest('[data-gemini-import-form]');if(!form)return;
         e.preventDefault();const button=form.querySelector('button[type=submit],button:not([type])'),data=new FormData(form),file=form.elements.file.files[0],group=String(data.get('group')||'').trim();
         button.disabled=true;button.textContent='Gemini analizează…';

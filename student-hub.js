@@ -302,6 +302,8 @@
     if(window.OrarGemini)gemini=window.OrarGemini.mount({
       root,getSchedule,applySchedule,
       getAppContext:()=>({subjects:collectSubjects(),classroom:classroom.contextSnapshot?.()||{}}),
+      getGoogleToken:()=>classroom.getAccessToken?.()||'',
+      requestGoogleAccess:()=>classroom.requestGeminiAccess?.(),
       changeView:next=>changeView(next),tell
     });
 
