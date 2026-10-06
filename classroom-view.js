@@ -181,6 +181,8 @@
         const exactDriveLink=safeURL(metadata?.webViewLink||'');if(exactDriveLink)viewer.querySelector('[data-cr-viewer-drive]').href=exactDriveLink;
         const mime=String(metadata?.mimeType||'').split(';')[0].trim().toLowerCase();
         const googleNative=mime.startsWith('application/vnd.google-apps.');
+        const isiOSDevice=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+        const isVideoFile=/\.(mp4|m4v|mov|webm|avi)$/i.test(driveName)||mime.startsWith('video/');
         const officeDocument=/\.(docx?|xlsx?|xlsm|pptx?|odt|ods|odp|rtf|pages|numbers|key)$/i.test(driveName)
           || /(?:msword|officedocument|ms-excel|ms-powerpoint|opendocument|rtf)/i.test(mime);
         const archive=/\.(zip|rar|7z)$/i.test(driveName) || /(?:zip|rar|7z|compressed|archive)/i.test(mime);
@@ -193,6 +195,28 @@
         const downloadAllowed=metadata?.capabilities?.canDownload!==false;
         downloadButton.title=downloadAllowed?'Descarcă fișierul':'Proprietarul a dezactivat descărcarea';
         if(downloadAllowed&&!googleNative)viewerDownload={name:driveName,url:base+'?alt=media',objectUrl:''};
+
+        /* iOS Home Screen apps are unreliable with large authenticated Drive
+           videos rendered from blob: URLs: playback can turn black and the
+           native control hit targets can stop responding. Let Drive's own
+           streaming preview handle video on iPhone/iPad instead. */
+        if(isiOSDevice&&isVideoFile){
+          const driveBox=viewer.querySelector('[data-cr-viewer-content]');
+          const frame=document.createElement('iframe');
+          frame.className='classroom-drive-video-preview';
+          frame.title='Redare '+driveName;
+          frame.src='https://drive.google.com/file/d/'+encodeURIComponent(fileId)+'/preview';
+          frame.setAttribute('allow','autoplay; fullscreen; picture-in-picture; encrypted-media');
+          frame.setAttribute('allowfullscreen','');
+          frame.setAttribute('webkitallowfullscreen','');
+          frame.setAttribute('referrerpolicy','no-referrer-when-downgrade');
+          driveBox.replaceChildren(frame);
+          driveBox.classList.add('has-drive-video');
+          disableViewerZoom();
+          downloadButton.disabled=!viewerDownload;
+          return;
+        }
+
         if(nativeGoogleDoc){
           if(!downloadAllowed)throw Error('Proprietarul a dezactivat exportul/descărcarea acestui fișier.');
           const target=mime==='application/vnd.google-apps.spreadsheet'
@@ -531,7 +555,7 @@
           const wrap=document.createElement('div');wrap.className='classroom-media-stage classroom-video-stage';
           const shell=document.createElement('div');shell.className='classroom-video-shell';
           const video=document.createElement('video');video.playsInline=true;video.preload='metadata';video.src=viewerObjectUrl;video.setAttribute('webkit-playsinline','');
-          const isiOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+          const isiOS=isiOSDevice;
           const failCleanly=()=>{if(generation!==viewerGeneration)return;const box=viewer.querySelector('[data-cr-viewer-content]');box.innerHTML='<div class="classroom-viewer-message classroom-video-unsupported" role="alert"><div><strong>Videoclipul nu poate fi redat local pe acest dispozitiv.</strong><p>Formatul '+esc(name.split('.').pop()?.toUpperCase()||'video')+' nu este suportat direct de playerul iPhone. Îl poți deschide în Google Drive sau descărca.</p></div></div>';};
           let playable=false;video.addEventListener('loadedmetadata',()=>{playable=true;},{once:true});video.addEventListener('error',failCleanly,{once:true});
           if(isiOS){
