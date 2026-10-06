@@ -1538,3 +1538,6 @@ body[data-orar-theme="custom"].orar-custom-light{color-scheme:light}
     textarea,select{font-size:16px!important}
   }
 }
+
+.gemini-shell.is-chats-open .gemini-chat-menu-toggle{opacity:0!important;visibility:hidden!important;pointer-events:none!important;transform:scale(.82)!important}
+.gemini-chat-menu-toggle{transition:opacity 150ms ease,visibility 150ms ease,transform 180ms ease,border-color 160ms ease,box-shadow 180ms ease!important}

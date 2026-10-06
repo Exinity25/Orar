@@ -2,7 +2,7 @@
   'use strict';
 
   const CHAT_KEY='orar_gemini_chats_v1';
-  const MODEL='gemini-2.5-flash';
+  const MODEL='gemini-3.8-flash';
   const MAX_FILE_BYTES=12*1024*1024;
   const esc=(value='')=>String(value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,9);
@@ -142,7 +142,7 @@
             <div class="gemini-key-button" title="Gemini folosește contul Google conectat"><span>G</span><strong>Cont Google</strong></div>
           </aside>
           <section class="gemini-main">
-            <header class="gemini-header"><div><span class="hub-eyebrow">AI</span><h1 id="geminiHeading" tabindex="-1">Gemini</h1></div><small>gemini-2.5-flash · Cont Google</small></header>
+            <header class="gemini-header"><div><span class="hub-eyebrow">AI</span><h1 id="geminiHeading" tabindex="-1">Gemini</h1></div><small>gemini-3.8-flash · Cont Google</small></header>
             <div class="gemini-conversation" data-gemini-conversation>${renderMessages(chat)}${busy?'<div class="gemini-thinking"><i></i><i></i><i></i></div>':''}</div>
             <div class="gemini-pending-files">${pendingFiles.map((file,index)=>`<span>▧ ${esc(file.name)} <button type="button" data-gemini-remove-file="${index}" aria-label="Elimină fișierul">×</button></span>`).join('')}</div>
             <form class="gemini-composer" data-gemini-form>
