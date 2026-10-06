@@ -1465,7 +1465,8 @@
       const noteExists = Boolean((item.note || '').trim());
       const noteClass = noteState(item);
       const open = !editing && expandedKey === key;
-      const tone = cardTone(item);
+      const ownTone = cardTone(item);
+      const tone = !editing && scheduleBook.schedules.length>1 && ownTone==='default' ? (activeScheduleEntry()?.accent||'red') : ownTone;
       if(editing){
         return `<article class="class-card card-tone-${tone} ${noteClass}" data-card="${key}">
           <span class="note-dot" aria-hidden="true"></span>
