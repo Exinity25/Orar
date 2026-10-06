@@ -757,7 +757,7 @@
     function postsMarkup(){
       if(loading)return '<p class="classroom-notice classroom-panel-notice" role="status">Se încarcă materialele…</p>';
       const notice=warning?`<p class="classroom-notice classroom-panel-notice" role="alert">${esc(warning)}</p>`:'';
-      const body=posts.map(post=>`<article class="classroom-post"><span class="classroom-kind">${esc(post.kind)}</span><h3>${esc(post.title|| (post.kind==='Anunț'?'Anunț':'Material'))}</h3><div class="classroom-attachments">${attachments(post)}</div>${post.description||post.text?`<p>${linkifyText(post.description||post.text)}</p>`:''}<div class="classroom-post-classroom-link">${link(post.alternateLink,'Vezi în Classroom')}</div></article>`).join('');
+      const body=posts.map(post=>`<article class="classroom-post"><span class="classroom-kind">${esc(post.kind)}</span><h3>${esc(post.title|| (post.kind==='Anunț'?'Anunț':'Material'))}</h3><div class="classroom-attachments">${attachments(post)}</div><div class="classroom-post-classroom-link">${link(post.alternateLink,'Deschide în Classroom')}</div></article>`).join('');
       return notice+(body||(!warning?'<p class="hub-empty">Nu sunt materiale publicate în această clasă.</p>':''));
     }
     function courseMarkup(course){
