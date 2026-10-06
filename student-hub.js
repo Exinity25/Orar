@@ -15,7 +15,7 @@
     customize:svg('<path d="M4 20h4l11-11-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/><path d="M4 16l4 4"/>')
   };
   let initialized = false;
-  window.OrarStudentHub = {init({getSchedule,applySchedule}) {
+  window.OrarStudentHub = {init({getSchedule,applySchedule,getSchedules,getScheduleById,applyScheduleTo}) {
     if(initialized) return;
     initialized = true;
     const app = document.querySelector('.app');
@@ -301,7 +301,10 @@
     if(window.OrarPlanner)planner=window.OrarPlanner.mount({root,getSchedule,applySchedule,getSubjects:collectSubjects,changeView:next=>changeView(next),tell,classroom,applyTheme});
     if(window.OrarGemini)gemini=window.OrarGemini.mount({
       root,getSchedule,applySchedule,
-      getAppContext:()=>({subjects:collectSubjects(),planner:planner?.contextSnapshot?.()||{},classroom:classroom.contextSnapshot?.()||{}}),
+      getAppContext:()=>({subjects:collectSubjects(),schedules:getSchedules?.()||[],planner:planner?.contextSnapshot?.()||{},classroom:classroom.contextSnapshot?.()||{}}),
+      getScheduleTargets:()=>getSchedules?.()||[],
+      getScheduleById:id=>getScheduleById?.(id)||getSchedule(),
+      applyScheduleTo:(id,next)=>applyScheduleTo?.(id,next),
       addPlannerTask:task=>planner?.addTask?.(task),
       getGoogleToken:()=>classroom.getAccessToken?.()||'',
       requestGoogleAccess:()=>classroom.requestGeminiAccess?.(),
