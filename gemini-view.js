@@ -179,4 +179,46 @@
           const answer=await generate(key,history,systemPrompt(),false);
           chat.messages.push({role:'model',text:answer,attachments:[]});chat.updated=Date.now();writeChats(chats);
         }catch(error){
-          chat.messages.push({role:'model',t
+          chat.messages.push({role:'model',text:'Eroare: '+(error?.message||'Gemini nu a răspuns.'),attachments:[]});writeChats(chats);
+        }finally{busy=false;render();}
+      }
+
+      function openKeyDialog(){
+        importDialog.innerHTML=`<div class="pl-dialog-head"><h2>Cheie Gemini API</h2><button type="button" data-gemini-dialog-close aria-label="Închide">✕</button></div>
+          <p>Cheia este păstrată numai pe acest dispozitiv și nu este inclusă în Cloud sync.</p>
+          <form data-gemini-key-form><label>API key<input name="key" type="password" value="${esc(apiKey())}" autocomplete="off" placeholder="AIza…"></label><button>Salvează cheia</button></form>`;
+        if(!importDialog.open)importDialog.showModal();
+      }
+
+      function cleanScheduleObject(raw,current){
+        if(!raw||typeof raw!=='object'||!Array.isArray(raw.times)||!raw.classes||typeof raw.classes!=='object')throw Error('Gemini nu a returnat un orar valid.');
+        const times=raw.times.slice(0,24).map(pair=>Array.isArray(pair)?[String(pair[0]||''),String(pair[1]||'')]:null).filter(pair=>pair&&/^\d{2}:\d{2}$/.test(pair[0])&&/^\d{2}:\d{2}$/.test(pair[1]));
+        if(!times.length)throw Error('Nu am putut identifica intervalele orare.');
+        const classes={};
+        for(const [key,value] of Object.entries(raw.classes)){
+          if(!/^\d+-[0-4]$/.test(key)||!value||typeof value!=='object')continue;
+          const row=Number(key.split('-')[0]);if(row>=times.length)continue;
+          const normalizeItem=item=>{
+            if(!item||typeof item!=='object')return null;
+            const subject=String(item.subject||'').trim();if(!subject)return null;
+            const week=['PARĂ','IMPARĂ'].includes(String(item.week||'').toUpperCase())?String(item.week).toUpperCase():'MEREU';
+            const type=['CURS','SEMINAR','LABORATOR'].includes(String(item.type||'').toUpperCase())?String(item.type).toUpperCase():'CURS';
+            return {type,subject,professor:String(item.professor||'').trim(),location:String(item.location||'').trim(),week,note:'',deadline:'',cardColor:'default'};
+          };
+          const item=normalizeItem(value);if(!item)continue;
+          const alt=normalizeItem(value.alternate);if(alt){item.alternate=alt;if(item.week==='MEREU')item.week='PARĂ';if(alt.week==='MEREU')alt.week=item.week==='PARĂ'?'IMPARĂ':'PARĂ';}
+          classes[key]=item;
+        }
+        if(!Object.keys(classes).length)throw Error('Nu am identificat nicio activitate în imagine/PDF.');
+        return {title:String(raw.title||current?.title||'Orar').slice(0,120),subtitle:String(raw.subtitle||current?.subtitle||'').slice(0,180),times,classes};
+      }
+
+      async function importSchedule(file,group=''){
+        const key=apiKey();if(!key){openKeyDialog();throw Error('Configurează mai întâi cheia Gemini.');}
+        if(!file)throw Error('Alege o poză sau un PDF.');
+        if(!/^image\//.test(file.type)&&file.type!=='application/pdf'&&!/\.pdf$/i.test(file.name))throw Error('Pentru importul orarului folosește o fotografie sau un PDF.');
+        const current=getSchedule();
+        const hiddenInstruction=[
+          'Analizează imaginea/PDF-ul cu orarul universitar și transformă-l în JSON pentru aplicația Orar.',
+          'Răspunde EXCLUSIV cu JSON valid, fără markdown și fără explicații.',
+          'Schema exactă: {"title":"...","subtitle":"...","times":[["08:00","09:30"]],"classes":{"0-0":{"type":"CURS","subject":"...","professor":"...","location":"...","week":"MEREU","alternate":{"type":"LABORATOR","
