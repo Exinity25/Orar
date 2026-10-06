@@ -8,7 +8,8 @@
     'https://www.googleapis.com/auth/drive.readonly',
     'https://www.googleapis.com/auth/drive.appdata',
     'https://www.googleapis.com/auth/gmail.modify',
-    'https://www.googleapis.com/auth/gmail.send'];
+    'https://www.googleapis.com/auth/gmail.send',
+    'https://www.googleapis.com/auth/generative-language.retriever'];
   const esc = (s='') => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const safeURL = value => {try{const u=new URL(String(value||'').trim());return ['https:','http:','mailto:','tel:'].includes(u.protocol)?u.href:'';}catch{return '';}};
   const driveTargetFromUrl = raw => {try{const u=new URL(String(raw||'').trim()),host=u.hostname.toLowerCase();if(!/(^|\.)drive\.google\.com$/.test(host)&&!/(^|\.)docs\.google\.com$/.test(host))return null;const folder=u.pathname.match(/\/drive\/folders\/([A-Za-z0-9_-]+)/)||u.pathname.match(/\/folders\/([A-Za-z0-9_-]+)/);if(folder)return {id:folder[1],type:'folder'};const patterns=[/\/file\/d\/([A-Za-z0-9_-]+)/,/\/document\/d\/([A-Za-z0-9_-]+)/,/\/spreadsheets\/d\/([A-Za-z0-9_-]+)/,/\/presentation\/d\/([A-Za-z0-9_-]+)/];for(const re of patterns){const m=u.pathname.match(re);if(m)return {id:m[1],type:'file'};}const id=u.searchParams.get('id');return id?{id,type:'file'}:null;}catch{return null;}};
@@ -608,7 +609,7 @@
       profile.classList.remove('is-open');
       if(!account?.email){
         const disabled=!configured()||!client||reauthenticating;
-        profile.innerHTML=`<button class="classroom-profile-summary classroom-profile-signin" type="button" data-cr-profile-signin ${disabled?'disabled':''}><span class="classroom-profile-avatar classroom-profile-google" aria-hidden="true">G</span><span class="classroom-profile-copy"><strong>${reauthenticating?'Se conectează…':'Conectează contul Google'}</strong><span>Classroom · Drive · Mail</span></span><span class="classroom-profile-signin-arrow" aria-hidden="true">→</span></button>`;
+        profile.innerHTML=`<button class="classroom-profile-summary classroom-profile-signin" type="button" data-cr-profile-signin ${disabled?'disabled':''}><span class="classroom-profile-avatar classroom-profile-google" aria-hidden="true">G</span><span class="classroom-profile-copy"><strong>${reauthenticating?'Se conectează…':'Conectează contul Google'}</strong><span>Classroom · Drive · Mail · Gemini</span></span><span class="classroom-profile-signin-arrow" aria-hidden="true">→</span></button>`;
         profile.classList.remove('hub-hidden');return;
       }
       const picture=safeURL(account.picture||'');
@@ -986,6 +987,7 @@
     const restored=restoreSession();renderProfile(rememberedAccount(),restored);if(restored){scheduleExpiry();restoreCloud().catch(()=>{});if(mailScopeOk())refreshMailSummary();}
     render();renderMail();renderDrive();prepareSignIn();setInterval(()=>{if(mailScopeOk())refreshMailSummary();},5*60000);
     return {element:page,mailElement:mailPage,driveElement:drivePage,syncPlanner,openFile:openViewer,openDriveLink,
+      getAccessToken:()=>token&&Date.now()<expires?token:'',
       contextSnapshot:()=>({
         googleConnected:Boolean(token&&Date.now()<expires),
         courses:courses.map(c=>({id:c.id,name:c.name,section:c.section||'',descriptionHeading:c.descriptionHeading||''})),
