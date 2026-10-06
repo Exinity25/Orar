@@ -1548,16 +1548,35 @@
       window.addEventListener('load', () => {
         const hadController = Boolean(navigator.serviceWorker.controller);
         let reloading = false;
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-          if(!hadController || reloading) return;
-          if(editing){pendingAppUpdate = true;return;}
-          reloading = true;
+        const reloadForUpdate=()=>{
+          if(reloading)return;
+          if(editing){pendingAppUpdate=true;return;}
+          reloading=true;
           location.reload();
+        };
+        const checkPublishedVersion=async()=>{
+          try{
+            const response=await fetch('./sw.js?orar-version='+Date.now(),{cache:'no-store',credentials:'same-origin'});
+            if(!response.ok)return;
+            const source=await response.text(),match=source.match(/const\s+CACHE\s*=\s*['"]([^'"]+)['"]/);
+            const version=match?.[1]||'';if(!version)return;
+            const key='orar_published_version_v1',previous=localStorage.getItem(key);
+            localStorage.setItem(key,version);
+            if(previous&&previous!==version)reloadForUpdate();
+          }catch{}
+        };
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if(!hadController) return;
+          reloadForUpdate();
         });
         navigator.serviceWorker.register('./sw.js', {updateViaCache:'none'}).then(registration => {
           registration.update().catch(() => {});
+          checkPublishedVersion();
           document.addEventListener('visibilitychange', () => {
-            if(document.visibilityState === 'visible') registration.update().catch(() => {});
+            if(document.visibilityState === 'visible'){
+              registration.update().catch(() => {});
+              checkPublishedVersion();
+            }
           });
         }).catch(() => {});
       });
