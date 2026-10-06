@@ -1577,30 +1577,23 @@ body[data-orar-theme="custom"].orar-custom-light{color-scheme:light}
 
 
 
-/* v69 stable iOS safe-area paint.
-   Never override the default artwork or viewport height. The keyboard can resize
-   100dvh on iOS; changing the pseudo-element height made the bottom gap return
-   after focusing Gemini and could cover the default artwork after relaunch. */
+/* v70 stable iOS safe-area paint.
+   The background gets a JS-maintained full-height value that does not collapse
+   when the iOS keyboard opens. This keeps the home-indicator area painted after
+   leaving Gemini while preserving the DEFAULT artwork and all custom themes. */
 @supports (-webkit-touch-callout:none){
   html,body{background-color:var(--bg,#05070c)!important}
   body::before,
   body::after{
+    top:0!important;
+    bottom:auto!important;
+    height:calc(var(--ios-stable-viewport-height,100dvh) + env(safe-area-inset-bottom))!important;
+    min-height:0!important;
     border-radius:0!important;
     -webkit-mask-image:none!important;
     mask-image:none!important;
+    -webkit-transform:translateZ(0);
+    transform:translateZ(0);
   }
-  body::before{
-    /* Preserve whichever image is active: built-in DEFAULT or custom/theme. */
-    bottom:calc(-1 * env(safe-area-inset-bottom))!important;
-    height:auto!important;
-    min-height:0!important;
-  }
-  body::after{
-    bottom:calc(-1 * env(safe-area-inset-bottom))!important;
-    height:auto!important;
-    min-height:0!important;
-  }
-  .app,.hub-page,.gemini-shell,.gemini-main{
-    min-height:100%!important;
-  }
+  .app,.hub-page,.gemini-shell,.gemini-main{min-height:100%!important}
 }
