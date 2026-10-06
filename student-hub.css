@@ -1033,3 +1033,17 @@ body[data-orar-theme] .hub-brand-dot{color:var(--accent-2)!important}
   .classroom-viewer-actions{width:100%;justify-content:flex-end;flex-wrap:wrap}
   .classroom-viewer-download{font-size:11px;white-space:nowrap}
 }
+
+
+/* Navigation consistency: old and planner entries use the same icon box and text alignment. */
+.hub-nav-item{align-items:center}
+.hub-icon{width:22px;height:22px;flex:0 0 22px;display:grid;place-items:center;line-height:1}
+.hub-icon svg{display:block;width:22px;height:22px}
+.hub-nav-copy{min-width:0;display:grid;gap:3px;align-content:center}
+.hub-nav-copy strong,.hub-nav-copy small{margin:0;line-height:1.25}
+.hub-nav-copy small{margin-top:0}
+
+/* App-like page scrolling: no sideways canvas in portrait or landscape. */
+.hub-page{overflow-x:hidden!important;max-width:100vw}
+.hub-content{min-width:0;max-width:100%}
+.hub-heading:focus,.hub-heading:focus-visible{outline:none!important;box-shadow:none!important}
