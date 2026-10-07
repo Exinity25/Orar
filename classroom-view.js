@@ -209,7 +209,9 @@
     async function openViewer(id,title){
       const fileId=String(id||'');if(!/^[A-Za-z0-9_-]+$/.test(fileId))return;
       const name=String(title||'Fișier'),generation=++viewerGeneration;
-      viewerReturnFocus=document.activeElement instanceof HTMLElement?document.activeElement:null;resetViewerContent();
+      viewerReturnFocus=document.activeElement instanceof HTMLElement?document.activeElement:null;
+      try{document.activeElement?.blur?.();}catch{}
+      resetViewerContent();
       viewer.querySelector('[data-cr-viewer-title]').textContent=name;
       viewer.querySelector('[data-cr-viewer-drive]').href='https://drive.google.com/file/d/'+encodeURIComponent(fileId)+'/view';
       viewer.classList.remove('hub-hidden');document.body.classList.add('classroom-viewer-open');viewerMessage('Se încarcă fișierul…');viewer.querySelector('.classroom-viewer-close').focus({preventScroll:true});
@@ -632,6 +634,16 @@
           wrap.append(shell,controls);
           viewer.querySelector('[data-cr-viewer-content]').replaceChildren(wrap);disableViewerZoom();
 
+          const dismissTextFocus=()=>{
+            const active=document.activeElement;
+            if(!(active instanceof HTMLElement))return;
+            if(active.matches('textarea,[contenteditable="true"],input:not([type="range"]):not([type="button"]):not([type="submit"]):not([type="checkbox"]):not([type="radio"])')){
+              try{active.blur();}catch{}
+            }
+          };
+          wrap.addEventListener('touchstart',dismissTextFocus,{passive:true,capture:true});
+          wrap.addEventListener('pointerdown',dismissTextFocus,{passive:true,capture:true});
+
           const play=controls.querySelector('.classroom-video-play');
           const progress=controls.querySelector('.classroom-video-progress');
           const current=controls.querySelector('[data-video-current]');
@@ -684,6 +696,7 @@
           };
           const setAppFullscreen=on=>{
             clearControlsHide();
+            try{document.activeElement?.blur?.();}catch{}
             wrap.classList.toggle('is-app-fullscreen',Boolean(on));
             document.body.classList.toggle('classroom-video-app-fullscreen',Boolean(on));
             controls.classList.remove('is-hidden');
@@ -776,6 +789,15 @@
     },{passive:false}));
     viewerContent.addEventListener('dblclick',e=>{if(e.target.closest('.classroom-image-preview,.classroom-image-stage'))e.preventDefault();},{passive:false});
     viewer.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();closeViewer();}});
+    document.addEventListener('focusin',e=>{
+      if(viewer.classList.contains('hub-hidden')||!viewer.querySelector('.classroom-video-stage'))return;
+      const target=e.target;
+      if(!(target instanceof HTMLElement))return;
+      if(target.closest('.classroom-video-controls'))return;
+      if(target.matches('textarea,[contenteditable="true"],input:not([type="range"]):not([type="button"]):not([type="submit"]):not([type="checkbox"]):not([type="radio"])')){
+        try{target.blur();}catch{}
+      }
+    },true);
     const SESSION_KEY='orar_classroom_session_v2',OLD_SESSION_KEY='orar_classroom_session_v1';
     const SESSION_CACHE_KEY='orar_google_access_session_v1';
     const AUTH_META_KEY='orar_classroom_auth_meta_v1';
