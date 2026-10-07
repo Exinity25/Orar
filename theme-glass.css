@@ -25,7 +25,7 @@ html body[data-ui-glass][data-ui-glass] :is(.pl-card,.pl-hero,.pl-metrics articl
 html body[data-ui-glass][data-ui-glass] :is(.slot-cell,.slot-cell.empty,.schedule-shell,.mobile-tabs){background:transparent!important;border-color:var(--glass-border)!important}
 html body[data-ui-glass][data-ui-glass] :is(.note-panel,.pl-event,.hub-brand,.classroom-panel-notice){border-color:var(--glass-border)!important}
 html body[data-ui-glass][data-ui-glass] :is(.hub-page,.planner-dialog,.app,.classroom-viewer-header) :is(button,.hub-small-button,.hub-primary,.classroom-viewer-drive),
-html body[data-ui-glass][data-ui-glass] :is(.hub-menu-button,.hub-close,.hub-nav-item,.edit-toggle,.undo-toggle,.week-toggle,.cloud-sync-button,.card-color-trigger){
+html body[data-ui-glass][data-ui-glass] :is(.hub-menu-button,.gemini-chat-menu-toggle,.hub-close,.hub-nav-item,.edit-toggle,.undo-toggle,.week-toggle,.cloud-sync-button,.card-color-trigger){
   color:var(--glass-ink)!important;background:var(--glass-surface)!important;border-color:var(--glass-border)!important;
   -webkit-backdrop-filter:blur(18px) saturate(145%);backdrop-filter:blur(18px) saturate(145%);
   box-shadow:inset 0 1px 0 var(--glass-highlight),0 4px 14px rgba(var(--glass-base),.14)!important;
@@ -231,7 +231,7 @@ html body[data-ui-glass][data-ui-glass] :is(
   html body[data-ui-glass][data-ui-glass] :is(
     button:not(:disabled),[role="button"]:not([aria-disabled="true"]),a.hub-small-button,a.classroom-viewer-drive
   ):active{
-    transform:scale(.985)!important;
+    transform:none!important;
   }
   html body[data-ui-glass][data-ui-glass] :is(
     .day-tab.active,
@@ -247,5 +247,28 @@ html body[data-ui-glass][data-ui-glass] :is(
       background-color 220ms ease,
       box-shadow 240ms ease,
       color 220ms ease!important;
+  }
+}
+
+
+/* v86: premium touch states use fades, never geometry jumps. */
+html body[data-ui-glass][data-ui-glass] :is(
+  button,[role="button"],.hub-nav-item,.day-tab,.class-card,
+  .classroom-course,.classroom-course-summary,.mail-card,.drive-card
+){
+  -webkit-tap-highlight-color:transparent!important;
+  transition:
+    opacity 150ms ease,
+    color 180ms ease,
+    background-color 200ms ease,
+    border-color 200ms ease,
+    box-shadow 220ms ease!important;
+}
+@media (hover:none), (pointer:coarse){
+  html body[data-ui-glass][data-ui-glass] :is(
+    button,[role="button"],.hub-nav-item,.day-tab,.class-card,
+    .classroom-course-summary,.mail-card,.drive-card
+  ):active{
+    transform:none!important;
   }
 }
