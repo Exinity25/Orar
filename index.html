@@ -1664,13 +1664,22 @@
 
       if(scheduleViewMode==='combined'&&scheduleBook.schedules.length>1&&!editing){
         const {bands,slots}=combinedParityAffectedSlots();
+        const outgoing=[];
         if(!reduce){
           slots.forEach(({bandIndex,day})=>{
             const slot=grid.querySelector(`[data-combined-band="${bandIndex}"][data-combined-day="${day}"]`);
-            if(!slot?.animate)return;
-            weekFadeMotions.push(slot.animate([{opacity:1},{opacity:0}],{duration:170,easing:'ease-out',fill:'forwards'}));
+            if(!slot)return;
+            slot.querySelectorAll('.class-card,.overlap-piece').forEach(node=>{
+              if(!node.animate)return;
+              outgoing.push(node.animate(
+                [{opacity:1},{opacity:0}],
+                {duration:170,easing:'ease-out',fill:'forwards'}
+              ));
+            });
           });
-          if(weekFadeMotions.length)await Promise.allSettled(weekFadeMotions.map(m=>m.finished));
+          weekFadeMotions=outgoing;
+          if(outgoing.length)await Promise.allSettled(outgoing.map(m=>m.finished));
+          outgoing.forEach(m=>{try{m.cancel();}catch{}});
         }
 
         selectedWeek=week;
@@ -1685,8 +1694,14 @@
         if(!reduce){
           slots.forEach(({bandIndex,day})=>{
             const slot=grid.querySelector(`[data-combined-band="${bandIndex}"][data-combined-day="${day}"]`);
-            if(!slot?.animate)return;
-            weekFadeMotions.push(slot.animate([{opacity:0},{opacity:1}],{duration:210,easing:'ease-out'}));
+            if(!slot)return;
+            slot.querySelectorAll('.class-card,.overlap-piece').forEach(node=>{
+              if(!node.animate)return;
+              weekFadeMotions.push(node.animate(
+                [{opacity:0},{opacity:1}],
+                {duration:210,easing:'ease-out'}
+              ));
+            });
           });
           Promise.allSettled(weekFadeMotions.map(m=>m.finished)).finally(()=>{weekFadeMotions=[];});
         }
