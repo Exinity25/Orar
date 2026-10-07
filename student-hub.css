@@ -1679,8 +1679,8 @@ body:not([data-orar-theme]):not(.orar-custom-background)::after{
       will-change:transform;
     }
     .gemini-conversation{
-      padding-bottom:calc(var(--gemini-composer-height,58px) + 30px + env(safe-area-inset-bottom))!important;
-      scroll-padding-bottom:calc(var(--gemini-composer-height,58px) + 30px + env(safe-area-inset-bottom));
+      padding-bottom:calc(var(--gemini-composer-height,58px) + var(--gemini-keyboard-inset,0px) + 30px + env(safe-area-inset-bottom))!important;
+      scroll-padding-bottom:calc(var(--gemini-composer-height,58px) + var(--gemini-keyboard-inset,0px) + 30px + env(safe-area-inset-bottom));
     }
     .gemini-composer{
       position:fixed!important;
