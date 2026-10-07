@@ -329,3 +329,14 @@ html body[data-ui-glass][data-ui-glass] .hub-drawer .hub-nav-item{
     transform:none!important;
   }
 }
+
+
+/* v95 selected timetable tab: exact same red treatment as the active day.
+   This must live after the generic glass button rule because that rule uses
+   !important and otherwise hides the selected schedule color. */
+html body[data-ui-glass][data-ui-glass] .app .schedule-view-bar button[aria-pressed="true"]{
+  background:linear-gradient(90deg,#9d0a27,#c91137)!important;
+  border-color:transparent!important;
+  color:#fff!important;
+  box-shadow:0 8px 18px rgba(201,17,55,.18)!important;
+}
