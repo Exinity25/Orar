@@ -135,6 +135,11 @@
       let geminiViewportRaf=0;
       const geminiViewport=()=>window.visualViewport||null;
       const composerField=()=>page.querySelector('.gemini-composer textarea');
+      const pinConversationToLatest=()=>{
+        const box=page.querySelector('[data-gemini-conversation]');
+        if(!box)return;
+        box.scrollTop=Math.max(0,box.scrollHeight-box.clientHeight);
+      };
       /* visualViewport emits several uneven resize steps while the iOS keyboard
          animates. Keep one compositor-only RAF loop alive and only update its
          targets. This avoids cancel/restart jank and makes the motion a true
@@ -158,6 +163,7 @@
         if(conversation)conversation.style.transform=scene;
         if(composer)composer.style.transform=composerY;
         if(pending)pending.style.transform=composerY;
+        if(composerField()===document.activeElement)pinConversationToLatest();
       };
       const runGeminiMotion=now=>{
         const reduce=window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
@@ -227,6 +233,7 @@
         requestAnimationFrame(()=>{
           const composer=field.closest('.gemini-composer');
           if(composer)page.style.setProperty('--gemini-composer-height',Math.ceil(composer.getBoundingClientRect().height)+'px');
+          if(field===document.activeElement)pinConversationToLatest();
         });
       };
       const syncGeminiKeyboard=()=>{
@@ -258,6 +265,7 @@
           page.style.setProperty('--gemini-viewport-offset',offset+'px');
           document.body.style.setProperty('--gemini-viewport-offset',offset+'px');
           setGeminiMotionTargets(offset,inset);
+          pinConversationToLatest();
         });
       };
 
@@ -293,7 +301,7 @@
       }
       const systemPrompt=()=>[
         'Ești Gemini integrat în aplicația universitară Orar. Răspunde în română, clar și practic.',
-        'Ai acces de citire la snapshot-ul curent al aplicației: orar, materii, profesori, săli, locații, task-uri, termene, notițe, examene, prezențe, catalog, focus, resurse, Classroom, Mail și Drive în măsura în care sunt încărcate.',
+        'Ai acces de citire la snapshot-ul curent al aplicației: orar, materii, profesori, săli, locații, task-uri, termene, notițe, examene, catalog, focus, resurse, Classroom, Mail și Drive în măsura în care sunt încărcate.',
         'Ai acces de scriere numai pentru acțiuni cerute explicit de utilizator: add_course, update_course, delete_course și add_task. Nu pretinde că ai modificat alte tipuri de date.',
         'Răspunde EXCLUSIV cu JSON valid, fără markdown, în schema: {"reply":"text pentru utilizator","action":null} sau {"reply":"confirmare scurtă","action":{...}}.',
         'Dacă există mai multe orare, acțiunile asupra orarului pot include "targetSchedule":"numele orarului". Dacă utilizatorul numește un orar/facultate, setează targetSchedule. Dacă nu îl numește, folosește orarul marcat active din snapshot. Dacă nu poți identifica sigur orarul cerut, întreabă.',
@@ -641,9 +649,12 @@
         const vv=geminiViewport();
         if(vv)geminiUnfocusedViewportHeight=Math.max(geminiUnfocusedViewportHeight,Math.round(vv.height+Math.max(0,vv.offsetTop)));
         autosizeComposer(field);
+        const conversation=page.querySelector('[data-gemini-conversation]');
+        if(conversation)conversation.scrollTo({top:conversation.scrollHeight,behavior:'smooth'});
         syncGeminiKeyboard();
-        setTimeout(syncGeminiKeyboard,80);
-        setTimeout(syncGeminiKeyboard,260);
+        setTimeout(()=>{syncGeminiKeyboard();pinConversationToLatest();},80);
+        setTimeout(()=>{syncGeminiKeyboard();pinConversationToLatest();},260);
+        setTimeout(pinConversationToLatest,460);
       });
       page.addEventListener('focusout',e=>{
         const field=e.target.closest('.gemini-composer textarea');if(!field)return;
