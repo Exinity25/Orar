@@ -2820,3 +2820,84 @@ body.classroom-video-app-fullscreen{
     }
   }
 }
+
+
+/* v111 fullscreen video chrome: overlay controls + auto-hide, hide viewer header. */
+body.classroom-video-app-fullscreen .classroom-viewer-header{
+  display:none!important;
+}
+body.classroom-video-app-fullscreen .classroom-viewer-dialog{
+  width:100vw!important;
+  height:100dvh!important;
+  max-width:none!important;
+  max-height:none!important;
+  border:0!important;
+  border-radius:0!important;
+  background:#000!important;
+}
+body.classroom-video-app-fullscreen .classroom-viewer-content{
+  width:100%!important;
+  height:100%!important;
+  flex:1 1 auto!important;
+  overflow:hidden!important;
+  background:#000!important;
+}
+.classroom-video-stage.is-app-fullscreen{
+  display:block!important;
+  position:fixed!important;
+  inset:0!important;
+  z-index:13000!important;
+  width:100vw!important;
+  height:100dvh!important;
+  min-height:100dvh!important;
+  padding:0!important;
+  margin:0!important;
+  background:#000!important;
+}
+.classroom-video-stage.is-app-fullscreen .classroom-video-shell{
+  position:absolute!important;
+  inset:0!important;
+  width:100%!important;
+  height:100%!important;
+  max-width:none!important;
+  max-height:none!important;
+  margin:0!important;
+  aspect-ratio:auto!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+}
+.classroom-video-stage.is-app-fullscreen .classroom-video-controls{
+  position:absolute!important;
+  z-index:3!important;
+  left:max(12px,env(safe-area-inset-left))!important;
+  right:max(12px,env(safe-area-inset-right))!important;
+  bottom:max(12px,env(safe-area-inset-bottom))!important;
+  width:auto!important;
+  max-width:980px!important;
+  margin:0 auto!important;
+  padding:9px 10px!important;
+  border-radius:18px!important;
+  opacity:1!important;
+  transform:translateY(0)!important;
+  pointer-events:auto!important;
+  transition:opacity 180ms ease,transform 180ms ease!important;
+}
+.classroom-video-stage.is-app-fullscreen .classroom-video-controls.is-hidden{
+  opacity:0!important;
+  transform:translateY(12px)!important;
+  pointer-events:none!important;
+}
+@supports (-webkit-touch-callout:none){
+  .classroom-video-stage.is-app-fullscreen{
+    height:100dvh!important;
+    min-height:100dvh!important;
+    padding:0!important;
+  }
+  .classroom-video-stage.is-app-fullscreen .classroom-video-controls{
+    left:max(8px,env(safe-area-inset-left))!important;
+    right:max(8px,env(safe-area-inset-right))!important;
+    bottom:max(8px,env(safe-area-inset-bottom))!important;
+    width:auto!important;
+    margin:0 auto!important;
+  }
+}
