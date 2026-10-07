@@ -31,7 +31,9 @@
       min-height:100vh;
       min-height:100svh;
       color:var(--text);
-      font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI",system-ui,sans-serif;
+      -webkit-text-size-adjust:100%;
+      text-size-adjust:100%;
       overflow:hidden;
       background:var(--bg);
     }
@@ -1375,9 +1377,21 @@
       return `<div class="slot-cell combined-slot day-col day-${day}">${items.map(renderCombinedCard).join('')}</div>`;
     }
     function renderTabs(){
-      mobileTabs.innerHTML = DAYS.map((day,i) =>
-        `<button class="day-tab ${i===selectedDay?'active':''}" data-day="${i}" type="button">${day}</button>`
-      ).join('');
+      let buttons=[...mobileTabs.querySelectorAll('.day-tab')];
+      if(buttons.length!==DAYS.length){
+        mobileTabs.replaceChildren(...DAYS.map((day,i)=>{
+          const button=document.createElement('button');
+          button.className='day-tab';button.type='button';button.textContent=day;button.dataset.day=String(i);
+          return button;
+        }));
+        buttons=[...mobileTabs.querySelectorAll('.day-tab')];
+      }
+      buttons.forEach((button,i)=>{
+        button.dataset.day=String(i);
+        if(button.textContent!==DAYS[i])button.textContent=DAYS[i];
+        button.classList.toggle('active',i===selectedDay);
+        button.setAttribute('aria-pressed',String(i===selectedDay));
+      });
       document.body.classList.remove('mobile-day-0','mobile-day-1','mobile-day-2','mobile-day-3','mobile-day-4');
       document.body.classList.add(`mobile-day-${selectedDay}`);
     }
@@ -1449,6 +1463,69 @@
 
     let dayTransitionId = 0;
 
+    function makeDayTransitionVisual(dayIndex){
+      const clone=grid.cloneNode(true);
+      clone.removeAttribute('id');
+      clone.querySelectorAll('[id]').forEach(node=>node.removeAttribute('id'));
+      clone.querySelectorAll('.day-col').forEach(node=>{
+        const visible=node.classList.contains('day-'+dayIndex);
+        if(!visible)node.style.setProperty('display','none','important');
+        else if(node.classList.contains('head-cell'))node.style.setProperty('display','flex','important');
+        else if(node.classList.contains('slot-cell'))node.style.setProperty('display','flex','important');
+        else node.style.setProperty('display','block','important');
+      });
+      clone.querySelectorAll('input,select,textarea,button,[tabindex]').forEach(node=>node.setAttribute('tabindex','-1'));
+      const layer=document.createElement('div');
+      layer.className='schedule-day-motion-layer';
+      layer.setAttribute('aria-hidden','true');
+      layer.append(clone);
+      return layer;
+    }
+
+    async function animateIosDaySwap(nextDay,forward,transitionId){
+      const shell=grid.parentElement;
+      const oldLayer=makeDayTransitionVisual(selectedDay);
+      shell.append(oldLayer);
+
+      selectedDay=nextDay;
+      expandedKey=null;
+      storageSet('c11_1_selected_day',selectedDay);
+      render();
+
+      if(transitionId!==dayTransitionId){oldLayer.remove();return;}
+      const newLayer=makeDayTransitionVisual(selectedDay);
+      shell.append(newLayer);
+      shell.classList.add('is-day-transitioning');
+      grid.style.visibility='hidden';
+
+      const distance='104%';
+      const oldEnd=forward?'-'+distance:distance;
+      const newStart=forward?distance:'-'+distance;
+      const oldAnimation=oldLayer.animate(
+        [{transform:'translate3d(0,0,0)',opacity:1},{transform:`translate3d(${oldEnd},0,0)`,opacity:.18}],
+        {duration:280,easing:'cubic-bezier(.4,0,.2,1)',fill:'forwards'}
+      );
+      const newAnimation=newLayer.animate(
+        [{transform:`translate3d(${newStart},0,0)`,opacity:.35},{transform:'translate3d(0,0,0)',opacity:1}],
+        {duration:330,easing:'cubic-bezier(.16,1,.3,1)',fill:'forwards'}
+      );
+
+      let cleaned=false;
+      const cleanup=()=>{
+        if(cleaned)return;cleaned=true;
+        try{oldAnimation.cancel();newAnimation.cancel();}catch{}
+        oldLayer.remove();newLayer.remove();
+        shell.classList.remove('is-day-transitioning');
+        grid.style.removeProperty('visibility');
+        void grid.offsetHeight;
+      };
+      const motion={cancel:cleanup};
+      gridMotion=motion;
+      try{await Promise.all([oldAnimation.finished,newAnimation.finished]);}catch{}
+      if(gridMotion===motion)gridMotion=null;
+      cleanup();
+    }
+
     async function changeDay(nextDay){
       if(nextDay === selectedDay) return;
 
@@ -1459,6 +1536,11 @@
       if(gridMotion){
         try{ gridMotion.cancel(); }catch(e){}
         gridMotion = null;
+      }
+
+      if(iosStandaloneWebKit&&!reduce&&window.matchMedia('(max-width:900px) and (orientation:portrait)').matches){
+        await animateIosDaySwap(nextDay,forward,transitionId);
+        return;
       }
 
       if(grid.animate && !reduce){
