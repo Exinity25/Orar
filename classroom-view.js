@@ -713,7 +713,7 @@
     }
     const CLOUD_FILE='orar-sync.json';
     const CLOUD_VERSION=3;
-    const CLOUD_SKIP=new Set([SESSION_KEY,OLD_SESSION_KEY,AUTH_META_KEY,ACCOUNT_KEY,'orar_google_session_v1','orar_cloud_pending_v1','orar_gemini_api_key_v1']);
+    const CLOUD_SKIP=new Set([SESSION_KEY,OLD_SESSION_KEY,AUTH_META_KEY,ACCOUNT_KEY,'orar_google_session_v1','orar_cloud_pending_v1','orar_gemini_api_key_v1','orar_published_version_v1']);
     const cloudKeys=()=>Object.keys(localStorage).filter(key=>!CLOUD_SKIP.has(key));
     let cloudFileId='',cloudTimer=0,cloudApplying=false,cloudUploading=false,cloudRestoredAccount='';
     const PENDING_KEY='orar_cloud_pending_v1';
