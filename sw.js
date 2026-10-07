@@ -1,4 +1,4 @@
-const CACHE = 'orar-v90-parity-no-global-flash';
+const CACHE = 'orar-v91-gemini-import-reliable';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './student-hub.css', './student-hub.js', './classroom-config.js', './classroom-view.js', './student-planner.js', './gemini-view.js', './student-planner.css', './theme-glass.css'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
