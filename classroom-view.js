@@ -666,12 +666,36 @@
             updateTime();
           },{once:true});
 
+          let controlsHideTimer=0;
+          const clearControlsHide=()=>{if(controlsHideTimer){clearTimeout(controlsHideTimer);controlsHideTimer=0;}};
+          const showFullscreenControls=()=>{
+            if(!wrap.classList.contains('is-app-fullscreen'))return;
+            controls.classList.remove('is-hidden');
+            clearControlsHide();
+            controlsHideTimer=setTimeout(()=>controls.classList.add('is-hidden'),2600);
+          };
+          const hideFullscreenControls=()=>{
+            if(!wrap.classList.contains('is-app-fullscreen'))return;
+            clearControlsHide();
+            controls.classList.add('is-hidden');
+          };
           const setAppFullscreen=on=>{
+            clearControlsHide();
             wrap.classList.toggle('is-app-fullscreen',Boolean(on));
             document.body.classList.toggle('classroom-video-app-fullscreen',Boolean(on));
+            controls.classList.remove('is-hidden');
             fullscreen.textContent=on?'×':'⛶';
             fullscreen.setAttribute('aria-label',on?'Ieși din ecran complet':'Ecran complet');
+            if(on)showFullscreenControls();
           };
+          controls.addEventListener('click',e=>{e.stopPropagation();if(wrap.classList.contains('is-app-fullscreen'))showFullscreenControls();});
+          controls.addEventListener('pointerdown',e=>{e.stopPropagation();if(wrap.classList.contains('is-app-fullscreen')){clearControlsHide();controls.classList.remove('is-hidden');}});
+          controls.addEventListener('pointerup',()=>{if(wrap.classList.contains('is-app-fullscreen'))showFullscreenControls();});
+          wrap.addEventListener('click',e=>{
+            if(!wrap.classList.contains('is-app-fullscreen')||e.target.closest('.classroom-video-controls'))return;
+            if(controls.classList.contains('is-hidden'))showFullscreenControls();
+            else hideFullscreenControls();
+          });
           fullscreen.addEventListener('click',async e=>{
             e.stopPropagation();
             if(isiOSDevice){
@@ -685,7 +709,14 @@
             }catch{}
           });
           document.addEventListener('fullscreenchange',()=>{
-            if(!isiOSDevice)fullscreen.textContent=document.fullscreenElement?'×':'⛶';
+            if(isiOSDevice)return;
+            const on=Boolean(document.fullscreenElement);
+            wrap.classList.toggle('is-app-fullscreen',on);
+            document.body.classList.toggle('classroom-video-app-fullscreen',on);
+            controls.classList.remove('is-hidden');
+            fullscreen.textContent=on?'×':'⛶';
+            fullscreen.setAttribute('aria-label',on?'Ieși din ecran complet':'Ecran complet');
+            if(on)showFullscreenControls();else clearControlsHide();
           },{once:false});
 
           const failCleanly=()=>{
