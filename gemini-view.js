@@ -157,11 +157,12 @@
         const conversation=page.querySelector('.gemini-conversation');
         const composer=page.querySelector('.gemini-composer');
         const pending=page.querySelector('.gemini-pending-files');
-        const composerY=`translate3d(0,${(-geminiMotion.composer).toFixed(2)}px,0)`;
+        const lift=Math.max(0,geminiMotion.composer);
+        page.style.setProperty('--gemini-composer-lift',lift.toFixed(2)+'px');
         if(header)header.style.removeProperty('transform');
         if(conversation)conversation.style.removeProperty('transform');
-        if(composer)composer.style.transform=composerY;
-        if(pending)pending.style.transform=composerY;
+        if(composer)composer.style.removeProperty('transform');
+        if(pending)pending.style.removeProperty('transform');
         if(composerField()===document.activeElement)pinConversationToLatest();
       };
       const runGeminiMotion=now=>{
@@ -257,7 +258,7 @@
           }
           if(!geminiUnfocusedViewportHeight)geminiUnfocusedViewportHeight=Math.max(1,Math.round(vv.height+Math.max(0,vv.offsetTop)));
           const visibleBottom=vv.height+Math.max(0,vv.offsetTop);
-          const baseHeight=geminiStageHeight||geminiUnfocusedViewportHeight;
+          const baseHeight=geminiUnfocusedViewportHeight||geminiStageHeight||Math.round(window.innerHeight||visibleBottom);
           const inset=Math.max(0,Math.round(baseHeight-visibleBottom));
           const offset=Math.max(0,Math.round(vv.offsetTop));
           page.style.setProperty('--gemini-keyboard-inset',inset+'px');
@@ -646,7 +647,7 @@
         captureGeminiStage();
         setGeminiKeyboardOpen(true);
         const vv=geminiViewport();
-        if(vv)geminiUnfocusedViewportHeight=Math.max(geminiUnfocusedViewportHeight,Math.round(vv.height+Math.max(0,vv.offsetTop)));
+        if(vv&&!geminiUnfocusedViewportHeight)geminiUnfocusedViewportHeight=Math.round(vv.height+Math.max(0,vv.offsetTop));
         autosizeComposer(field);
         pinConversationToLatest();
         syncGeminiKeyboard();
@@ -722,8 +723,8 @@
 
       return {
         element:page,
-        show(){chatMenuOpen=false;setGeminiKeyboardOpen(false);geminiStageHeight=0;geminiStageWidth=0;page.classList.remove('is-entering');void page.offsetWidth;page.classList.add('is-entering');render();requestAnimationFrame(captureGeminiStage);page.querySelector('#geminiHeading')?.focus({preventScroll:true});},
-        hide(){setGeminiKeyboardOpen(false);page.style.setProperty('--gemini-keyboard-inset','0px');page.style.setProperty('--gemini-viewport-offset','0px');document.body.style.setProperty('--gemini-viewport-offset','0px');resetGeminiMotion(true);},
+        show(){chatMenuOpen=false;setGeminiKeyboardOpen(false);resetGeminiMotion(true);geminiStageHeight=0;geminiStageWidth=0;const vv=geminiViewport();geminiUnfocusedViewportHeight=Math.round(vv?(vv.height+Math.max(0,vv.offsetTop)):(window.innerHeight||0));page.classList.remove('is-entering');void page.offsetWidth;page.classList.add('is-entering');render();requestAnimationFrame(()=>{captureGeminiStage();pinConversationToLatest();});page.querySelector('#geminiHeading')?.focus({preventScroll:true});},
+        hide(){setGeminiKeyboardOpen(false);page.style.setProperty('--gemini-keyboard-inset','0px');page.style.setProperty('--gemini-viewport-offset','0px');page.style.setProperty('--gemini-composer-lift','0px');document.body.style.setProperty('--gemini-viewport-offset','0px');resetGeminiMotion(true);},
         openScheduleImport,
         contextSnapshot(){return {chats:chats.map(chat=>({id:chat.id,title:chat.title,updated:chat.updated,messages:chat.messages.slice(-20).map(m=>({role:m.role,text:m.text,attachments:m.attachments}))}))};}
       };
