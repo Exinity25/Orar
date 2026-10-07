@@ -1036,7 +1036,8 @@
     }
     function courseMarkup(course){
       const open=Boolean(selected && selected.id===course.id);
-      return `<section class="classroom-course ${open?'is-open':''}" data-cr-course-card="${esc(course.id)}">
+      const opening=Boolean(open&&courseAccentOpeningId===course.id);
+      return `<section class="classroom-course ${open?'is-open':''} ${opening?'is-opening':''}" data-cr-course-card="${esc(course.id)}">
         <button class="classroom-course-summary" type="button" data-cr-course="${esc(course.id)}" aria-expanded="${open?'true':'false'}">
           <span class="classroom-course-copy"><strong>${esc(course.name)}</strong><span>${esc(course.section||course.descriptionHeading||'')}${course.courseState==='ARCHIVED'?' · Arhivată':''}</span></span>
           <span class="classroom-course-chevron" aria-hidden="true">›</span>
@@ -1153,9 +1154,9 @@
         mail:{unread:mailUnread,items:mailItems.slice(0,50).map(m=>({subject:m.subject,from:m.from,date:m.date,snippet:m.snippet,unread:m.unread})),open:mailOpen?{...mailOpen,body:mailBody}:null},
         drive:{folder:driveFolderName||'',query:driveQuery,items:driveItems.slice(0,80).map(file=>({name:file.name,mimeType:file.mimeType,modifiedTime:file.modifiedTime}))}
       }),
-      isConnected:()=>Boolean(token&&Date.now()<expires),showDrive(){driveVisible=true;renderDrive();prepareSignIn();if(driveScopeOk()&&!driveLoading&&!driveItems.length)loadDrive(false);drivePage.classList.remove('is-entering');drivePage.querySelector('h1')?.focus({preventScroll:true});},showMail(){mailVisible=true;renderMail();prepareSignIn();if(mailScopeOk()&&!mailLoading&&!mailItems.length)refreshMail();mailPage.classList.remove('is-entering');mailPage.querySelector('h1')?.focus({preventScroll:true});},show(){
-      visible=true;render();prepareSignIn();
-      if(token && Date.now()<expires){if(!courses.length&&!loading)loadCourses();}
+      isConnected:()=>Boolean(token&&Date.now()<expires),showDrive(){driveVisible=true;const shouldLoad=driveScopeOk()&&!driveLoading&&!driveItems.length;if(shouldLoad)driveLoading=true;renderDrive();prepareSignIn();if(shouldLoad){driveLoading=false;loadDrive(false);}drivePage.classList.remove('is-entering');drivePage.querySelector('h1')?.focus({preventScroll:true});},showMail(){mailVisible=true;const shouldLoad=mailScopeOk()&&!mailLoading&&!mailItems.length;if(shouldLoad)mailLoading=true;renderMail();prepareSignIn();if(shouldLoad){mailLoading=false;refreshMail();}mailPage.classList.remove('is-entering');mailPage.querySelector('h1')?.focus({preventScroll:true});},show(){
+      visible=true;const shouldLoad=Boolean(token&&Date.now()<expires&&!courses.length&&!loading);if(shouldLoad)loading=true;render();prepareSignIn();
+      if(shouldLoad){loading=false;loadCourses();}
       page.classList.remove('is-entering');page.querySelector('h1').focus({preventScroll:true});
     }};
   }};
