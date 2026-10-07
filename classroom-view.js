@@ -624,6 +624,7 @@
     viewerContent.addEventListener('dblclick',e=>{if(e.target.closest('.classroom-image-preview,.classroom-image-stage'))e.preventDefault();},{passive:false});
     viewer.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();closeViewer();}});
     const SESSION_KEY='orar_classroom_session_v2',OLD_SESSION_KEY='orar_classroom_session_v1';
+    const SESSION_CACHE_KEY='orar_google_access_session_v1';
     const AUTH_META_KEY='orar_classroom_auth_meta_v1';
     const ACCOUNT_KEY='orar_classroom_account_v1';
     let token='',expires=0,grantedScopes='',client=null,courses=[],posts=[],selected=null,loading=false,message='',warning='',generation=0,session=0,expireTimer,visible=false,reauthenticating=false,silentRenewing=false,authRequestSilent=false;
@@ -691,8 +692,18 @@
     }
     function saveSession(){
       try{
-        /* Access tokens stay in memory only. Persist only non-secret scope metadata
-           so manual reconnects do not ask for consent unnecessarily. */
+        /* Keep the short-lived Google access token only for this browser/PWA
+           session so reloads (including Cloud restore reloads) do not immediately
+           open another Google authorization window. Never persist it in localStorage. */
+        if(token&&expires>Date.now()){
+          sessionStorage.setItem(SESSION_CACHE_KEY,JSON.stringify({
+            token:String(token),
+            expires:Number(expires)||0,
+            grantedScopes:String(grantedScopes||'')
+          }));
+        }else{
+          sessionStorage.removeItem(SESSION_CACHE_KEY);
+        }
         localStorage.removeItem(SESSION_KEY);
         localStorage.removeItem(OLD_SESSION_KEY);
         localStorage.setItem(AUTH_META_KEY,JSON.stringify({grantedScopes:String(grantedScopes||'')}));
@@ -967,31 +978,43 @@
     });
     function forgetSession({forgetMeta=false}={}){
       try{
+        sessionStorage.removeItem(SESSION_CACHE_KEY);
         localStorage.removeItem(SESSION_KEY);
         localStorage.removeItem(OLD_SESSION_KEY);
         if(forgetMeta)localStorage.removeItem(AUTH_META_KEY);
       }catch{}
     }
     function restoreSession(){
-      /* Migrate old installs once: salvage only granted scopes, then erase any
-         previously persisted bearer token. A fresh token is requested silently
-         from Google using the remembered account. */
+      /* Reuse a still-valid token across same-session reloads. This avoids a
+         second Google window after Cloud restore while keeping bearer tokens out
+         of persistent localStorage. */
       try{
         let scopes='';
         const meta=JSON.parse(localStorage.getItem(AUTH_META_KEY)||'null');
         if(meta?.grantedScopes)scopes=String(meta.grantedScopes||'');
         const legacy=JSON.parse(localStorage.getItem(SESSION_KEY)||'null');
         if(!scopes&&legacy?.grantedScopes)scopes=String(legacy.grantedScopes||'');
-        grantedScopes=scopes;
-        token='';expires=0;
+
+        let cached=null;
+        try{cached=JSON.parse(sessionStorage.getItem(SESSION_CACHE_KEY)||'null');}catch{}
+        const cachedExpiry=Number(cached?.expires)||0;
+        if(cached?.token&&cachedExpiry>Date.now()+30000){
+          token=String(cached.token);
+          expires=cachedExpiry;
+          grantedScopes=String(cached.grantedScopes||scopes||'');
+        }else{
+          token='';expires=0;grantedScopes=scopes;
+          sessionStorage.removeItem(SESSION_CACHE_KEY);
+        }
+
         localStorage.removeItem(SESSION_KEY);
         localStorage.removeItem(OLD_SESSION_KEY);
-        if(scopes)localStorage.setItem(AUTH_META_KEY,JSON.stringify({grantedScopes:scopes}));
+        if(grantedScopes)localStorage.setItem(AUTH_META_KEY,JSON.stringify({grantedScopes:String(grantedScopes)}));
       }catch{
         token='';expires=0;grantedScopes='';
         forgetSession();
       }
-      return false;
+      return Boolean(token&&Date.now()<expires);
     }
     function scheduleExpiry(){
       clearTimeout(expireTimer);if(!token||expires<=Date.now())return;
@@ -1323,7 +1346,10 @@
           }});
         renderProfile(rememberedAccount(),Boolean(token&&Date.now()<expires));
         render();renderMail();renderDrive();
-        if(token)scheduleExpiry();else if(rememberedAccount())setTimeout(()=>requestAccess(true,true),0);
+        if(token){
+          scheduleExpiry();
+          restoreCloudForAccount(rememberedAccount()?.email||'').catch(()=>{});
+        }else if(rememberedAccount())setTimeout(()=>requestAccess(true,true),0);
       }catch(e){message=e.message;renderProfile(rememberedAccount(),Boolean(token&&Date.now()<expires));render();renderMail();renderDrive();}
     }
     function hasAllRequestedScopes(){
@@ -1376,7 +1402,9 @@
     const ensureGoogleSessionForSection=()=>{
       prepareSignIn();
       if(!client||!rememberedAccount()||reauthenticating||silentRenewing)return;
-      if(!token||expires-Date.now()<5*60*1000)requestAccess(true,true);
+      /* Do not open a Google window just because the user entered Drive/Mail.
+         Reuse the current token for its full lifetime; renew only when needed. */
+      if(!token||Date.now()>=expires)requestAccess(true,true);
     };
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')ensureFreshGoogleSession();});
     window.addEventListener('pageshow',()=>setTimeout(ensureFreshGoogleSession,0),{passive:true});
