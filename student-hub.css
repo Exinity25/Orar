@@ -2391,15 +2391,9 @@ html,body{
 }
 
 
-/* v88 parity switch: the timetable itself never flashes.
-   Only courses whose PAR/IMPAR state changes fade out and back in. */
-.schedule-grid.is-week-switching .class-card{
-  animation:none!important;
-}
-.schedule-grid.is-week-switching,
-.schedule-grid.is-week-switching .slot-cell{
-  transition:none!important;
-}
+/* Parity switching is handled per-slot in JS. The grid itself is never put
+   into a temporary animation state, so unaffected cards cannot restart their
+   entry animation. */
 
 /* Mail / Drive directional navigation. The page header and background stay
    mounted; only the content stage crossfades/slides. */
