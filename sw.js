@@ -1,4 +1,4 @@
-const CACHE = 'orar-v99-dark-theme-background-dim';
+const CACHE = 'orar-v100-transparent-top-statusbar';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './student-hub.css', './student-hub.js', './classroom-config.js', './classroom-view.js', './student-planner.js', './gemini-view.js', './student-planner.css', './theme-glass.css'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
