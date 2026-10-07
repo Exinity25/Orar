@@ -2581,3 +2581,20 @@ html,body{
     transition:none!important;
   }
 }
+
+
+/* v99: dark non-default themes dim custom background photos the same way as
+   DEFAULT. DEFAULT itself is intentionally untouched. ICE and CUSTOM light
+   remain un-dimmed. */
+body.orar-custom-background:not(.classroom-viewer-open):is(
+  [data-orar-theme="ocean"],
+  [data-orar-theme="forest"],
+  [data-orar-theme="violet"],
+  [data-orar-theme="custom"]:not(.orar-custom-light)
+)::after{
+  display:block!important;
+  background:
+    radial-gradient(circle at 50% 14%,rgba(255,255,255,.08),transparent 24%),
+    linear-gradient(rgba(2,5,11,.42),rgba(2,5,11,.58)),
+    linear-gradient(90deg,rgba(0,0,0,.22),rgba(0,0,0,0) 18%,rgba(0,0,0,0) 82%,rgba(0,0,0,.22))!important;
+}
