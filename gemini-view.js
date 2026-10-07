@@ -299,6 +299,17 @@
         document.body.classList.toggle('gemini-keyboard-open',Boolean(open));
         if(open)captureGeminiStage();
       };
+      const pinComposerAboveKeyboard=(field=composerField())=>{
+        if(!iosKeyboardMode||!field||field!==document.activeElement)return;
+        const vv=geminiViewport(),composer=field.closest('.gemini-composer');
+        if(!vv||!composer)return;
+        const offset=Math.max(0,Math.round(vv.offsetTop));
+        const visibleBottom=Math.round(vv.height+offset);
+        const composerHeight=Math.max(42,Math.ceil(composer.getBoundingClientRect().height||58));
+        const composerTop=Math.max(offset+4,visibleBottom-composerHeight-6);
+        page.style.setProperty('--gemini-composer-top',composerTop+'px');
+        page.style.setProperty('--gemini-composer-height',composerHeight+'px');
+      };
       const autosizeComposer=(field=composerField())=>{
         if(!field)return;
         field.style.height='0px';
@@ -309,7 +320,10 @@
         requestAnimationFrame(()=>{
           const composer=field.closest('.gemini-composer');
           if(composer)page.style.setProperty('--gemini-composer-height',Math.ceil(composer.getBoundingClientRect().height)+'px');
-          if(field===document.activeElement)pinConversationToLatest();
+          if(field===document.activeElement){
+            pinComposerAboveKeyboard(field);
+            pinConversationToLatest();
+          }
         });
       };
       const syncGeminiKeyboard=()=>{
@@ -339,14 +353,11 @@
           const visibleBottom=Math.round(vv.height+offset);
           const baseHeight=geminiUnfocusedViewportHeight||geminiStageHeight||Math.round(window.innerHeight||visibleBottom);
           const inset=Math.max(0,Math.round(baseHeight-visibleBottom));
-          const composer=field.closest('.gemini-composer');
-          const composerHeight=Math.max(42,Math.ceil(composer?.getBoundingClientRect().height||58));
-          const composerTop=Math.max(offset+4,visibleBottom-composerHeight-6);
           page.style.setProperty('--gemini-keyboard-inset',inset+'px');
           page.style.setProperty('--gemini-viewport-offset',offset+'px');
-          page.style.setProperty('--gemini-composer-top',composerTop+'px');
           document.body.style.setProperty('--gemini-viewport-offset',offset+'px');
           setGeminiMotionTargets(offset,0);
+          pinComposerAboveKeyboard(field);
           pinConversationToLatest();
         });
       };
@@ -800,6 +811,7 @@
       page.addEventListener('input',e=>{
         const field=e.target.closest('.gemini-composer textarea');if(!field)return;
         autosizeComposer(field);
+        if(field===document.activeElement)requestAnimationFrame(()=>pinComposerAboveKeyboard(field));
       });
       page.addEventListener('focusin',e=>{
         const field=e.target.closest('.gemini-composer textarea');if(!field)return;
