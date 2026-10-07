@@ -376,7 +376,10 @@
       try{
         const blob=await prepareBackground(file);await backgroundDbAction('write',blob);
         localStorage.setItem(BG_MODE_KEY,'custom');localStorage.setItem(BG_NAME_KEY,file.name||'Fotografie personalizată');
-        await applyStoredBackground();tell('Fundalul personalizat a fost salvat pe acest dispozitiv.');
+        /* The file may change while mode/name stay identical. Explicitly mark
+           the background key dirty so Cloud Sync replaces the binary asset too. */
+        window.dispatchEvent(new CustomEvent('orar-local-change',{detail:{key:BG_MODE_KEY}}));
+        await applyStoredBackground();tell('Fundalul personalizat a fost salvat pe acest dispozitiv și va fi inclus în Cloud sync.');
       }catch(error){tell(error?.message||'Nu am putut salva fundalul.');}
       finally{e.target.value='';}
     });
