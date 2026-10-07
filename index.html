@@ -1114,7 +1114,7 @@
           const parsed=JSON.parse(raw);
           if(parsed?.version===1&&Array.isArray(parsed.schedules)&&parsed.schedules.length){
             const seen=new Set();
-            parsed.schedules=parsed.schedules.slice(0,6).map((entry,index)=>{
+            parsed.schedules=parsed.schedules.slice(0,2).map((entry,index)=>{
               let id=String(entry?.id||'schedule-'+(index+1));while(seen.has(id))id+='-'+index;seen.add(id);
               const schedule=normalizeScheduleData(entry?.schedule&&Array.isArray(entry.schedule.times)?entry.schedule:clone(initialData));
               const accent=SCHEDULE_ACCENTS.includes(entry?.accent)?entry.accent:SCHEDULE_ACCENTS[index%SCHEDULE_ACCENTS.length];
@@ -1159,7 +1159,7 @@
       persistScheduleBook();if(entry.id===activeScheduleId)render();updateUndoButton();return true;
     }
     function addBlankSchedule(){
-      if(scheduleBook.schedules.length>=6){showToast('Poți avea maximum 6 orare.');return null;}
+      if(scheduleBook.schedules.length>=2){showToast('Poți avea maximum 2 orare.');return null;}
       syncActiveSchedule();
       const number=scheduleBook.schedules.length+1,name='Orar '+number,id='schedule-'+Date.now().toString(36);
       const entry={id,name,accent:SCHEDULE_ACCENTS[(number-1)%SCHEDULE_ACCENTS.length],schedule:{title:name,subtitle:'',times:clone(data.times),classes:{}}};
@@ -2066,7 +2066,7 @@
           <label>Accent<select data-schedule-accent="${escapeHtml(entry.id)}">${SCHEDULE_ACCENTS.map(color=>`<option value="${color}" ${entry.accent===color?'selected':''}>${CARD_TONE_LABELS[color]}</option>`).join('')}</select></label>
           <div class="schedule-manager-actions">${entry.id===activeScheduleId?'<span class="schedule-manager-active">Se editează</span>':`<button type="button" data-schedule-edit="${escapeHtml(entry.id)}">Editează</button>`}<button type="button" data-schedule-gemini="${escapeHtml(entry.id)}">Upload Gemini</button>${scheduleBook.schedules.length>1?`<button type="button" data-schedule-delete="${escapeHtml(entry.id)}">Șterge</button>`:''}</div>
         </section>`).join('')}</div>
-        <button class="hub-primary schedule-add-button" type="button" data-schedule-add>＋ Adaugă încă un orar</button>`;
+        ${scheduleBook.schedules.length<2?'<button class="hub-primary schedule-add-button" type="button" data-schedule-add>＋ Adaugă încă un orar</button>':''}`;
     }
 
     const saveHeaderField=(element,field)=>{
@@ -2089,7 +2089,7 @@
     scheduleManagerToggle.addEventListener('click',()=>{renderScheduleManager();if(!scheduleManagerDialog.open)scheduleManagerDialog.showModal();});
     scheduleManagerDialog.addEventListener('click',e=>{
       if(e.target.closest('[data-schedule-manager-close]')){scheduleManagerDialog.close();return;}
-      if(e.target.closest('[data-schedule-add]')){addBlankSchedule();renderScheduleManager();showToast('Orar nou adăugat');return;}
+      if(e.target.closest('[data-schedule-add]')){const added=addBlankSchedule();renderScheduleManager();if(added)showToast('Orar nou adăugat');return;}
       const edit=e.target.closest('[data-schedule-edit]');if(edit){switchActiveSchedule(edit.dataset.scheduleEdit);scheduleManagerDialog.close();showToast('Acum editezi '+activeScheduleEntry().name);return;}
       const upload=e.target.closest('[data-schedule-gemini]');if(upload){window.dispatchEvent(new CustomEvent('orar-gemini-import-request',{detail:{scheduleId:upload.dataset.scheduleGemini}}));scheduleManagerDialog.close();return;}
       const del=e.target.closest('[data-schedule-delete]');if(del){
