@@ -1368,13 +1368,14 @@
         </div>
       </section>`;
     }
-    function renderCombinedSlot(time,day){
+    function renderCombinedSlot(time,day,bandIndex){
       const items=combinedItemsAt(time,day);
-      if(!items.length)return `<div class="slot-cell empty day-col day-${day}"></div>`;
+      const attrs=` data-combined-band="${bandIndex}" data-combined-day="${day}"`;
+      if(!items.length)return `<div class="slot-cell empty day-col day-${day}"${attrs}></div>`;
       if(items.length===2&&isCompactOverlapView()){
-        return `<div class="slot-cell combined-slot overlap-split day-col day-${day}">${renderOverlapPiece(items[0],'top')}${renderOverlapPiece(items[1],'bottom')}</div>`;
+        return `<div class="slot-cell combined-slot overlap-split day-col day-${day}"${attrs}>${renderOverlapPiece(items[0],'top')}${renderOverlapPiece(items[1],'bottom')}</div>`;
       }
-      return `<div class="slot-cell combined-slot day-col day-${day}">${items.map(renderCombinedCard).join('')}</div>`;
+      return `<div class="slot-cell combined-slot day-col day-${day}"${attrs}>${items.map(renderCombinedCard).join('')}</div>`;
     }
     function renderTabs(){
       let buttons=[...mobileTabs.querySelectorAll('.day-tab')];
@@ -1409,7 +1410,7 @@
       if(combined){
         combinedTimes().forEach((time,row)=>{
           html+=renderTimeCell(time,row);
-          DAYS.forEach((_,day)=>{html+=renderCombinedSlot(time,day);});
+          DAYS.forEach((_,day)=>{html+=renderCombinedSlot(time,day,row);});
         });
       }else{
         data.times.forEach((time,row)=>{
@@ -1595,6 +1596,38 @@
 
     let weekFadeMotions = [];
 
+    function combinedParityAffectedSlots(){
+      const bands=combinedTimes(),affected=new Map();
+      scheduleBook.schedules.forEach(entry=>{
+        Object.entries(entry.schedule?.classes||{}).forEach(([key,root])=>{
+          if(!root)return;
+          const rootParity=root.week&&root.week!=='MEREU';
+          const altParity=root.alternate&&root.alternate.week&&root.alternate.week!=='MEREU';
+          if(!rootParity&&!altParity)return;
+          const parts=key.split('-'),sourceRow=Number(parts[0]),day=Number(parts[1]);
+          if(!Number.isInteger(sourceRow)||day<0||day>4)return;
+          const bandIndex=bands.findIndex(time=>time?.[2]?.members?.some(member=>member.entryId===entry.id&&member.row===sourceRow));
+          if(bandIndex<0)return;
+          affected.set(bandIndex+'-'+day,{bandIndex,day});
+        });
+      });
+      return {bands,slots:[...affected.values()]};
+    }
+
+    function refreshCombinedParitySlot(bands,bandIndex,day){
+      const slot=grid.querySelector(`[data-combined-band="${bandIndex}"][data-combined-day="${day}"]`);
+      const time=bands[bandIndex];
+      if(!slot||!time)return null;
+      const holder=document.createElement('div');
+      holder.innerHTML=renderCombinedSlot(time,day,bandIndex);
+      const next=holder.firstElementChild;
+      if(!next)return null;
+      slot.className=next.className;
+      slot.innerHTML=next.innerHTML;
+      slot.querySelectorAll('.class-card,.overlap-piece').forEach(node=>node.style.setProperty('animation','none','important'));
+      return slot;
+    }
+
     function parityAffectedKeys(){
       return Object.keys(data.classes).filter(key => {
         const root = data.classes[key];
@@ -1628,6 +1661,37 @@
       const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       weekFadeMotions.forEach(m => { try{ m.cancel(); }catch(e){} });
       weekFadeMotions = [];
+
+      if(scheduleViewMode==='combined'&&scheduleBook.schedules.length>1&&!editing){
+        const {bands,slots}=combinedParityAffectedSlots();
+        if(!reduce){
+          slots.forEach(({bandIndex,day})=>{
+            const slot=grid.querySelector(`[data-combined-band="${bandIndex}"][data-combined-day="${day}"]`);
+            if(!slot?.animate)return;
+            weekFadeMotions.push(slot.animate([{opacity:1},{opacity:0}],{duration:170,easing:'ease-out',fill:'forwards'}));
+          });
+          if(weekFadeMotions.length)await Promise.allSettled(weekFadeMotions.map(m=>m.finished));
+        }
+
+        selectedWeek=week;
+        storageSet('c11_1_selected_week',week);
+        document.body.dataset.week=selectedWeek;
+        document.getElementById('weekLabel').textContent=selectedWeek;
+        document.getElementById('weekToggle').setAttribute('aria-label',`Săptămâna ${selectedWeek}. Afișează săptămâna ${oppositeWeek(selectedWeek)}`);
+
+        slots.forEach(({bandIndex,day})=>refreshCombinedParitySlot(bands,bandIndex,day));
+
+        weekFadeMotions=[];
+        if(!reduce){
+          slots.forEach(({bandIndex,day})=>{
+            const slot=grid.querySelector(`[data-combined-band="${bandIndex}"][data-combined-day="${day}"]`);
+            if(!slot?.animate)return;
+            weekFadeMotions.push(slot.animate([{opacity:0},{opacity:1}],{duration:210,easing:'ease-out'}));
+          });
+          Promise.allSettled(weekFadeMotions.map(m=>m.finished)).finally(()=>{weekFadeMotions=[];});
+        }
+        return;
+      }
 
       const affectedKeys = parityAffectedKeys();
       if(!reduce){
