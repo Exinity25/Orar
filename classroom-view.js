@@ -1202,6 +1202,12 @@
       const accountKey=String(email||'').trim().toLowerCase()||'__current__';
       if(cloudRestoredAccount&&cloudRestoredAccount!==accountKey)cloudFileId='';
       const preferRemote=cloudRestoredAccount!==accountKey;
+
+      /* Flush unsynced edits first. uploadCloud now merges only dirty keys into
+         the current cloud snapshot, so this cannot erase newer unrelated data
+         from another device. */
+      if(Object.keys(pendingCloud()).length)await uploadCloud();
+
       const changed=await restoreCloud({preferRemote});
       cloudRestoredAccount=accountKey;
       return changed;
@@ -1215,14 +1221,17 @@
       proto.clear=function(){const local=this===window.localStorage,keys=local?Object.keys(this):[],result=nativeClear.call(this);if(local&&!cloudApplying)keys.forEach(emit);return result;};
     }
     window.addEventListener('orar-local-change',event=>{const key=event.detail?.key;if(cloudApplying||!key||CLOUD_SKIP.has(key))return;try{const pending=pendingCloud();pending[key]=Date.now()+':'+Math.random();localStorage.setItem(PENDING_KEY,JSON.stringify(pending));}catch{}scheduleCloudUpload();});
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&Object.keys(pendingCloud()).length)uploadCloud().catch(()=>{});});
+    window.addEventListener('pagehide',()=>{if(Object.keys(pendingCloud()).length)uploadCloud().catch(()=>{});},{passive:true});
     window.addEventListener('orar-cloud-sync-request',async()=>{
       try{
         if(!token||Date.now()>=expires||!grantedScopes.includes('drive.appdata')){
           window.dispatchEvent(new CustomEvent('orar-cloud-sync-result',{detail:{ok:false,message:'Conectează contul Google din Classroom pentru Cloud sync.'}}));
           return;
         }
+        if(Object.keys(pendingCloud()).length)await uploadCloud();
         const changed=await restoreCloud({preferRemote:true});
-        if(!changed)window.dispatchEvent(new CustomEvent('orar-cloud-sync-result',{detail:{ok:true,message:'Datele din cloud sunt deja la zi pe acest dispozitiv.'}}));
+        if(!changed)window.dispatchEvent(new CustomEvent('orar-cloud-sync-result',{detail:{ok:true,message:'Cloud sync finalizat. Datele locale și cele din cloud sunt la zi.'}}));
       }catch{
         window.dispatchEvent(new CustomEvent('orar-cloud-sync-result',{detail:{ok:false,message:'Sincronizarea cu cloud-ul nu a reușit.'}}));
       }
