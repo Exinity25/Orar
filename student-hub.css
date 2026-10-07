@@ -1733,7 +1733,8 @@ body:not([data-orar-theme]):not(.orar-custom-background)::after{
 /* v74 iOS overlay keyboard + post-rotation hit-test recovery.
    Gemini keeps its pre-keyboard stage size; the keyboard overlays that stage
    and only the composer follows the visible viewport. */
-.hub-layer:not(.is-open){display:none!important}
+/* Keep the drawer mounted so its open/close motion can complete. */
+.hub-layer:not(.is-open){display:block!important}
 .hub-layer.is-open{display:block!important}
 
 @supports (-webkit-touch-callout:none){
@@ -1824,4 +1825,154 @@ body:not([data-orar-theme]):not(.orar-custom-background)::after{
   background:#000!important;
   pointer-events:auto!important;
   touch-action:auto!important;
+}
+
+
+/* v77 motion system: short, consistent, compositor-friendly motion across the app. */
+:root{
+  --motion-fast:160ms;
+  --motion-base:240ms;
+  --motion-slow:320ms;
+  --motion-ease:cubic-bezier(.2,.8,.2,1);
+  --motion-spring:cubic-bezier(.16,1,.3,1);
+}
+
+/* Side menu: preserve both enter and exit instead of hiding the layer instantly. */
+.hub-layer{
+  visibility:hidden!important;
+  pointer-events:none!important;
+  transition:visibility 0s linear var(--motion-slow)!important;
+}
+.hub-layer.is-open{
+  visibility:visible!important;
+  pointer-events:auto!important;
+  transition-delay:0s!important;
+}
+.hub-backdrop{
+  transition:opacity var(--motion-base) ease!important;
+}
+.hub-drawer{
+  transition:transform var(--motion-slow) var(--motion-spring)!important;
+  will-change:transform;
+}
+.hub-layer.is-open .hub-nav-item{
+  animation:orar-menu-item-in 240ms var(--motion-spring) both;
+}
+.hub-layer.is-open .hub-nav-item:nth-child(2){animation-delay:22ms}
+.hub-layer.is-open .hub-nav-item:nth-child(3){animation-delay:38ms}
+.hub-layer.is-open .hub-nav-item:nth-child(4){animation-delay:54ms}
+.hub-layer.is-open .hub-nav-item:nth-child(5){animation-delay:70ms}
+.hub-layer.is-open .hub-nav-item:nth-child(6){animation-delay:86ms}
+@keyframes orar-menu-item-in{
+  from{opacity:0;transform:translate3d(-8px,0,0)}
+  to{opacity:1;transform:translate3d(0,0,0)}
+}
+
+/* Small controls should feel alive without large movement. */
+:is(
+  .hub-nav-item,.hub-small-button,.hub-primary,.hub-menu-button,.hub-close,
+  .edit-toggle,.undo-toggle,.redo-toggle,.week-toggle,.schedule-manager-toggle,
+  .day-tab,.add-class,.delete-class,.drive-card,.mail-card,.classroom-course-summary,
+  .gemini-new-chat,.gemini-chat-row,.gemini-attach,.gemini-send
+){
+  transition:
+    transform var(--motion-fast) ease,
+    opacity var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    background-color var(--motion-fast) ease,
+    box-shadow var(--motion-base) ease!important;
+}
+:is(
+  .hub-nav-item,.hub-small-button,.hub-primary,.hub-menu-button,.hub-close,
+  .edit-toggle,.undo-toggle,.redo-toggle,.week-toggle,.schedule-manager-toggle,
+  .day-tab,.add-class,.delete-class,.drive-card,.mail-card,.classroom-course-summary,
+  .gemini-new-chat,.gemini-chat-row,.gemini-attach,.gemini-send
+):active{
+  transform:scale(.975);
+}
+
+/* Page/content fades are shared by schedule-adjacent sections. */
+.hub-page.is-entering,
+.planner-page:not(.hub-hidden),
+.classroom-viewer:not(.hub-hidden) .classroom-viewer-dialog{
+  animation:orar-soft-enter var(--motion-base) var(--motion-spring) both!important;
+}
+@keyframes orar-soft-enter{
+  from{opacity:0;transform:translate3d(0,7px,0) scale(.995)}
+  to{opacity:1;transform:translate3d(0,0,0) scale(1)}
+}
+
+/* Details / expandable content gets a compact extend animation. */
+.hub-subject[open] .hub-subject-body,
+.classroom-course.is-open .classroom-course-panel,
+.classroom-profile.is-open .classroom-profile-menu{
+  animation:orar-expand-in 220ms var(--motion-spring) both!important;
+  transform-origin:top;
+}
+@keyframes orar-expand-in{
+  from{opacity:0;transform:translate3d(0,-6px,0) scaleY(.985)}
+  to{opacity:1;transform:translate3d(0,0,0) scaleY(1)}
+}
+
+/* Cards and rows fade in softly when their view is rendered. */
+.hub-page:not(.hub-hidden) :is(
+  .hub-subject,.hub-custom-section,.classroom-course,.classroom-post,.mail-card,.mail-message,.drive-card
+),
+.planner-page:not(.hub-hidden) :is(
+  .pl-card,.pl-hero,.pl-event,.pl-day,.pl-metrics article,.pl-subject-group
+){
+  animation:orar-card-soft-in 220ms var(--motion-ease) both;
+}
+@keyframes orar-card-soft-in{
+  from{opacity:.2;transform:translate3d(0,5px,0)}
+  to{opacity:1;transform:translate3d(0,0,0)}
+}
+
+/* Dialogs and file viewer surfaces get one subtle pop/fade. */
+.planner-dialog[open]{
+  animation:orar-dialog-in 220ms var(--motion-spring) both;
+}
+.planner-dialog[open]::backdrop{
+  animation:orar-backdrop-in 180ms ease both;
+}
+.classroom-viewer:not(.hub-hidden) .classroom-viewer-backdrop{
+  animation:orar-backdrop-in 180ms ease both;
+}
+@keyframes orar-dialog-in{
+  from{opacity:0;transform:translate3d(0,8px,0) scale(.985)}
+  to{opacity:1;transform:translate3d(0,0,0) scale(1)}
+}
+@keyframes orar-backdrop-in{from{opacity:0}to{opacity:1}}
+
+/* Gemini is animated by one rAF loop in JS. Keep it compositor-only. */
+.gemini-header,
+.gemini-conversation,
+.gemini-composer,
+.gemini-pending-files{
+  will-change:transform;
+  backface-visibility:hidden;
+  -webkit-backface-visibility:hidden;
+}
+
+/* Force WebKit to rebuild the fixed containing block after landscape edit mode.
+   The app content is hidden for these two internal frames, so this cannot flash. */
+@supports (-webkit-touch-callout:none){
+  body.ios-hit-rebuild{
+    position:absolute!important;
+    inset:0!important;
+    width:100%!important;
+    height:100%!important;
+    min-height:100%!important;
+    max-height:none!important;
+  }
+}
+
+/* Accessibility: motion remains optional for users who explicitly request less. */
+@media(prefers-reduced-motion:reduce){
+  .hub-layer,.hub-backdrop,.hub-drawer,.hub-nav-item,
+  .hub-page,.planner-page,.classroom-viewer-dialog,.classroom-viewer-backdrop,
+  .hub-subject-body,.classroom-course-panel,.classroom-profile-menu{
+    animation:none!important;
+    transition:none!important;
+  }
 }
