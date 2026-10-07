@@ -2015,14 +2015,17 @@
         display:node.style.display,
         visibility:node.style.visibility
       }));
+      document.body.classList.add('ios-hit-rebuild');
       nodes.forEach(node=>{node.style.visibility='hidden';node.style.display='none';});
       void document.body.offsetHeight;
       requestAnimationFrame(()=>{
-        saved.forEach(({node,display})=>{node.style.display=display;});
+        document.body.classList.remove('ios-hit-rebuild');
         void document.body.offsetHeight;
+        saved.forEach(({node,display})=>{node.style.display=display;});
         requestAnimationFrame(()=>{
           saved.forEach(({node,visibility})=>{node.style.visibility=visibility;});
           void document.body.offsetHeight;
+          window.dispatchEvent(new CustomEvent('orar-orientation-recover'));
         });
       });
     };
