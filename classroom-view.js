@@ -1174,7 +1174,7 @@
       if(failures)throw Error('Nu s-au putut actualiza toate secțiunile Classroom. Datele locale sunt păstrate; reîncearcă.');
       return {courses:courseList.map(c=>({id:String(c.id),name:c.name})),posts:items,updated:new Date().toISOString()};
     }
-    window.addEventListener('orar-drive-section-request',e=>{const id=String(e.detail?.id||''),type=String(e.detail?.type||''),title=String(e.detail?.title||'Google Drive');if(!id)return;if(type==='folder'){driveFolderId=id;driveFolderName=/^https?:\/\//i.test(title)?'Folder Drive':title;driveQuery='';driveNext='';driveItems=[];if(driveScopeOk())setTimeout(async()=>{try{const meta=await driveApi('files/'+encodeURIComponent(id)+'?fields=id,name,mimeType');if(meta?.name)driveFolderName=meta.name;}catch{}loadDrive(false);},0);}else setTimeout(()=>openViewer(id,title),0);});
+    window.addEventListener('orar-drive-section-request',e=>{const id=String(e.detail?.id||''),type=String(e.detail?.type||''),title=String(e.detail?.title||'Google Drive');if(!id)return;if(type==='folder'){driveFolderId=id;driveFolderName=/^https?:\/\//i.test(title)?'Folder Drive':title;driveQuery='';driveNext='';driveItems=[];if(driveScopeOk())setTimeout(async()=>{try{const meta=await driveApi('files/'+encodeURIComponent(id)+'?fields=id,name,mimeType');if(meta?.name)driveFolderName=meta.name;}catch{}loadDrive(false,'forward');},0);}else setTimeout(()=>openViewer(id,title),0);});
     const ensureFreshGoogleSession=()=>{
       if(!client||!rememberedAccount()||reauthenticating||silentRenewing)return;
       if(!token||expires-Date.now()<2*60*1000)requestAccess(true,true);
