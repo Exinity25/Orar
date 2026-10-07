@@ -2104,3 +2104,69 @@ body:not([data-orar-theme]):not(.orar-custom-background)::after{
     transform:none!important;
   }
 }
+
+
+/* v83 iOS Home Screen geometry + touch fallback.
+   v82 proved that making the document root relative/absolute exposes the
+   unpainted Home Screen region and moves safe-area controls under the status
+   bar. Restore the full-bleed fixed document root; keep the timetable itself
+   absolute and correct any WebKit stale hit target in JS using visual rects. */
+@supports (-webkit-touch-callout:none){
+  html{
+    width:100%!important;
+    height:100%!important;
+    min-height:100%!important;
+    overflow:hidden!important;
+  }
+  body,
+  body.gemini-keyboard-open{
+    position:fixed!important;
+    inset:0!important;
+    width:auto!important;
+    height:auto!important;
+    min-height:0!important;
+    max-height:none!important;
+    overflow:hidden!important;
+  }
+  body::before,
+  body::after,
+  body.gemini-keyboard-open::before,
+  body.gemini-keyboard-open::after{
+    position:fixed!important;
+    inset:0!important;
+    width:auto!important;
+    height:auto!important;
+    min-height:0!important;
+    max-height:none!important;
+  }
+
+  .app{
+    position:absolute!important;
+    inset:0!important;
+  }
+  .hub-page,
+  .hub-layer,
+  .classroom-viewer{
+    position:fixed!important;
+    inset:0!important;
+  }
+
+  .schedule-floating-controls{
+    display:contents!important;
+    pointer-events:auto!important;
+  }
+  .schedule-floating-controls > button,
+  .hub-menu-button,
+  .hub-status,
+  .gemini-composer,
+  .gemini-pending-files,
+  .gemini-sidebar,
+  .gemini-chat-backdrop,
+  .gemini-chat-menu-toggle{
+    position:fixed!important;
+  }
+
+  body.gemini-keyboard-open .gemini-page{
+    position:fixed!important;
+  }
+}
