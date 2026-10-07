@@ -630,6 +630,51 @@
     let mailItems=[],mailLoading=false,mailMessage='',mailOpen=null,mailBody='',mailBodyHtml='',mailUnread=0,mailVisible=false,mailNext='';
     let driveItems=[],driveLoading=false,driveMessage='',driveVisible=false,driveNext='',driveQuery='',driveFolderId='',driveFolderName='';
     let courseToggleMotion=0,courseAccentOpeningId='';
+    const reduceGoogleMotion=()=>Boolean(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    function renderGoogleStage(page,{stageClass,headingId,title,intro,body,motion=''}) {
+      let content=page.querySelector('.hub-content');
+      if(!content){
+        page.innerHTML=`<div class="hub-content"><header class="hub-page-header"><h1 class="hub-heading" id="${headingId}" tabindex="-1">${title}</h1><p class="hub-intro">${intro}</p></header><div class="${stageClass} google-view-stage"></div></div>`;
+        content=page.querySelector('.hub-content');
+      }
+      const stage=content.querySelector('.'+stageClass);
+      if(!stage)return;
+      try{stage.getAnimations({subtree:true}).forEach(animation=>animation.cancel());}catch{}
+      const old=stage.firstElementChild;
+      const next=document.createElement('div');
+      next.className='google-view-frame';
+      next.innerHTML=body;
+      if(!old||!motion||reduceGoogleMotion()||!old.animate||!next.animate){
+        stage.classList.remove('is-transitioning');
+        stage.replaceChildren(next);
+        return;
+      }
+      // Clean up any stale second frame before starting a new transition.
+      while(stage.children.length>1)stage.lastElementChild.remove();
+      stage.append(next);
+      stage.classList.add('is-transitioning');
+      let oldFrames,newFrames;
+      if(motion==='forward'){
+        oldFrames=[{opacity:1},{opacity:0}];
+        newFrames=[{opacity:0,transform:'translate3d(46px,0,0)'},{opacity:1,transform:'translate3d(0,0,0)'}];
+      }else if(motion==='back'){
+        oldFrames=[{opacity:1,transform:'translate3d(0,0,0)'},{opacity:0,transform:'translate3d(46px,0,0)'}];
+        newFrames=[{opacity:0},{opacity:1}];
+      }else{
+        oldFrames=[{opacity:1},{opacity:0}];
+        newFrames=[{opacity:0},{opacity:1}];
+      }
+      const oldMotion=old.animate(oldFrames,{duration:220,easing:'ease-out',fill:'forwards'});
+      const newMotion=next.animate(newFrames,{duration:motion==='forward'?320:260,easing:'cubic-bezier(.16,1,.3,1)',fill:'forwards'});
+      Promise.allSettled([oldMotion.finished,newMotion.finished]).then(()=>{
+        if(!next.isConnected)return;
+        try{oldMotion.cancel();newMotion.cancel();}catch{}
+        old.remove();
+        next.style.opacity='';
+        next.style.transform='';
+        stage.classList.remove('is-transitioning');
+      });
+    }
     const configured=()=>/^[\w.-]+\.apps\.googleusercontent\.com$/.test(window.ORAR_CLASSROOM_CLIENT_ID||'');
     function rememberedAccount(){try{const value=JSON.parse(localStorage.getItem(ACCOUNT_KEY)||'null');return value&&value.email?value:null;}catch{return null;}}
     function renderProfile(account,connected=Boolean(token&&Date.now()<expires)){
@@ -812,7 +857,7 @@
       if(!response.ok){let payload=null;try{payload=await response.clone().json();}catch{}throw Error(payload?.error?.message||'Google Drive nu a putut fi accesat.');}
       return response.json();
     }
-    async function loadDrive(append=false){
+    async function loadDrive(append=false,motion=''){
       if(!driveScopeOk()){driveItems=[];driveMessage='Reconectează contul Google și acceptă accesul la Drive.';renderDrive();return;}
       driveLoading=true;driveMessage='';drivePage.classList.add('is-data-loading');
       try{
@@ -821,16 +866,16 @@
         if(append&&driveNext)params.set('pageToken',driveNext);
         const result=await driveApi('files?'+params.toString()),next=result.files||[];
         driveItems=append?[...driveItems,...next.filter(row=>!driveItems.some(old=>old.id===row.id))]:next;driveNext=String(result.nextPageToken||'');
-      }catch(e){driveMessage=e.message||'Fișierele Drive nu au putut fi încărcate.';}finally{driveLoading=false;drivePage.classList.remove('is-data-loading');renderDrive();}
+      }catch(e){driveMessage=e.message||'Fișierele Drive nu au putut fi încărcate.';}finally{driveLoading=false;drivePage.classList.remove('is-data-loading');renderDrive(motion);}
     }
-    function renderDrive(){
+    function renderDrive(motion=''){
       const connected=Boolean(token&&Date.now()<expires),scope=driveScopeOk();let body='';
       if(!connected)body='<div class="classroom-welcome"><h2>Conectează contul Google</h2><p>Drive folosește același cont conectat pentru Classroom și Mail.</p><button class="hub-primary" data-drive-connect>Conectează contul Google</button></div>';
       else if(!scope)body='<div class="classroom-welcome"><h2>Activează Drive</h2><p>Reconectează contul și acceptă accesul read-only la Google Drive.</p><button class="hub-primary" data-drive-connect>Activează accesul Drive</button></div>';
       else{const rows=driveItems.map(file=>{const folder=file.mimeType==='application/vnd.google-apps.folder';return '<button class="drive-card '+(folder?'is-folder':'')+'" type="button" '+(folder?'data-drive-folder':'data-drive-open')+'="'+esc(file.id)+'" data-drive-title="'+esc(file.name)+'"><span class="drive-file-icon">'+(folder?'▱':'▧')+'</span><span><strong>'+esc(file.name)+'</strong><small>'+(folder?'Folder':esc(file.mimeType||'Fișier'))+' · '+(file.modifiedTime?new Date(file.modifiedTime).toLocaleString('ro-RO'):'')+'</small></span></button>';}).join('');body=(driveFolderId?'<div class="drive-folder-head"><button class="hub-small-button" type="button" data-drive-root>← Drive</button><strong>'+esc(driveFolderName||'Folder')+'</strong></div>':'')+'<form class="drive-toolbar" data-drive-search><input name="q" type="search" value="'+esc(driveQuery)+'" placeholder="'+(driveFolderId?'Caută în folder…':'Caută în Drive…')+'" aria-label="Caută în Google Drive"><button class="hub-primary">Caută</button><button type="button" class="hub-small-button" data-drive-refresh>Actualizează</button></form>'+(driveMessage?'<p class="classroom-notice" role="alert">'+esc(driveMessage)+'</p>':'')+'<div class="drive-list">'+(rows||(driveLoading?'':'<p class="hub-empty">Nu am găsit fișiere.</p>'))+'</div>'+(driveNext?'<button class="hub-small-button drive-more" data-drive-more '+(driveLoading?'disabled':'')+'>Încarcă mai multe</button>':'');}
-      drivePage.innerHTML='<div class="hub-content"><header class="hub-page-header"><h1 class="hub-heading" id="driveHeading" tabindex="-1">Drive</h1><p class="hub-intro">Fișierele contului Google, deschise direct în aplicație.</p></header>'+body+'</div>';
+      renderGoogleStage(drivePage,{stageClass:'drive-view-stage',headingId:'driveHeading',title:'Drive',intro:'Fișierele contului Google, deschise direct în aplicație.',body,motion});
     }
-    drivePage.addEventListener('click',e=>{if(e.target.closest('[data-drive-connect]')){requestAccess(Boolean(rememberedAccount()));return;}if(e.target.closest('[data-drive-root]')){driveFolderId='';driveFolderName='';driveQuery='';driveNext='';loadDrive(false);return;}if(e.target.closest('[data-drive-refresh]')){driveNext='';loadDrive(false);return;}if(e.target.closest('[data-drive-more]')){loadDrive(true);return;}const folder=e.target.closest('[data-drive-folder]');if(folder){driveFolderId=folder.dataset.driveFolder;driveFolderName=folder.dataset.driveTitle||'Folder';driveQuery='';driveNext='';loadDrive(false);return;}const open=e.target.closest('[data-drive-open]');if(open)openViewer(open.dataset.driveOpen,open.dataset.driveTitle);});
+    drivePage.addEventListener('click',e=>{if(e.target.closest('[data-drive-connect]')){requestAccess(Boolean(rememberedAccount()));return;}if(e.target.closest('[data-drive-root]')){driveFolderId='';driveFolderName='';driveQuery='';driveNext='';loadDrive(false,'back');return;}if(e.target.closest('[data-drive-refresh]')){driveNext='';loadDrive(false);return;}if(e.target.closest('[data-drive-more]')){loadDrive(true);return;}const folder=e.target.closest('[data-drive-folder]');if(folder){driveFolderId=folder.dataset.driveFolder;driveFolderName=folder.dataset.driveTitle||'Folder';driveQuery='';driveNext='';loadDrive(false,'forward');return;}const open=e.target.closest('[data-drive-open]');if(open)openViewer(open.dataset.driveOpen,open.dataset.driveTitle);});
     drivePage.addEventListener('submit',e=>{const form=e.target.closest('[data-drive-search]');if(!form)return;e.preventDefault();driveQuery=String(new FormData(form).get('q')||'').trim();driveNext='';loadDrive(false);});
     function openDriveLink(raw,title='Fișier Google Drive'){const target=driveTargetFromUrl(raw);if(!target)return false;window.dispatchEvent(new CustomEvent('orar-drive-section-request',{detail:{...target,title}}));return true;}
     const mailScopeOk=()=>Boolean(token&&Date.now()<expires&&grantedScopes.includes('gmail.modify')&&grantedScopes.includes('gmail.send'));
@@ -925,17 +970,17 @@
       if(!mailScopeOk()){mailLoading=false;mailItems=[];mailNext='';mailMessage='Pentru Mail, reconectează contul Google și acceptă accesul Gmail.';renderMail();return;}
       mailNext='';await loadMailBatch(false);
     }
-    async function openMail(id){if(!mailScopeOk())return;mailLoading=true;mailPage.classList.add('is-data-loading');try{const row=await gmailApi('messages/'+encodeURIComponent(id)+'?format=full');mailOpen={id:row.id,subject:mailHeader(row,'Subject')||'(fără subiect)',from:mailHeader(row,'From')||'',date:mailHeader(row,'Date')||''};mailBody=mailPlain(row.payload)||row.snippet||'(Mesaj fără conținut text.)';mailBodyHtml=await mailRichHtml(row);if((row.labelIds||[]).includes('UNREAD')){await gmailApi('messages/'+encodeURIComponent(id)+'/modify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({removeLabelIds:['UNREAD']})});const item=mailItems.find(x=>x.id===id);if(item)item.unread=false;await refreshMailSummary();}}catch(e){mailMessage=e.message||'Mesajul nu a putut fi deschis.';}finally{mailLoading=false;mailPage.classList.remove('is-data-loading');renderMail();}}
-    function renderMail(){
+    async function openMail(id){if(!mailScopeOk())return;mailLoading=true;mailPage.classList.add('is-data-loading');try{const row=await gmailApi('messages/'+encodeURIComponent(id)+'?format=full');mailOpen={id:row.id,subject:mailHeader(row,'Subject')||'(fără subiect)',from:mailHeader(row,'From')||'',date:mailHeader(row,'Date')||''};mailBody=mailPlain(row.payload)||row.snippet||'(Mesaj fără conținut text.)';mailBodyHtml=await mailRichHtml(row);if((row.labelIds||[]).includes('UNREAD')){await gmailApi('messages/'+encodeURIComponent(id)+'/modify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({removeLabelIds:['UNREAD']})});const item=mailItems.find(x=>x.id===id);if(item)item.unread=false;await refreshMailSummary();}}catch(e){mailMessage=e.message||'Mesajul nu a putut fi deschis.';}finally{mailLoading=false;mailPage.classList.remove('is-data-loading');renderMail(mailOpen?'forward':'');}}
+    function renderMail(motion=''){
       const connected=Boolean(token&&Date.now()<expires),gmail=mailScopeOk(),account=rememberedAccount();let body='';
       if(!connected)body='<div class="classroom-welcome"><h2>Conectează contul Google</h2><p>Mail folosește același cont conectat pentru Classroom și Drive.</p><button class="hub-primary" data-mail-connect>Conectează contul Google</button></div>';
       else if(!gmail)body='<div class="classroom-welcome"><h2>Activează Mail</h2><p>Este necesar acces Gmail pentru a vedea inboxul și a trimite mesaje de pe '+esc(account?.email||'contul conectat')+'.</p><button class="hub-primary" data-mail-connect>Activează accesul Mail</button></div>';
       else if(mailOpen)body='<section class="mail-detail"><button class="hub-small-button" data-mail-back>← Inbox</button><article class="mail-message"><span class="hub-eyebrow">MESAJ</span><h2>'+esc(mailOpen.subject)+'</h2><div class="mail-meta">'+mailSenderMarkup(mailOpen.from)+'<span>'+esc(mailOpen.date)+'</span></div><div class="mail-body '+(mailBodyHtml?'is-html':'')+'">'+(mailBodyHtml||linkifyText(mailBody))+'</div></article></section>';
       else{const rows=mailItems.map(m=>'<button class="mail-card '+(m.unread?'is-unread':'')+'" type="button" data-mail-open="'+esc(m.id)+'"><span class="mail-sender">'+esc(m.from)+'</span><strong>'+esc(m.subject)+'</strong><span class="mail-snippet">'+esc(m.snippet)+'</span><time>'+esc(m.date)+'</time></button>').join('');body='<div class="mail-toolbar"><button class="hub-primary" data-mail-compose>Scrie mail</button><button class="hub-small-button" data-mail-refresh '+(mailLoading?'disabled':'')+'>'+(mailLoading?'Se actualizează…':'Actualizează')+'</button></div>'+(mailMessage?'<p class="classroom-notice" role="alert">'+esc(mailMessage)+'</p>':'')+'<div class="mail-list">'+(rows||(mailLoading?'':'<p class="hub-empty">Inboxul este gol.</p>'))+'</div>'+(mailNext?'<button class="hub-small-button mail-more" data-mail-more '+(mailLoading?'disabled':'')+'>Încarcă mai multe</button>':'');}
-      mailPage.innerHTML='<div class="hub-content"><header class="hub-page-header"><h1 class="hub-heading" id="mailHeading" tabindex="-1">Mail</h1><p class="hub-intro">Inbox și trimitere de mesaje direct din contul Google conectat.</p></header>'+body+'</div>';
+      renderGoogleStage(mailPage,{stageClass:'mail-view-stage',headingId:'mailHeading',title:'Mail',intro:'Inbox și trimitere de mesaje direct din contul Google conectat.',body,motion});
     }
     function composeMail(){mailModal.innerHTML='<div class="pl-dialog-head"><h2>Mail nou</h2><button type="button" data-mail-close aria-label="Închide">✕</button></div><form data-mail-form><label>Către<input name="to" type="email" required autocomplete="email"></label><label>Subiect<input name="subject" maxlength="300"></label><label>Mesaj<textarea name="body" rows="10" required maxlength="50000"></textarea></label><label class="mail-attachment-picker">Fișiere sau poze<input name="attachments" type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip"></label><div class="mail-attachment-note">Poți selecta mai multe fișiere. Gmail acceptă în mod normal maximum aproximativ 25 MB per mesaj.</div><button class="hub-primary">Trimite</button></form>';if(!mailModal.open)mailModal.showModal();}
-    mailPage.addEventListener('click',e=>{const linkEl=e.target.closest('a[href]');if(linkEl&&openDriveLink(linkEl.href,linkEl.textContent||'Fișier Google Drive')){e.preventDefault();return;}if(e.target.closest('[data-mail-connect]')){requestAccess(Boolean(rememberedAccount()));return;}if(e.target.closest('[data-mail-refresh]')){refreshMail();return;}if(e.target.closest('[data-mail-more]')){loadMailBatch(true);return;}if(e.target.closest('[data-mail-compose]')){composeMail();return;}if(e.target.closest('[data-mail-back]')){mailOpen=null;mailBody='';mailBodyHtml='';renderMail();return;}const open=e.target.closest('[data-mail-open]');if(open)openMail(open.dataset.mailOpen);});
+    mailPage.addEventListener('click',e=>{const linkEl=e.target.closest('a[href]');if(linkEl&&openDriveLink(linkEl.href,linkEl.textContent||'Fișier Google Drive')){e.preventDefault();return;}if(e.target.closest('[data-mail-connect]')){requestAccess(Boolean(rememberedAccount()));return;}if(e.target.closest('[data-mail-refresh]')){refreshMail();return;}if(e.target.closest('[data-mail-more]')){loadMailBatch(true);return;}if(e.target.closest('[data-mail-compose]')){composeMail();return;}if(e.target.closest('[data-mail-back]')){mailOpen=null;mailBody='';mailBodyHtml='';renderMail('back');return;}const open=e.target.closest('[data-mail-open]');if(open)openMail(open.dataset.mailOpen);});
     mailModal.addEventListener('click',e=>{if(e.target.closest('[data-mail-close]'))mailModal.close();});
     mailModal.addEventListener('submit',async e=>{const form=e.target.closest('[data-mail-form]');if(!form)return;e.preventDefault();const fd=new FormData(form),to=String(fd.get('to')||'').trim(),subject=String(fd.get('subject')||'').trim(),body=String(fd.get('body')||''),files=[...form.querySelector('[name=attachments]').files];if(!to||!body)return;const total=files.reduce((n,file)=>n+file.size,0);if(total>25*1024*1024){mailMessage='Atașamentele depășesc 25 MB. Elimină unul sau mai multe fișiere.';mailModal.close();renderMail();return;}const boundary='orar_'+Date.now().toString(36),parts=['To: '+to,'Subject: '+subject,'MIME-Version: 1.0','Content-Type: multipart/mixed; boundary="'+boundary+'"','','--'+boundary,'Content-Type: text/plain; charset="UTF-8"','Content-Transfer-Encoding: 8bit','',body];for(const file of files){const bytes=new Uint8Array(await file.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));const encoded=btoa(binary).match(/.{1,76}/g)?.join('\r\n')||'';parts.push('--'+boundary,'Content-Type: '+(file.type||'application/octet-stream')+'; name="'+file.name.replace(/["\r\n]/g,'_')+'"','Content-Disposition: attachment; filename="'+file.name.replace(/["\r\n]/g,'_')+'"','Content-Transfer-Encoding: base64','',encoded);}parts.push('--'+boundary+'--','');const raw=parts.join('\r\n'),button=form.querySelector('button');button.disabled=true;button.textContent='Se trimite…';try{await gmailApi('messages/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({raw:encodeMailRaw(raw)})});mailModal.close();mailMessage=files.length?'Mail trimis cu '+files.length+' atașament'+(files.length===1?'':'e')+'.':'Mail trimis.';renderMail();}catch(err){mailMessage=err.message||'Mailul nu a putut fi trimis.';mailModal.close();renderMail();}});
     async function listAll(path,field,currentGeneration){
