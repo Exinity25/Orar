@@ -650,7 +650,10 @@
           const seekBy=amount=>{if(Number.isFinite(video.duration)&&video.duration>0)video.currentTime=Math.max(0,Math.min(video.duration,video.currentTime+amount));};
 
           play.addEventListener('click',e=>{e.stopPropagation();togglePlay();});
-          video.addEventListener('click',togglePlay);
+          video.addEventListener('click',e=>{
+            if(wrap.classList.contains('is-app-fullscreen'))return;
+            togglePlay();
+          });
           back.addEventListener('click',e=>{e.stopPropagation();seekBy(-10);});
           forward.addEventListener('click',e=>{e.stopPropagation();seekBy(10);});
           progress.addEventListener('input',e=>{e.stopPropagation();if(Number.isFinite(video.duration)&&video.duration>0)video.currentTime=video.duration*Number(progress.value)/1000;});
