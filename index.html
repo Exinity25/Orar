@@ -1605,6 +1605,21 @@
       });
     }
 
+    function refreshParitySlot(key){
+      const slot=grid.querySelector(`[data-key="${key}"]`);
+      if(!slot)return null;
+      const day=Number(String(key).split('-')[1]);
+      const item=activeItem(key);
+      slot.className=`slot-cell${item?'':' empty'} day-col day-${day}${item&&!editing&&expandedKey===key?' note-open-slot':''}`;
+      if(item){
+        slot.innerHTML=renderCard(item,key);
+      }else{
+        slot.innerHTML=editing?`<button class="add-class" type="button" data-add="${key}">＋ Adaugă${data.classes[key]?' · '+selectedWeek:''}</button>`:'';
+      }
+      attachDynamicHandlers(slot);
+      return slot;
+    }
+
     async function selectWeek(week){
       if(week === selectedWeek) return;
 
@@ -1618,34 +1633,36 @@
       if(!reduce){
         affectedKeys.forEach(key => {
           const card = grid.querySelector(`[data-key="${key}"] .class-card`);
-          if(!card || !card.animate) return;
-          const motion = card.animate(
+          if(!card || !card.animate)return;
+          weekFadeMotions.push(card.animate(
             [{opacity:1},{opacity:0}],
-            {duration:170,easing:'ease-out',fill:'forwards'}
-          );
-          weekFadeMotions.push(motion);
+            {duration:180,easing:'ease-out',fill:'forwards'}
+          ));
         });
-        if(weekFadeMotions.length)await Promise.allSettled(weekFadeMotions.map(m => m.finished));
+        if(weekFadeMotions.length)await Promise.allSettled(weekFadeMotions.map(m=>m.finished));
       }
 
-      selectedWeek = week;
+      selectedWeek=week;
       storageSet('c11_1_selected_week',week);
-      expandedKey = null;
-      render();
+      if(expandedKey&&affectedKeys.includes(expandedKey))expandedKey=null;
+      document.body.dataset.week=selectedWeek;
+      document.getElementById('weekLabel').textContent=selectedWeek;
+      document.getElementById('weekToggle').setAttribute('aria-label',`Săptămâna ${selectedWeek}. Afișează săptămâna ${oppositeWeek(selectedWeek)}`);
 
-      weekFadeMotions = [];
+      affectedKeys.forEach(refreshParitySlot);
+
+      weekFadeMotions=[];
       if(!reduce){
-        affectedKeys.forEach(key => {
-          const card = grid.querySelector(`[data-key="${key}"] .class-card`);
-          if(!card || !card.animate) return;
-          const motion = card.animate(
+        affectedKeys.forEach(key=>{
+          const card=grid.querySelector(`[data-key="${key}"] .class-card`);
+          if(!card||!card.animate)return;
+          weekFadeMotions.push(card.animate(
             [{opacity:0},{opacity:1}],
             {duration:220,easing:'ease-out'}
-          );
-          weekFadeMotions.push(motion);
+          ));
         });
-        Promise.allSettled(weekFadeMotions.map(m => m.finished)).finally(() => {
-          weekFadeMotions = [];
+        Promise.allSettled(weekFadeMotions.map(m=>m.finished)).finally(()=>{
+          weekFadeMotions=[];
           grid.classList.remove('is-week-switching');
         });
       }else{
@@ -1837,8 +1854,8 @@
       </div>`;
     }
 
-    function attachDynamicHandlers(){
-      grid.querySelectorAll('[data-card]').forEach(card => {
+    function attachDynamicHandlers(scope=grid){
+      scope.querySelectorAll('[data-card]').forEach(card => {
         if(editing) return;
         card.addEventListener('click', e => {
           if(e.target.closest('.note-panel, .week-switch')) return;
@@ -1852,7 +1869,7 @@
         });
       });
 
-      grid.querySelectorAll('[data-note]').forEach(area => {
+      scope.querySelectorAll('[data-note]').forEach(area => {
         area.addEventListener('click', e=>e.stopPropagation());
         area.addEventListener('focus',()=>{if(!area.dataset.undoCaptured){recordUndo();area.dataset.undoCaptured='1';}});
         area.addEventListener('input', e => {
@@ -1868,7 +1885,7 @@
         });
       });
 
-      grid.querySelectorAll('[data-deadline]').forEach(input => {
+      scope.querySelectorAll('[data-deadline]').forEach(input => {
         input.addEventListener('click', e=>e.stopPropagation());
         input.addEventListener('change', e => {
           recordUndo();
@@ -1884,13 +1901,13 @@
         });
       });
 
-      grid.querySelectorAll('[data-field]').forEach(control => {
+      scope.querySelectorAll('[data-field]').forEach(control => {
         control.addEventListener('focus',()=>{if(!control.dataset.undoCaptured){recordUndo();control.dataset.undoCaptured='1';}});
         control.addEventListener('input', updateField);
         control.addEventListener('change', updateField);
       });
 
-      grid.querySelectorAll('[data-time-row]').forEach(control => {
+      scope.querySelectorAll('[data-time-row]').forEach(control => {
         control.addEventListener('focus',()=>{if(!control.dataset.undoCaptured){recordUndo();control.dataset.undoCaptured='1';}});
         control.addEventListener('input', e => {
           const row = Number(e.target.dataset.timeRow);
@@ -1900,7 +1917,7 @@
         });
       });
 
-      grid.querySelectorAll('[data-add]').forEach(btn => {
+      scope.querySelectorAll('[data-add]').forEach(btn => {
         btn.addEventListener('click', () => {
           recordUndo();
           const key = btn.dataset.add;
@@ -1917,13 +1934,13 @@
         });
       });
 
-      grid.querySelectorAll('.card-color-picker').forEach(picker => {
+      scope.querySelectorAll('.card-color-picker').forEach(picker => {
         picker.addEventListener('toggle',()=>{
           if(!picker.open)return;
           grid.querySelectorAll('.card-color-picker[open]').forEach(other=>{if(other!==picker)other.open=false;});
         });
       });
-      grid.querySelectorAll('[data-card-color]').forEach(btn => {
+      scope.querySelectorAll('[data-card-color]').forEach(btn => {
         btn.addEventListener('click', e => {
           e.stopPropagation();
           const key=btn.dataset.key,item=activeItem(key);if(!item)return;
@@ -1934,7 +1951,7 @@
         });
       });
 
-      grid.querySelectorAll('[data-delete]').forEach(btn => {
+      scope.querySelectorAll('[data-delete]').forEach(btn => {
         btn.addEventListener('click', () => {
           recordUndo();
           const key = btn.dataset.delete;
