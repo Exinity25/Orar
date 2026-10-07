@@ -157,10 +157,9 @@
         const conversation=page.querySelector('.gemini-conversation');
         const composer=page.querySelector('.gemini-composer');
         const pending=page.querySelector('.gemini-pending-files');
-        const scene=`translate3d(0,${geminiMotion.scene.toFixed(2)}px,0)`;
         const composerY=`translate3d(0,${(-geminiMotion.composer).toFixed(2)}px,0)`;
-        if(header)header.style.transform=scene;
-        if(conversation)conversation.style.transform=scene;
+        if(header)header.style.removeProperty('transform');
+        if(conversation)conversation.style.removeProperty('transform');
         if(composer)composer.style.transform=composerY;
         if(pending)pending.style.transform=composerY;
         if(composerField()===document.activeElement)pinConversationToLatest();
@@ -187,8 +186,8 @@
         if(moving)geminiMotion.raf=requestAnimationFrame(runGeminiMotion);
         else{geminiMotion.raf=0;geminiMotion.last=0;}
       };
-      const setGeminiMotionTargets=(sceneOffset,composerInset)=>{
-        geminiMotion.sceneTarget=Math.max(0,Number(sceneOffset)||0);
+      const setGeminiMotionTargets=(_sceneOffset,composerInset)=>{
+        geminiMotion.sceneTarget=0;
         geminiMotion.composerTarget=Math.max(0,Number(composerInset)||0);
         if(!geminiMotion.raf){
           geminiMotion.last=0;
@@ -649,8 +648,7 @@
         const vv=geminiViewport();
         if(vv)geminiUnfocusedViewportHeight=Math.max(geminiUnfocusedViewportHeight,Math.round(vv.height+Math.max(0,vv.offsetTop)));
         autosizeComposer(field);
-        const conversation=page.querySelector('[data-gemini-conversation]');
-        if(conversation)conversation.scrollTo({top:conversation.scrollHeight,behavior:'smooth'});
+        pinConversationToLatest();
         syncGeminiKeyboard();
         setTimeout(()=>{syncGeminiKeyboard();pinConversationToLatest();},80);
         setTimeout(()=>{syncGeminiKeyboard();pinConversationToLatest();},260);
@@ -669,6 +667,7 @@
           const vv=geminiViewport();
           if(vv)geminiUnfocusedViewportHeight=Math.max(1,Math.round(vv.height+Math.max(0,vv.offsetTop)));
           captureGeminiStage();
+          pinConversationToLatest();
         },320);
       });
       page.addEventListener('change',e=>{
