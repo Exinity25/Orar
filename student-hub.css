@@ -2461,3 +2461,23 @@ html,body{
 @media(prefers-reduced-motion:reduce){
   .google-view-stage.is-transitioning > .google-view-frame{will-change:auto}
 }
+
+
+/* v91 Gemini timetable import status. */
+.gemini-import-status{
+  min-height:18px;
+  margin:2px 0 0;
+  font-size:11px;
+  line-height:1.45;
+  color:var(--glass-muted,#aeb7c7);
+  transition:opacity 160ms ease,color 160ms ease;
+}
+.gemini-import-status:empty{opacity:0}
+.gemini-import-form.is-importing .gemini-import-status,
+[data-gemini-import-form].is-importing .gemini-import-status{
+  color:var(--glass-link,var(--accent,#ff315d));
+}
+[data-gemini-import-form].is-importing .hub-primary{
+  cursor:progress;
+  opacity:.88;
+}
