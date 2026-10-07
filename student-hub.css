@@ -2483,23 +2483,43 @@ html,body{
 }
 
 
-/* v92 menu polish: animate the menu as one surface, never each button.
-   Per-item stagger animations could briefly re-composite selected/outlined
-   buttons on iOS and look like a random flash. */
+/* v93 menu polish: keep the layer mounted and stable at all times.
+   Rapid close -> reopen no longer races a delayed visibility transition or
+   re-composites individual glass buttons. Only drawer/backdrop animate. */
+.hub-layer{
+  visibility:visible!important;
+  pointer-events:none!important;
+  transition:none!important;
+}
+.hub-layer.is-open{
+  visibility:visible!important;
+  pointer-events:auto!important;
+}
 .hub-layer .hub-nav-item{
   animation:none!important;
+  transition:none!important;
+  -webkit-backface-visibility:hidden;
+  backface-visibility:hidden;
 }
 .hub-nav{
-  opacity:0;
-  transition:opacity 150ms ease!important;
-  will-change:opacity;
+  opacity:1!important;
+  transition:none!important;
+  will-change:auto!important;
 }
-.hub-layer.is-open .hub-nav{
-  opacity:1;
+.hub-drawer{
+  -webkit-backface-visibility:hidden;
+  backface-visibility:hidden;
+  contain:paint;
 }
 @media (hover:none), (pointer:coarse){
   .hub-drawer :focus,
   .hub-drawer :focus-visible{
     outline:none!important;
+  }
+  .hub-nav-item:not([aria-current="page"]):hover,
+  .hub-nav-item:not([aria-current="page"]):active{
+    background:var(--glass-surface,rgba(8,11,17,.76))!important;
+    border-color:var(--glass-border,rgba(255,255,255,.12))!important;
+    box-shadow:inset 0 1px 0 var(--glass-highlight,rgba(255,255,255,.08)),0 4px 14px rgba(var(--glass-base,8,11,17),.14)!important;
   }
 }
