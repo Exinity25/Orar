@@ -2170,3 +2170,24 @@ body:not([data-orar-theme]):not(.orar-custom-background)::after{
     position:fixed!important;
   }
 }
+
+
+/* Keep the v74 Gemini keyboard stage sizing while v83 restores the fixed
+   full-screen document root. */
+@supports (-webkit-touch-callout:none){
+  body.gemini-keyboard-open{
+    top:0!important;
+    bottom:auto!important;
+    height:var(--gemini-stage-height,100lvh)!important;
+    min-height:var(--gemini-stage-height,100lvh)!important;
+    max-height:var(--gemini-stage-height,100lvh)!important;
+  }
+  body.gemini-keyboard-open::before,
+  body.gemini-keyboard-open::after{
+    top:0!important;
+    bottom:auto!important;
+    height:var(--gemini-stage-height,100lvh)!important;
+    min-height:var(--gemini-stage-height,100lvh)!important;
+    max-height:var(--gemini-stage-height,100lvh)!important;
+  }
+}
