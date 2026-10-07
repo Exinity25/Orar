@@ -699,6 +699,7 @@
       }catch{}
     }
     const CLOUD_FILE='orar-sync.json';
+    const CLOUD_VERSION=3;
     const CLOUD_SKIP=new Set([SESSION_KEY,OLD_SESSION_KEY,AUTH_META_KEY,ACCOUNT_KEY,'orar_google_session_v1','orar_cloud_pending_v1','orar_gemini_api_key_v1']);
     const cloudKeys=()=>Object.keys(localStorage).filter(key=>!CLOUD_SKIP.has(key));
     let cloudFileId='',cloudTimer=0,cloudApplying=false,cloudUploading=false;
@@ -706,7 +707,125 @@
     const pendingCloud=()=>{try{return JSON.parse(localStorage.getItem(PENDING_KEY)||'{}');}catch{return {};}};
     function acknowledgeCloud(sent){const pending=pendingCloud();for(const key of Object.keys(sent))if(pending[key]===sent[key])delete pending[key];localStorage.setItem(PENDING_KEY,JSON.stringify(pending));if(Object.keys(pending).length)scheduleCloudUpload();}
 
-    const cloudPayload=()=>{const values={};for(const key of cloudKeys()){const value=localStorage.getItem(key);if(value!==null)values[key]=value;}return {version:2,updatedAt:Date.now(),values};};
+    const openBackupDb=(name,storeName)=>new Promise((resolve,reject)=>{
+      if(!('indexedDB' in window)){reject(Error('IndexedDB indisponibil.'));return;}
+      const req=indexedDB.open(name,1);
+      req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains(storeName))req.result.createObjectStore(storeName);};
+      req.onsuccess=()=>resolve(req.result);
+      req.onerror=()=>reject(req.error||Error('Nu s-a putut deschide stocarea locală.'));
+    });
+    async function backupDbGet(dbName,storeName,key){
+      const db=await openBackupDb(dbName,storeName);
+      return new Promise((resolve,reject)=>{
+        const tx=db.transaction(storeName,'readonly'),req=tx.objectStore(storeName).get(key);let value=null;
+        req.onsuccess=()=>{value=req.result||null;};
+        req.onerror=()=>reject(req.error);
+        tx.oncomplete=()=>{db.close();resolve(value);};
+        tx.onerror=()=>{db.close();reject(tx.error);};
+      });
+    }
+    async function backupDbPut(dbName,storeName,key,value){
+      const db=await openBackupDb(dbName,storeName);
+      return new Promise((resolve,reject)=>{
+        const tx=db.transaction(storeName,'readwrite'),store=tx.objectStore(storeName);
+        value==null?store.delete(key):store.put(value,key);
+        tx.oncomplete=()=>{db.close();resolve();};
+        tx.onerror=()=>{db.close();reject(tx.error);};
+      });
+    }
+    const hex=buffer=>[...new Uint8Array(buffer)].map(byte=>byte.toString(16).padStart(2,'0')).join('');
+    async function blobHash(blob){
+      if(!blob)return '';
+      if(globalThis.crypto?.subtle){
+        try{return hex(await crypto.subtle.digest('SHA-256',await blob.arrayBuffer()));}catch{}
+      }
+      return String(blob.size||0)+':'+String(blob.type||'');
+    }
+    async function blobToCloudRecord(blob){
+      if(!blob)return null;
+      const data=await new Promise((resolve,reject)=>{
+        const reader=new FileReader();
+        reader.onload=()=>{const value=String(reader.result||''),comma=value.indexOf(',');resolve(comma>=0?value.slice(comma+1):'');};
+        reader.onerror=()=>reject(reader.error||Error('Fișierul local nu a putut fi citit.'));
+        reader.readAsDataURL(blob);
+      });
+      return {type:String(blob.type||'application/octet-stream'),size:Number(blob.size)||0,hash:await blobHash(blob),data};
+    }
+    function cloudRecordToBlob(record){
+      if(!record||typeof record.data!=='string')return null;
+      const binary=atob(record.data),parts=[];
+      for(let offset=0;offset<binary.length;offset+=32768){
+        const slice=binary.slice(offset,offset+32768),bytes=new Uint8Array(slice.length);
+        for(let i=0;i<slice.length;i++)bytes[i]=slice.charCodeAt(i);
+        parts.push(bytes);
+      }
+      return new Blob(parts,{type:String(record.type||'application/octet-stream')});
+    }
+    function plannerCloudFileIds(){
+      try{
+        const planner=JSON.parse(localStorage.getItem('orar_planner_v1')||'null');
+        return [...new Set((planner?.resources||[]).map(item=>String(item?.fileId||'').trim()).filter(Boolean))];
+      }catch{return [];}
+    }
+    async function captureCloudAssets(){
+      const assets={background:null,plannerFiles:{}};
+      const missing={background:false,plannerFiles:[]};
+      const wantsBackground=localStorage.getItem('orar_background_mode_v1')==='custom';
+      if(wantsBackground){
+        try{
+          const blob=await backupDbGet('orar_customization_v1','assets','background');
+          if(blob)assets.background=await blobToCloudRecord(blob);
+          else missing.background=true;
+        }catch{missing.background=true;}
+      }
+      for(const id of plannerCloudFileIds()){
+        try{
+          const blob=await backupDbGet('orar_planner_files_v1','files',id);
+          if(blob)assets.plannerFiles[id]=await blobToCloudRecord(blob);
+          else missing.plannerFiles.push(id);
+        }catch{missing.plannerFiles.push(id);}
+      }
+      return {assets,missing};
+    }
+    async function restoreCloudAssets(remote){
+      if(Number(remote?.version||0)<CLOUD_VERSION||!remote?.assets||typeof remote.assets!=='object')return {changed:false,needsBackfill:true};
+      let changed=false;
+      const remoteBackground=remote.assets.background||null;
+      const wantsBackground=String(remote.values?.['orar_background_mode_v1']||'')==='custom';
+      if(wantsBackground&&remoteBackground){
+        try{
+          const local=await backupDbGet('orar_customization_v1','assets','background');
+          const same=local&&remoteBackground.hash&&await blobHash(local)===remoteBackground.hash;
+          if(!same){
+            const blob=cloudRecordToBlob(remoteBackground);
+            if(blob){await backupDbPut('orar_customization_v1','assets','background',blob);changed=true;}
+          }
+        }catch{}
+      }else if(!wantsBackground){
+        try{
+          const local=await backupDbGet('orar_customization_v1','assets','background');
+          if(local){await backupDbPut('orar_customization_v1','assets','background',null);changed=true;}
+        }catch{}
+      }
+      for(const [id,record] of Object.entries(remote.assets.plannerFiles||{})){
+        if(!id||!record?.data)continue;
+        try{
+          const local=await backupDbGet('orar_planner_files_v1','files',id);
+          const same=local&&record.hash&&await blobHash(local)===record.hash;
+          if(!same){
+            const blob=cloudRecordToBlob(record);
+            if(blob){await backupDbPut('orar_planner_files_v1','files',id,blob);changed=true;}
+          }
+        }catch{}
+      }
+      return {changed,needsBackfill:false};
+    }
+    async function cloudPayload(){
+      const values={};
+      for(const key of cloudKeys()){const value=localStorage.getItem(key);if(value!==null)values[key]=value;}
+      const captured=await captureCloudAssets();
+      return {version:CLOUD_VERSION,updatedAt:Date.now(),values,assets:captured.assets,_missingAssets:captured.missing};
+    }
     async function findCloudFile(){
       if(cloudFileId)return cloudFileId;
       const q=encodeURIComponent("name='"+CLOUD_FILE+"' and 'appDataFolder' in parents and trashed=false");
@@ -719,18 +838,45 @@
       }
       return cloudFileId;
     }
+    async function writeCloudSnapshot(id,body){
+      if(id){
+        const r=await fetch('https://www.googleapis.com/upload/drive/v3/files/'+encodeURIComponent(id)+'?uploadType=media',{
+          method:'PATCH',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body
+        });
+        if(!r.ok)throw Error('Nu s-a putut înlocui backup-ul existent.');
+        return id;
+      }
+      const boundary='orar_sync_boundary',meta=JSON.stringify({name:CLOUD_FILE,parents:['appDataFolder']});
+      const multipart='--'+boundary+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+meta+'\r\n--'+boundary+'\r\nContent-Type: application/json\r\n\r\n'+body+'\r\n--'+boundary+'--';
+      const r=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',{
+        method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'multipart/related; boundary='+boundary},body:multipart
+      });
+      if(!r.ok)throw Error('Nu s-a putut crea backup-ul orarului.');
+      return (await r.json()).id||'';
+    }
     async function uploadCloud(){
       if(cloudApplying||!token||Date.now()>=expires||!grantedScopes.includes('drive.appdata'))return;
       if(cloudUploading)return;cloudUploading=true;
       try{
-      const sent=pendingCloud(),payload=cloudPayload(),id=await findCloudFile();
-      if(id){const previous=await fetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(id)+'?alt=media',{headers:{Authorization:'Bearer '+token},cache:'no-store'});if(!previous.ok)throw Error('Nu s-a putut verifica backup-ul existent.');const remote=await previous.json();for(const [key,value] of Object.entries(remote.values||{})){if(CLOUD_SKIP.has(key))continue;if(!sent[key]&&typeof value==='string'&&!Object.prototype.hasOwnProperty.call(payload.values,key))payload.values[key]=value;}}
-      const body=JSON.stringify(payload);
-      if(id){const r=await fetch('https://www.googleapis.com/upload/drive/v3/files/'+encodeURIComponent(id)+'?uploadType=media',{method:'PATCH',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body});if(!r.ok)throw Error('Nu s-a putut sincroniza orarul.');acknowledgeCloud(sent);return;}
-      const boundary='orar_sync_boundary',meta=JSON.stringify({name:CLOUD_FILE,parents:['appDataFolder']});
-      const multipart='--'+boundary+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+meta+'\r\n--'+boundary+'\r\nContent-Type: application/json\r\n\r\n'+body+'\r\n--'+boundary+'--';
-      const r=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'multipart/related; boundary='+boundary},body:multipart});
-      if(!r.ok)throw Error('Nu s-a putut crea backup-ul orarului.');cloudFileId=(await r.json()).id||'';acknowledgeCloud(sent);
+        const sent=pendingCloud(),payload=await cloudPayload(),id=await findCloudFile();
+        if(id){
+          const previous=await fetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(id)+'?alt=media',{headers:{Authorization:'Bearer '+token},cache:'no-store'});
+          if(!previous.ok)throw Error('Nu s-a putut verifica backup-ul existent.');
+          const remote=await previous.json();
+          for(const [key,value] of Object.entries(remote.values||{})){
+            if(CLOUD_SKIP.has(key))continue;
+            if(!sent[key]&&typeof value==='string'&&!Object.prototype.hasOwnProperty.call(payload.values,key))payload.values[key]=value;
+          }
+          const missing=payload._missingAssets||{};
+          if(missing.background&&remote.assets?.background)payload.assets.background=remote.assets.background;
+          for(const fileId of missing.plannerFiles||[]){
+            if(remote.assets?.plannerFiles?.[fileId])payload.assets.plannerFiles[fileId]=remote.assets.plannerFiles[fileId];
+          }
+        }
+        delete payload._missingAssets;
+        const body=JSON.stringify(payload);
+        cloudFileId=await writeCloudSnapshot(id,body);
+        acknowledgeCloud(sent);
       }finally{cloudUploading=false;}
     }
     function scheduleCloudUpload(){clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>uploadCloud().catch(()=>{}),450);}
@@ -749,6 +895,9 @@
           if(local!==value){localStorage.setItem(key,value);changed=true;}
         }else if(local!==null)needsBackfill=true;
       }
+      const assetRestore=await restoreCloudAssets(remote);
+      changed=changed||assetRestore.changed;
+      needsBackfill=needsBackfill||assetRestore.needsBackfill;
       cloudApplying=false;
       if(changed){location.reload();return true;}
       if(needsBackfill)scheduleCloudUpload();
