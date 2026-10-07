@@ -1626,7 +1626,17 @@ body:not([data-orar-theme]):not(.orar-custom-background)::after{
     transform:translateZ(0);
   }
 
-  .app,
+  /* The timetable is a scroll surface inside the fixed Home Screen viewport.
+     Keeping it absolute avoids iOS retaining stale fixed-element hit coordinates
+     after landscape -> portrait. Hub pages can stay fixed. */
+  .app{
+    position:absolute!important;
+    inset:0!important;
+    width:auto!important;
+    height:auto!important;
+    min-height:0!important;
+    max-height:none!important;
+  }
   .hub-page{
     position:fixed!important;
     inset:0!important;
@@ -1982,3 +1992,26 @@ body:not([data-orar-theme]):not(.orar-custom-background)::after{
    Schedule floating controls live outside the fixed, scrollable .app root.
    This avoids WebKit keeping their landscape hit boxes after returning to portrait. */
 .schedule-floating-controls{display:contents}
+
+
+/* v81 iOS timetable hit-testing.
+   Never leave transforms on the interactive timetable tree. iOS Home Screen
+   can paint transformed descendants correctly after rotation while continuing
+   to hit-test them at their old landscape coordinates. */
+@keyframes orar-card-fade-ios{
+  from{opacity:.15}
+  to{opacity:1}
+}
+@supports (-webkit-touch-callout:none){
+  .app:not(.hub-hidden) .class-card{
+    animation:orar-card-fade-ios 200ms ease both!important;
+    transform:none!important;
+    will-change:auto!important;
+  }
+  .schedule-grid,
+  .schedule-shell,
+  .slot-cell{
+    transform:none;
+    will-change:auto!important;
+  }
+}
