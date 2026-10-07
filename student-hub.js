@@ -29,6 +29,9 @@
         store = parsed;
       }
     } catch(e){storageProblem = true;}
+    const VIEW_SESSION_KEY='orar_active_view_v1';
+    let resumeView='planner:today';
+    try{resumeView=sessionStorage.getItem(VIEW_SESSION_KEY)||resumeView;}catch{}
     let view = 'schedule', search = '', serial = 0, statusTimer;
     const openSubjects = new Set(), drafts = new Map();
     let deletion = null;
@@ -332,7 +335,9 @@
         try{document.activeElement.blur();}catch{}
       }
       if(leavingGemini)gemini?.hide?.();
-      view=next;closeMenu(false);if(planner){planner.hide();if(view.startsWith('planner:'))planner.show(view.slice(8));}
+      view=next;
+      try{sessionStorage.setItem(VIEW_SESSION_KEY,view);}catch{}
+      closeMenu(false);if(planner){planner.hide();if(view.startsWith('planner:'))planner.show(view.slice(8));}
       app.classList.toggle('hub-hidden',view!=='schedule');if(scheduleControls){const showScheduleControls=view==='schedule';scheduleControls.classList.toggle('hub-hidden',!showScheduleControls);scheduleControls.hidden=!showScheduleControls;scheduleControls.setAttribute('aria-hidden',showScheduleControls?'false':'true');}page.classList.toggle('hub-hidden',view!=='subjects');customPage.classList.toggle('hub-hidden',view!=='customize');classroom.element.classList.toggle('hub-hidden',view!=='classroom');if(classroom.mailElement)classroom.mailElement.classList.toggle('hub-hidden',view!=='mail');if(classroom.driveElement)classroom.driveElement.classList.toggle('hub-hidden',view!=='drive');if(gemini)gemini.element.classList.toggle('hub-hidden',view!=='gemini');
       root.querySelectorAll('[data-hub-view]').forEach(el=>el.dataset.hubView===view?el.setAttribute('aria-current','page'):el.removeAttribute('aria-current'));
       if(view==='subjects'){
@@ -432,7 +437,10 @@
     });
     window.addEventListener('storage',e=>{if(e.key!==KEY)return;try{const next=JSON.parse(e.newValue||'{"subjects":{}}');if(next?.subjects && typeof next.subjects==='object'){store=next;if(view==='subjects')renderSubjects();}}catch{}});
     window.addEventListener('orar-homework-change',()=>{try{store=JSON.parse(localStorage.getItem(KEY)||'{"subjects":{}}');if(view==='subjects')renderSubjects();}catch{}});
-    if(planner)changeView('planner:today');
+    if(planner){
+      const validResume=resumeView==='schedule'||resumeView==='subjects'||resumeView==='customize'||resumeView==='classroom'||resumeView==='mail'||resumeView==='drive'||resumeView==='gemini'||resumeView.startsWith('planner:');
+      changeView(validResume?resumeView:'planner:today');
+    }
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible' && view==='subjects')renderSubjects();});
   }};
 })();
