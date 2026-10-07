@@ -32,8 +32,13 @@ html body[data-ui-glass][data-ui-glass] :is(.hub-menu-button,.hub-close,.hub-nav
   -webkit-tap-highlight-color:transparent;
 }
 html body[data-ui-glass][data-ui-glass] :is(.planner-page,.planner-dialog,.planner-preferences) button{min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:6px;vertical-align:middle;line-height:1.3}
-html body[data-ui-glass][data-ui-glass] :is(.hub-page,.planner-dialog,.app,.classroom-viewer-header) button:hover:not(:disabled),
-html body[data-ui-glass][data-ui-glass] .hub-nav-item:hover{border-color:var(--glass-focus)!important;background:color-mix(in srgb,var(--accent) 13%,rgba(var(--glass-base),.82))!important}
+@media (hover:hover) and (pointer:fine){
+  html body[data-ui-glass][data-ui-glass] :is(.hub-page,.planner-dialog,.app,.classroom-viewer-header) button:hover:not(:disabled),
+  html body[data-ui-glass][data-ui-glass] .hub-nav-item:hover{
+    border-color:var(--glass-focus)!important;
+    background:color-mix(in srgb,var(--accent) 13%,rgba(var(--glass-base),.82))!important;
+  }
+}
 /* Selected states share the current theme accent, including custom accents. */
 html body[data-ui-glass][data-ui-glass] :is(.head-cell:not(.time-head),.day-tab.active,.hub-nav-item[aria-current="page"],.hub-primary,.classroom-course.is-open,.pl-day.pl-today,.hub-theme-card[aria-pressed="true"],.edit-toggle[aria-pressed="true"],.card-color-menu button[aria-checked="true"]){
   background:linear-gradient(120deg,color-mix(in srgb,var(--accent) 27%,rgba(var(--glass-base),.8)),rgba(var(--glass-base),.72))!important;
@@ -201,4 +206,45 @@ html body[data-ui-glass][data-ui-glass] .overlap-piece{
   backdrop-filter:blur(24px) saturate(145%)!important;
   box-shadow:inset 0 1px 0 var(--glass-highlight)!important;
   background-clip:padding-box;
+}
+
+
+/* v85 premium touch response.
+   Touch devices do not synthesize a red hover frame anymore. State colors
+   interpolate normally; the press feedback is a tiny scale/brightness change. */
+html body[data-ui-glass][data-ui-glass] :is(
+  button,[role="button"],a.hub-small-button,a.classroom-viewer-drive
+){
+  -webkit-tap-highlight-color:transparent!important;
+  touch-action:manipulation;
+  transition:
+    transform 140ms cubic-bezier(.2,.8,.2,1),
+    opacity 160ms ease,
+    border-color 190ms ease,
+    background-color 190ms ease,
+    box-shadow 210ms ease,
+    color 190ms ease!important;
+}
+@media (hover:none), (pointer:coarse){
+  html body[data-ui-glass][data-ui-glass] :is(
+    button:not(:disabled),[role="button"]:not([aria-disabled="true"]),a.hub-small-button,a.classroom-viewer-drive
+  ):active{
+    transform:scale(.985)!important;
+    filter:brightness(.97);
+  }
+  html body[data-ui-glass][data-ui-glass] :is(
+    .day-tab.active,
+    .hub-nav-item[aria-current="page"],
+    .hub-primary,
+    .hub-theme-card[aria-pressed="true"],
+    .edit-toggle[aria-pressed="true"],
+    .card-color-menu button[aria-checked="true"]
+  ){
+    transition:
+      transform 140ms cubic-bezier(.2,.8,.2,1),
+      border-color 220ms ease,
+      background-color 220ms ease,
+      box-shadow 240ms ease,
+      color 220ms ease!important;
+  }
 }
