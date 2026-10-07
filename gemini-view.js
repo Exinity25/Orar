@@ -5,6 +5,8 @@
   const MODEL='gemini-3.8-flash';
   const FALLBACK_MODEL='gemini-3.5-flash-lite';
   const MAX_FILE_BYTES=12*1024*1024;
+  const IMPORT_TIMEOUT_MS=55000;
+  const IMPORT_FALLBACK_MODEL='gemini-3.6-flash';
   const esc=(value='')=>String(value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,9);
   const DAY_NAMES=['Luni','Marți','Miercuri','Joi','Vineri'];
@@ -58,34 +60,91 @@
     const mime=file.type||(/\.pdf$/i.test(file.name)?'application/pdf':'application/octet-stream');
     return {inlineData:{mimeType:mime,data:base64}};
   }
+  async function importFilePart(file){
+    if(!file)return null;
+    if(file.size>MAX_FILE_BYTES)throw Error('Fișierul depășește 12 MB.');
+    if(!/^image\//i.test(file.type||''))return filePart(file);
+    try{
+      let bitmap;
+      if(window.createImageBitmap)bitmap=await createImageBitmap(file);
+      else{
+        bitmap=await new Promise((resolve,reject)=>{
+          const url=URL.createObjectURL(file),img=new Image();
+          img.onload=()=>{URL.revokeObjectURL(url);resolve(img);};
+          img.onerror=()=>{URL.revokeObjectURL(url);reject(Error('Imaginea nu a putut fi decodată.'));};
+          img.src=url;
+        });
+      }
+      const width=Number(bitmap.width||bitmap.naturalWidth||0),height=Number(bitmap.height||bitmap.naturalHeight||0);
+      if(!width||!height)throw Error('Imagine invalidă.');
+      const maxSide=2200,scale=Math.min(1,maxSide/Math.max(width,height));
+      const canvas=document.createElement('canvas');
+      canvas.width=Math.max(1,Math.round(width*scale));
+      canvas.height=Math.max(1,Math.round(height*scale));
+      const ctx=canvas.getContext('2d',{alpha:false});
+      if(!ctx)throw Error('Canvas indisponibil.');
+      ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);
+      if(typeof bitmap.close==='function')bitmap.close();
+      const blob=await new Promise((resolve,reject)=>canvas.toBlob(value=>value?resolve(value):reject(Error('Imaginea nu a putut fi pregătită.')),'image/jpeg',.9));
+      return filePart(new File([blob],(file.name||'orar').replace(/\.[^.]+$/,'')+'.jpg',{type:'image/jpeg'}));
+    }catch{
+      // Safari can fail to canvas-decode some image formats; direct inline
+      // upload is still supported, so fall back to the original file.
+      return filePart(file);
+    }
+  }
   function extractText(payload){
     const parts=payload?.candidates?.[0]?.content?.parts||[];
     return parts.map(part=>part?.text||'').filter(Boolean).join('\n').trim();
   }
   const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-  async function generate(accessToken,contents,systemText='',json=false){
+  async function generate(accessToken,contents,systemText='',json=false,options={}){
+    const timeoutMs=Math.max(10000,Number(options.timeoutMs)||70000);
+    const thinkingLevel=options.thinkingLevel||'';
+    const maxOutputTokens=Number(options.maxOutputTokens)||0;
+    const models=Array.isArray(options.models)&&options.models.length?options.models:[MODEL,FALLBACK_MODEL];
+    const attempts=Math.max(1,Number(options.attempts)||2);
+    const onStatus=typeof options.onStatus==='function'?options.onStatus:()=>{};
     const request=async model=>{
-      const response=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(model)+':generateContent',{
-        method:'POST',
-        headers:{'Content-Type':'application/json','Authorization':'Bearer '+accessToken},
-        body:JSON.stringify({
-          systemInstruction:systemText?{parts:[{text:systemText}]}:undefined,
-          contents,
-          generationConfig:json?{responseMimeType:'application/json'}:undefined
-        })
-      });
-      let payload=null;try{payload=await response.json();}catch{}
-      return {response,payload};
+      const controller=new AbortController();
+      const timer=setTimeout(()=>controller.abort(),timeoutMs);
+      try{
+        const generationConfig={};
+        if(json)generationConfig.responseMimeType='application/json';
+        if(thinkingLevel)generationConfig.thinkingConfig={thinkingLevel};
+        if(maxOutputTokens)generationConfig.maxOutputTokens=maxOutputTokens;
+        const response=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(model)+':generateContent',{
+          method:'POST',
+          headers:{'Content-Type':'application/json','Authorization':'Bearer '+accessToken},
+          signal:controller.signal,
+          body:JSON.stringify({
+            systemInstruction:systemText?{parts:[{text:systemText}]}:undefined,
+            contents,
+            generationConfig:Object.keys(generationConfig).length?generationConfig:undefined
+          })
+        });
+        let payload=null;try{payload=await response.json();}catch{}
+        return {response,payload};
+      }catch(error){
+        if(error?.name==='AbortError')throw Error('TIMEOUT');
+        throw error;
+      }finally{
+        clearTimeout(timer);
+      }
     };
-    const plans=[{model:MODEL,attempts:3},{model:FALLBACK_MODEL,attempts:2}];
-    let transient=false,lastMessage='',saw429=false,sawUnavailable=false;
-    for(const plan of plans){
-      for(let attempt=0;attempt<plan.attempts;attempt++){
+    let transient=false,lastMessage='',saw429=false,sawUnavailable=false,sawTimeout=false;
+    for(let modelIndex=0;modelIndex<models.length;modelIndex++){
+      const model=models[modelIndex];
+      onStatus(modelIndex?'Gemini reîncearcă analiza…':'Gemini analizează…');
+      for(let attempt=0;attempt<attempts;attempt++){
         let result;
-        try{result=await request(plan.model);}
+        try{result=await request(model);}
         catch(error){
-          transient=true;lastMessage=error?.message||'Eroare de rețea';
-          if(attempt<plan.attempts-1)await sleep(700*Math.pow(2,attempt)+Math.floor(Math.random()*250));
+          transient=true;
+          if(error?.message==='TIMEOUT'){sawTimeout=true;lastMessage='Analiza a durat prea mult.';}
+          else lastMessage=error?.message||'Eroare de rețea';
+          if(attempt<attempts-1)await sleep(500*Math.pow(2,attempt));
           continue;
         }
         const {response,payload}=result;
@@ -98,15 +157,16 @@
         if(response.status===401||response.status===403)throw Error('Gemini nu este autorizat pentru contul Google. Reconectează contul și acceptă permisiunea Gemini.');
         if(response.status===408||response.status===429||response.status>=500){
           transient=true;if(response.status===429)saw429=true;if(response.status>=500)sawUnavailable=true;
-          if(attempt<plan.attempts-1)await sleep(700*Math.pow(2,attempt)+Math.floor(Math.random()*250));
+          if(attempt<attempts-1)await sleep(500*Math.pow(2,attempt));
           continue;
         }
         throw Error(message);
       }
     }
-    if(sawUnavailable)throw Error('Gemini este foarte solicitat acum. Am reîncercat automat și am încercat și modelul de rezervă. Încearcă din nou peste puțin timp.');
+    if(sawTimeout)throw Error('Analiza Gemini a expirat. Încearcă din nou; pentru poze folosește o captură clară a orarului.');
+    if(sawUnavailable)throw Error('Gemini este foarte solicitat acum. Încearcă din nou peste puțin timp.');
     if(saw429)throw Error('Ai atins temporar limita Gemini pentru contul/proiectul curent. Încearcă din nou mai târziu.');
-    if(transient)throw Error('Gemini nu este disponibil momentan. Încearcă din nou peste puțin timp.');
+    if(transient)throw Error('Gemini nu este disponibil momentan. Verifică internetul și încearcă din nou.');
     throw Error(lastMessage||'Gemini nu a răspuns.');
   }
 
@@ -586,7 +646,7 @@
         return {title:String(raw.title||current?.title||'Orar').slice(0,120),subtitle:String(raw.subtitle||current?.subtitle||'').slice(0,180),times,classes};
       }
 
-      async function importSchedule(file,group='',targetId=''){
+      async function importSchedule(file,group='',targetId='',onStatus=()=>{}){
         const accessToken=String(getGoogleToken?.()||'');if(!accessToken){requestGoogleAccess?.();throw Error('Acceptă permisiunea Gemini pentru contul Google conectat, apoi încearcă din nou.');}
         if(!file)throw Error('Alege o poză sau un PDF.');
         if(!/^image\//.test(file.type)&&file.type!=='application/pdf'&&!/\.pdf$/i.test(file.name))throw Error('Pentru importul orarului folosește o fotografie sau un PDF.');
@@ -605,11 +665,28 @@
           group?('Utilizatorul a indicat grupa: '+group+'. Dacă documentul conține mai multe grupe/subgrupe, importă activitățile relevante acestei grupe și activitățile comune.'):'Nu a fost specificată o grupă; importă programul principal vizibil în document.',
           'Orarul curent este furnizat doar ca reper pentru titlu/subtitlu, nu copia clase vechi care nu apar în fișier: '+JSON.stringify({title:current.title,subtitle:current.subtitle,times:current.times})
         ].join('\n');
-        const part=await filePart(file);
-        const result=await generate(accessToken,[{role:'user',parts:[{text:hiddenInstruction},part]}],'Ești un extractor strict de orare universitare. Nu adăuga comentarii.',true);
+        onStatus('Pregătesc fișierul…');
+        const part=await importFilePart(file);
+        onStatus('Gemini analizează…');
+        const result=await generate(
+          accessToken,
+          [{role:'user',parts:[{text:hiddenInstruction},part]}],
+          'Ești un extractor strict de orare universitare. Nu adăuga comentarii.',
+          true,
+          {
+            timeoutMs:IMPORT_TIMEOUT_MS,
+            thinkingLevel:'low',
+            maxOutputTokens:8192,
+            attempts:1,
+            models:[MODEL,IMPORT_FALLBACK_MODEL],
+            onStatus
+          }
+        );
         let parsed;try{parsed=JSON.parse(result.replace(/^```json\s*|```$/g,'').trim());}catch{throw Error('Gemini a returnat un răspuns care nu poate fi importat. Încearcă din nou cu o poză mai clară.');}
+        onStatus('Aplic orarul…');
         const schedule=cleanScheduleObject(parsed,current);
-        if(target?.id&&typeof applyScheduleTo==='function')applyScheduleTo(target.id,schedule);else applySchedule(schedule);
+        const applied=target?.id&&typeof applyScheduleTo==='function'?applyScheduleTo(target.id,schedule):applySchedule(schedule);
+        if(applied===false)throw Error('Orarul a fost analizat, dar nu a putut fi aplicat în aplicație.');
         tell?.('Orarul'+(target?.name?' „'+target.name+'”':'')+' a fost importat cu Gemini.');
         return schedule;
       }
@@ -624,6 +701,7 @@
             <label>Poză sau PDF<input name="file" type="file" accept="image/*,.pdf,application/pdf" required></label>
             <label>Grupă / subgrupă <span class="gemini-optional">(opțional)</span><input name="group" maxlength="80" placeholder="ex. C_11/1"></label>
             <small>Gemini va înlocui doar orarul selectat și va importa materiile, profesorii, sălile și săptămânile pare/impare.</small>
+            <p class="gemini-import-status" data-gemini-import-status role="status" aria-live="polite"></p>
             <button class="hub-primary">Importă automat</button>
           </form>`;
         if(!importDialog.open)importDialog.showModal();
@@ -686,10 +764,21 @@
       importDialog.addEventListener('click',e=>{if(e.target.closest('[data-gemini-dialog-close]'))importDialog.close();});
       importDialog.addEventListener('submit',async e=>{
         const form=e.target.closest('[data-gemini-import-form]');if(!form)return;
-        e.preventDefault();const button=form.querySelector('button[type=submit],button:not([type])'),data=new FormData(form),file=form.elements.file.files[0],group=String(data.get('group')||'').trim(),target=String(data.get('target')||'').trim();
-        button.disabled=true;button.textContent='Gemini analizează…';
-        try{await importSchedule(file,group,target);importDialog.close();}
-        catch(error){tell?.(error?.message||'Importul nu a reușit.');button.disabled=false;button.textContent='Importă automat';}
+        e.preventDefault();
+        const button=form.querySelector('button[type=submit],button:not([type])'),status=form.querySelector('[data-gemini-import-status]'),data=new FormData(form),file=form.elements.file.files[0],group=String(data.get('group')||'').trim(),target=String(data.get('target')||'').trim();
+        const setStatus=message=>{if(status)status.textContent=message;button.textContent=message||'Importă automat';};
+        button.disabled=true;form.classList.add('is-importing');setStatus('Pregătesc fișierul…');
+        try{
+          await importSchedule(file,group,target,setStatus);
+          setStatus('Import finalizat');
+          importDialog.close();
+        }catch(error){
+          const message=error?.message||'Importul nu a reușit.';
+          if(status)status.textContent=message;
+          tell?.(message);
+        }finally{
+          button.disabled=false;button.textContent='Importă automat';form.classList.remove('is-importing');
+        }
       });
 
       if(iosKeyboardMode&&window.visualViewport){
