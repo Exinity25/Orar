@@ -1070,28 +1070,72 @@
       return (await r.json()).id||'';
     }
     async function uploadCloud(){
-      if(cloudApplying||!token||Date.now()>=expires||!grantedScopes.includes('drive.appdata'))return;
-      if(cloudUploading)return;cloudUploading=true;
+      if(cloudApplying||!token||Date.now()>=expires||!grantedScopes.includes('drive.appdata'))return false;
+      if(cloudUploading)return false;
+      cloudUploading=true;
       try{
-        const sent=pendingCloud(),payload=await cloudPayload(),id=await findCloudFile();
+        const sent=pendingCloud(),dirtyKeys=Object.keys(sent),localPayload=await cloudPayload(),id=await findCloudFile();
+        let payload=localPayload;
+
         if(id){
           const previous=await fetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(id)+'?alt=media',{headers:{Authorization:'Bearer '+token},cache:'no-store'});
           if(!previous.ok)throw Error('Nu s-a putut verifica backup-ul existent.');
           const remote=await previous.json();
+
+          /* Start from the newest cloud snapshot and apply only values that were
+             actually changed on this device. This is what makes edits from a
+             laptop survive a later autosave from a phone, and vice versa. */
+          const mergedValues={};
           for(const [key,value] of Object.entries(remote.values||{})){
+            if(!CLOUD_SKIP.has(key)&&typeof value==='string')mergedValues[key]=value;
+          }
+          for(const key of dirtyKeys){
             if(CLOUD_SKIP.has(key))continue;
-            if(!sent[key]&&typeof value==='string'&&!Object.prototype.hasOwnProperty.call(payload.values,key))payload.values[key]=value;
+            const local=localStorage.getItem(key);
+            if(local===null)delete mergedValues[key];
+            else mergedValues[key]=local;
           }
-          const missing=payload._missingAssets||{};
-          if(missing.background&&remote.assets?.background)payload.assets.background=remote.assets.background;
-          for(const fileId of missing.plannerFiles||[]){
-            if(remote.assets?.plannerFiles?.[fileId])payload.assets.plannerFiles[fileId]=remote.assets.plannerFiles[fileId];
+
+          const remoteAssets=remote.assets&&typeof remote.assets==='object'?remote.assets:{};
+          const mergedAssets={
+            background:remoteAssets.background||null,
+            plannerFiles:{...(remoteAssets.plannerFiles||{})}
+          };
+
+          /* Binary assets follow the local keys that describe them. */
+          const backgroundDirty=dirtyKeys.includes('orar_background_mode_v1')||dirtyKeys.includes('orar_background_name_v1');
+          if(backgroundDirty){
+            mergedAssets.background=localPayload.assets?.background||null;
+          }else if(!mergedAssets.background&&localPayload.assets?.background){
+            mergedAssets.background=localPayload.assets.background;
           }
+
+          if(dirtyKeys.includes('orar_planner_v1')){
+            const currentIds=new Set(plannerCloudFileIds());
+            for(const id of Object.keys(mergedAssets.plannerFiles))if(!currentIds.has(id))delete mergedAssets.plannerFiles[id];
+            for(const [id,record] of Object.entries(localPayload.assets?.plannerFiles||{}))mergedAssets.plannerFiles[id]=record;
+          }else{
+            for(const [id,record] of Object.entries(localPayload.assets?.plannerFiles||{})){
+              if(!mergedAssets.plannerFiles[id])mergedAssets.plannerFiles[id]=record;
+            }
+          }
+
+          payload={
+            version:CLOUD_VERSION,
+            updatedAt:Date.now(),
+            values:mergedValues,
+            assets:mergedAssets
+          };
+        }else{
+          delete payload._missingAssets;
         }
+
+        if(id&&!dirtyKeys.length)return true;
         delete payload._missingAssets;
         const body=JSON.stringify(payload);
         cloudFileId=await writeCloudSnapshot(id,body);
         acknowledgeCloud(sent);
+        return true;
       }finally{cloudUploading=false;}
     }
     function scheduleCloudUpload(){clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>uploadCloud().catch(()=>{}),450);}
@@ -1148,8 +1192,8 @@
           window.dispatchEvent(new CustomEvent('orar-cloud-sync-result',{detail:{ok:false,message:'Conectează contul Google din Classroom pentru Cloud sync.'}}));
           return;
         }
-        const changed=await restoreCloud();
-        if(!changed)window.dispatchEvent(new CustomEvent('orar-cloud-sync-result',{detail:{ok:true,message:'Datele sunt sincronizate cu cloud-ul.'}}));
+        const changed=await restoreCloud({preferRemote:true});
+        if(!changed)window.dispatchEvent(new CustomEvent('orar-cloud-sync-result',{detail:{ok:true,message:'Datele din cloud sunt deja la zi pe acest dispozitiv.'}}));
       }catch{
         window.dispatchEvent(new CustomEvent('orar-cloud-sync-result',{detail:{ok:false,message:'Sincronizarea cu cloud-ul nu a reușit.'}}));
       }
