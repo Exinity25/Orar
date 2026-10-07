@@ -364,3 +364,34 @@ html body[data-ui-glass][data-ui-glass] .app .schedule-view-bar button[aria-pres
     min-height:100vh!important;
   }
 }
+
+
+/* v104 compact iOS top fade: gradient only, never a large blurred band. */
+@media (display-mode: standalone), (display-mode: fullscreen){
+  .ios-top-fade{
+    height:calc(env(safe-area-inset-top) + 44px)!important;
+    background:
+      linear-gradient(
+        180deg,
+        rgba(5,7,12,.92) 0%,
+        rgba(5,7,12,.74) 38%,
+        rgba(5,7,12,.34) 72%,
+        rgba(5,7,12,0) 100%
+      )!important;
+    -webkit-backdrop-filter:none!important;
+    backdrop-filter:none!important;
+    -webkit-mask-image:none!important;
+    mask-image:none!important;
+  }
+
+  body[data-orar-theme="ice"] .ios-top-fade{
+    background:
+      linear-gradient(
+        180deg,
+        rgba(32,41,56,.88) 0%,
+        rgba(43,54,71,.66) 38%,
+        rgba(76,91,112,.28) 72%,
+        rgba(244,248,255,0) 100%
+      )!important;
+  }
+}
