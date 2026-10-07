@@ -76,7 +76,7 @@
             </div>
           </section>
           <section class="hub-custom-section" aria-labelledby="hubBackgroundHeading">
-            <div class="hub-custom-section-head"><div><span class="hub-eyebrow">Imagine</span><h2 id="hubBackgroundHeading">Custom background</h2></div><small>Imaginea rămâne local pe dispozitivul tău.</small></div>
+            <div class="hub-custom-section-head"><div><span class="hub-eyebrow">Imagine</span><h2 id="hubBackgroundHeading">Custom background</h2></div><small>Imaginea este păstrată local și inclusă în Cloud sync.</small></div>
             <div class="hub-background-card">
               <div class="hub-background-copy"><strong id="hubBackgroundStatus">DEFAULT</strong><span>Poți încărca o fotografie proprie sau reveni oricând la fundalul original.</span></div>
               <div class="hub-background-actions">
