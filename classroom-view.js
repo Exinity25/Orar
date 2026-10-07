@@ -624,6 +624,7 @@
     viewerContent.addEventListener('dblclick',e=>{if(e.target.closest('.classroom-image-preview,.classroom-image-stage'))e.preventDefault();},{passive:false});
     viewer.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();closeViewer();}});
     const SESSION_KEY='orar_classroom_session_v2',OLD_SESSION_KEY='orar_classroom_session_v1';
+    const AUTH_META_KEY='orar_classroom_auth_meta_v1';
     const ACCOUNT_KEY='orar_classroom_account_v1';
     let token='',expires=0,grantedScopes='',client=null,courses=[],posts=[],selected=null,loading=false,message='',warning='',generation=0,session=0,expireTimer,visible=false,reauthenticating=false,silentRenewing=false,authRequestSilent=false;
     let mailItems=[],mailLoading=false,mailMessage='',mailOpen=null,mailBody='',mailBodyHtml='',mailUnread=0,mailVisible=false,mailNext='';
@@ -639,12 +640,21 @@
         profile.classList.remove('hub-hidden');return;
       }
       const picture=safeURL(account.picture||'');
-      profile.innerHTML=`<button class="classroom-profile-summary" type="button" data-cr-profile-toggle aria-expanded="false">${picture?`<img src="${esc(picture)}" alt="" referrerpolicy="no-referrer">`:'<span class="classroom-profile-avatar" aria-hidden="true">G</span>'}<span class="classroom-profile-copy"><strong>${esc(account.name||'Cont Google')}</strong><span>${esc(account.email)}</span></span><span class="classroom-profile-chevron" aria-hidden="true">›</span></button><div class="classroom-profile-menu"><div class="classroom-profile-details"><strong>${connected?'Cont Google conectat':'Sesiunea Google trebuie reînnoită'}</strong><span>${esc(account.email)}</span></div>${!connected?`<button class="hub-small-button classroom-profile-reconnect" type="button" data-cr-profile-signin ${!client||reauthenticating?'disabled':''}>${reauthenticating?'Se reconectează…':'Reconectează contul'}</button>`:''}<button class="hub-small-button classroom-profile-logout" type="button" data-cr-logout>Deconectează</button></div>`;
+      const connectionLabel=connected?'Cont Google conectat':silentRenewing?'Se reconectează automat…':'Sesiunea Google trebuie reînnoită';
+      profile.innerHTML=`<button class="classroom-profile-summary" type="button" data-cr-profile-toggle aria-expanded="false">${picture?`<img src="${esc(picture)}" alt="" referrerpolicy="no-referrer">`:'<span class="classroom-profile-avatar" aria-hidden="true">G</span>'}<span class="classroom-profile-copy"><strong>${esc(account.name||'Cont Google')}</strong><span>${esc(account.email)}</span></span><span class="classroom-profile-chevron" aria-hidden="true">›</span></button><div class="classroom-profile-menu"><div class="classroom-profile-details"><strong>${connectionLabel}</strong><span>${esc(account.email)}</span></div>${!connected?`<button class="hub-small-button classroom-profile-reconnect" type="button" data-cr-profile-signin ${!client||reauthenticating||silentRenewing?'disabled':''}>${reauthenticating||silentRenewing?'Se reconectează…':'Reconectează contul'}</button>`:''}<button class="hub-small-button classroom-profile-logout" type="button" data-cr-logout>Deconectează</button></div>`;
       profile.classList.remove('hub-hidden');
     }
-    function saveSession(){try{localStorage.setItem(SESSION_KEY,JSON.stringify({token,expires,grantedScopes}));}catch{}}
+    function saveSession(){
+      try{
+        /* Access tokens stay in memory only. Persist only non-secret scope metadata
+           so manual reconnects do not ask for consent unnecessarily. */
+        localStorage.removeItem(SESSION_KEY);
+        localStorage.removeItem(OLD_SESSION_KEY);
+        localStorage.setItem(AUTH_META_KEY,JSON.stringify({grantedScopes:String(grantedScopes||'')}));
+      }catch{}
+    }
     const CLOUD_FILE='orar-sync.json';
-    const CLOUD_SKIP=new Set([SESSION_KEY,OLD_SESSION_KEY,ACCOUNT_KEY,'orar_google_session_v1','orar_cloud_pending_v1','orar_gemini_api_key_v1']);
+    const CLOUD_SKIP=new Set([SESSION_KEY,OLD_SESSION_KEY,AUTH_META_KEY,ACCOUNT_KEY,'orar_google_session_v1','orar_cloud_pending_v1','orar_gemini_api_key_v1']);
     const cloudKeys=()=>Object.keys(localStorage).filter(key=>!CLOUD_SKIP.has(key));
     let cloudFileId='',cloudTimer=0,cloudApplying=false,cloudUploading=false;
     const PENDING_KEY='orar_cloud_pending_v1';
@@ -720,13 +730,32 @@
         window.dispatchEvent(new CustomEvent('orar-cloud-sync-result',{detail:{ok:false,message:'Sincronizarea cu cloud-ul nu a reușit.'}}));
       }
     });
-    function forgetSession(){try{localStorage.removeItem(SESSION_KEY);}catch{}}
-    function restoreSession(){
+    function forgetSession({forgetMeta=false}={}){
       try{
+        localStorage.removeItem(SESSION_KEY);
         localStorage.removeItem(OLD_SESSION_KEY);
-        const saved=JSON.parse(localStorage.getItem(SESSION_KEY)||'null');
-        if(saved){grantedScopes=String(saved.grantedScopes||'');const savedExpires=Number(saved.expires)||0;if(saved.token&&savedExpires>Date.now()+5000){token=saved.token;expires=savedExpires;return true;}localStorage.setItem(SESSION_KEY,JSON.stringify({token:'',expires:0,grantedScopes}));}
-      }catch{forgetSession();grantedScopes='';}
+        if(forgetMeta)localStorage.removeItem(AUTH_META_KEY);
+      }catch{}
+    }
+    function restoreSession(){
+      /* Migrate old installs once: salvage only granted scopes, then erase any
+         previously persisted bearer token. A fresh token is requested silently
+         from Google using the remembered account. */
+      try{
+        let scopes='';
+        const meta=JSON.parse(localStorage.getItem(AUTH_META_KEY)||'null');
+        if(meta?.grantedScopes)scopes=String(meta.grantedScopes||'');
+        const legacy=JSON.parse(localStorage.getItem(SESSION_KEY)||'null');
+        if(!scopes&&legacy?.grantedScopes)scopes=String(legacy.grantedScopes||'');
+        grantedScopes=scopes;
+        token='';expires=0;
+        localStorage.removeItem(SESSION_KEY);
+        localStorage.removeItem(OLD_SESSION_KEY);
+        if(scopes)localStorage.setItem(AUTH_META_KEY,JSON.stringify({grantedScopes:scopes}));
+      }catch{
+        token='';expires=0;grantedScopes='';
+        forgetSession();
+      }
       return false;
     }
     function scheduleExpiry(){
@@ -744,7 +773,10 @@
     }
     function clearSession(text='',forgetAccount=false){
       closeViewer(false);generation++;session++;clearTimeout(expireTimer);token='';expires=0;grantedScopes='';forgetSession();courses=[];posts=[];selected=null;loading=false;message=text;warning='';reauthenticating=false;silentRenewing=false;authRequestSilent=false;mailItems=[];mailOpen=null;mailBody='';mailUnread=0;mailMessage='';driveItems=[];driveMessage='';window.dispatchEvent(new CustomEvent('orar-mail-unread',{detail:{count:0}}));
-      if(forgetAccount){try{localStorage.removeItem(ACCOUNT_KEY);}catch{}}
+      if(forgetAccount){
+        forgetSession({forgetMeta:true});
+        try{localStorage.removeItem(ACCOUNT_KEY);}catch{}
+      }
       renderProfile(rememberedAccount(),false);
       render();renderMail();renderDrive();
       if(!forgetAccount&&client&&rememberedAccount())setTimeout(()=>requestAccess(true,true),250);
@@ -1087,9 +1119,20 @@
       return {courses:courseList.map(c=>({id:String(c.id),name:c.name})),posts:items,updated:new Date().toISOString()};
     }
     window.addEventListener('orar-drive-section-request',e=>{const id=String(e.detail?.id||''),type=String(e.detail?.type||''),title=String(e.detail?.title||'Google Drive');if(!id)return;if(type==='folder'){driveFolderId=id;driveFolderName=/^https?:\/\//i.test(title)?'Folder Drive':title;driveQuery='';driveNext='';driveItems=[];if(driveScopeOk())setTimeout(async()=>{try{const meta=await driveApi('files/'+encodeURIComponent(id)+'?fields=id,name,mimeType');if(meta?.name)driveFolderName=meta.name;}catch{}loadDrive(false);},0);}else setTimeout(()=>openViewer(id,title),0);});
-    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&client&&rememberedAccount()&&(!token||expires-Date.now()<2*60*1000))requestAccess(true,true);});
-    const restored=restoreSession();renderProfile(rememberedAccount(),restored);if(restored){scheduleExpiry();restoreCloud().catch(()=>{});if(mailScopeOk())refreshMailSummary();}
-    render();renderMail();renderDrive();prepareSignIn();setInterval(()=>{if(mailScopeOk())refreshMailSummary();},5*60000);
+    const ensureFreshGoogleSession=()=>{
+      if(!client||!rememberedAccount()||reauthenticating||silentRenewing)return;
+      if(!token||expires-Date.now()<2*60*1000)requestAccess(true,true);
+    };
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')ensureFreshGoogleSession();});
+    window.addEventListener('pageshow',()=>setTimeout(ensureFreshGoogleSession,0),{passive:true});
+    window.addEventListener('focus',ensureFreshGoogleSession,{passive:true});
+    window.addEventListener('online',ensureFreshGoogleSession,{passive:true});
+    const restored=restoreSession();renderProfile(rememberedAccount(),restored);
+    render();renderMail();renderDrive();prepareSignIn();
+    setInterval(()=>{
+      ensureFreshGoogleSession();
+      if(mailScopeOk())refreshMailSummary();
+    },5*60000);
     return {element:page,mailElement:mailPage,driveElement:drivePage,syncPlanner,openFile:openViewer,openDriveLink,
       getAccessToken:()=>token&&Date.now()<expires&&String(grantedScopes||'').split(/\s+/).includes('https://www.googleapis.com/auth/generative-language.retriever')?token:'',
       requestGeminiAccess:()=>{if(client)requestAccess(true,false);},
