@@ -2523,3 +2523,61 @@ html,body{
     box-shadow:inset 0 1px 0 var(--glass-highlight,rgba(255,255,255,.08)),0 4px 14px rgba(var(--glass-base,8,11,17),.14)!important;
   }
 }
+
+
+/* v96 local note motion + Gemini drawer polish. */
+
+/* Note expand/collapse is animated by the touched slot only. Newly refreshed
+   note cards must never restart the timetable-wide card entry animation. */
+.schedule-grid .note-open-slot .class-card,
+.schedule-grid .note-open-slot .note-panel{
+  animation:none!important;
+}
+.schedule-grid .note-panel{
+  transform:none!important;
+}
+
+/* Gemini conversations drawer: true extend/collapse on the same DOM node. */
+.gemini-sidebar{
+  transform-origin:right center!important;
+  opacity:.18;
+  transform:translate3d(calc(100% + 18px),0,0) scaleX(.965)!important;
+  transition:
+    transform 290ms cubic-bezier(.16,1,.3,1),
+    opacity 190ms ease,
+    width 220ms ease,
+    padding 220ms ease!important;
+  will-change:transform,opacity;
+}
+.gemini-shell.is-chats-open .gemini-sidebar{
+  opacity:1;
+  transform:translate3d(0,0,0) scaleX(1)!important;
+}
+
+/* The writing area fades away while the chat drawer is open and comes back
+   smoothly when it closes. It stays mounted, so no layout flash occurs. */
+.gemini-composer,
+.gemini-pending-files{
+  transition:
+    opacity 180ms ease,
+    border-color 160ms ease,
+    box-shadow 180ms ease!important;
+}
+.gemini-shell.is-chats-open .gemini-composer,
+.gemini-shell.is-chats-open .gemini-pending-files{
+  opacity:0!important;
+  pointer-events:none!important;
+}
+
+/* Conversation remains readable behind the drawer; only the input surface fades. */
+.gemini-chat-backdrop{
+  transition:opacity 210ms ease!important;
+}
+@media(prefers-reduced-motion:reduce){
+  .gemini-sidebar,
+  .gemini-composer,
+  .gemini-pending-files,
+  .gemini-chat-backdrop{
+    transition:none!important;
+  }
+}
