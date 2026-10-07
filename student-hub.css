@@ -2199,3 +2199,82 @@ body:not([data-orar-theme]):not(.orar-custom-background)::after{
 .schedule-floating-controls.hub-hidden{
   display:none!important;
 }
+
+
+/* v85 premium motion + keyboard layout. */
+.schedule-shell.is-day-transitioning{
+  position:relative!important;
+  overflow:hidden!important;
+}
+.schedule-day-motion-layer{
+  position:absolute;
+  top:0;
+  left:0;
+  width:100%;
+  z-index:80;
+  pointer-events:none!important;
+  will-change:transform,opacity;
+  contain:paint;
+}
+.schedule-day-motion-layer .schedule-grid{
+  width:100%!important;
+  max-width:100%!important;
+  pointer-events:none!important;
+}
+.schedule-day-motion-layer .class-card{
+  animation:none!important;
+  pointer-events:none!important;
+}
+
+/* Use the same actual native font in every timetable state and prevent iOS
+   orientation text autosizing from briefly substituting a different size/font. */
+html,body{
+  -webkit-text-size-adjust:100%!important;
+  text-size-adjust:100%!important;
+}
+:is(
+  #scheduleTitle,#scheduleSubtitle,.schedule-grid,.schedule-grid button,
+  .schedule-grid input,.schedule-grid select,.schedule-grid textarea,
+  .edit-input,.edit-select,.time-edit input,.day-tab
+){
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI",system-ui,sans-serif!important;
+}
+:is(
+  .subject,.meta-line,.type-row,.time-cell,.head-cell,
+  .edit-input,.edit-select,.time-edit input,#scheduleTitle,#scheduleSubtitle
+){
+  transition:
+    font-size 180ms cubic-bezier(.2,.8,.2,1),
+    line-height 180ms cubic-bezier(.2,.8,.2,1),
+    opacity 160ms ease!important;
+}
+
+/* A short Gemini conversation should sit at the bottom just like a long one:
+   the newest message remains immediately above the composer. */
+.gemini-conversation{
+  display:flex!important;
+  flex-direction:column!important;
+  overscroll-behavior:contain;
+}
+.gemini-conversation > :first-child{
+  margin-top:auto!important;
+}
+
+@supports (-webkit-touch-callout:none){
+  /* iOS may pan the visual viewport when the textarea focuses. Offset the
+     fixed Gemini page by exactly that amount so the conversation itself does
+     not jump upward; only the composer follows the keyboard. */
+  body.gemini-keyboard-open .gemini-page{
+    top:var(--gemini-viewport-offset,0px)!important;
+    left:0!important;
+    right:0!important;
+  }
+
+  /* No touch-highlight flash anywhere in the main interactive surfaces. */
+  :is(
+    button,[role="button"],.day-tab,.class-card,.hub-nav-item,
+    .classroom-course-summary,.drive-card,.mail-card
+  ){
+    -webkit-tap-highlight-color:transparent!important;
+  }
+}
