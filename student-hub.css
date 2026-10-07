@@ -2481,3 +2481,25 @@ html,body{
   cursor:progress;
   opacity:.88;
 }
+
+
+/* v92 menu polish: animate the menu as one surface, never each button.
+   Per-item stagger animations could briefly re-composite selected/outlined
+   buttons on iOS and look like a random flash. */
+.hub-layer .hub-nav-item{
+  animation:none!important;
+}
+.hub-nav{
+  opacity:0;
+  transition:opacity 150ms ease!important;
+  will-change:opacity;
+}
+.hub-layer.is-open .hub-nav{
+  opacity:1;
+}
+@media (hover:none), (pointer:coarse){
+  .hub-drawer :focus,
+  .hub-drawer :focus-visible{
+    outline:none!important;
+  }
+}
