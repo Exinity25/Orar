@@ -320,7 +320,11 @@
     };
     const openMenu = () => {
       layer.inert=false;layer.setAttribute('aria-hidden','false');layer.classList.add('is-open');menu.setAttribute('aria-expanded','true');
-      app.inert=true;if(scheduleControls)scheduleControls.inert=true;page.inert=true;customPage.inert=true;classroom.element.inert=true;if(classroom.mailElement)classroom.mailElement.inert=true;if(classroom.driveElement)classroom.driveElement.inert=true;if(gemini)gemini.element.inert=true;menu.inert=true;if(planner)planner.element.inert=true;$('#hubClose').focus({preventScroll:true});
+      app.inert=true;if(scheduleControls)scheduleControls.inert=true;page.inert=true;customPage.inert=true;classroom.element.inert=true;if(classroom.mailElement)classroom.mailElement.inert=true;if(classroom.driveElement)classroom.driveElement.inert=true;if(gemini)gemini.element.inert=true;menu.inert=true;if(planner)planner.element.inert=true;
+      /* Avoid iOS drawing a one-frame focus/accent flash on the close button.
+         Keyboard/trackpad users still receive deliberate focus. */
+      if(window.matchMedia?.('(hover:hover) and (pointer:fine)')?.matches)$('#hubClose').focus({preventScroll:true});
+      else try{document.activeElement?.blur?.();}catch{}
     };
     const changeView = next => {
       const leavingGemini=view==='gemini'&&next!=='gemini';
