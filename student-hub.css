@@ -2369,3 +2369,23 @@ html,body{
 #hubDrivePage.is-data-loading{
   cursor:progress;
 }
+
+
+/* v87 touch devices never keep synthetic hover colors after a tap. */
+@media (hover:none), (pointer:coarse){
+  #hubClassroomPage .classroom-course-summary:hover{
+    background:transparent!important;
+  }
+  #hubClassroomPage .classroom-attachments .classroom-link:hover{
+    background:#ffffff04!important;
+    border-color:#ffffff18!important;
+  }
+  #hubDrivePage .drive-card:hover{
+    border-color:var(--glass-border,#ffffff1b)!important;
+    transform:none!important;
+  }
+  #hubMailPage .mail-rich-action:active,
+  #hubMailPage a:active{
+    transform:none!important;
+  }
+}
