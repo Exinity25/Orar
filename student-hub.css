@@ -1486,12 +1486,13 @@ body[data-orar-theme="custom"].orar-custom-light{color-scheme:light}
 .gemini-shell.is-chats-open .gemini-chat-backdrop{opacity:1;pointer-events:auto}
 .gemini-chat-menu-toggle{
   position:fixed;z-index:255;right:max(18px,env(safe-area-inset-right));left:auto;
-  top:max(18px,calc(env(safe-area-inset-top) + 8px));width:54px;height:54px;padding:0!important;
+  top:max(18px,env(safe-area-inset-top));width:54px;height:54px;padding:0!important;
   display:grid;place-content:center;border-radius:50%!important;
-  border:1px solid var(--glass-border,#ffffff22)!important;
-  background:color-mix(in srgb,var(--glass-surface,rgba(8,11,17,.92)) 94%,transparent)!important;
-  box-shadow:0 12px 34px rgba(0,0,0,.34),inset 0 0 0 1px rgba(255,255,255,.025);
-  backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  border:1px solid rgba(255,255,255,.16)!important;
+  background:rgba(7,10,17,.9)!important;
+  color:#f8f0f3!important;
+  box-shadow:0 12px 30px #0005!important;
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
 }
 .gemini-chat-menu-toggle .gemini-menu-star{display:grid;place-items:center;width:30px;height:30px;color:var(--accent,#ff315d);background:none}
 .gemini-chat-menu-toggle .gemini-menu-star svg{width:30px;height:30px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 8px color-mix(in srgb,var(--accent,#ff315d) 45%,transparent))}
@@ -1697,7 +1698,7 @@ body:not([data-orar-theme]):not(.orar-custom-background)::after{
       z-index:10015!important;
       left:max(10px,env(safe-area-inset-left))!important;
       right:max(10px,env(safe-area-inset-right))!important;
-      bottom:max(10px,env(safe-area-inset-bottom))!important;
+      bottom:calc(max(10px,env(safe-area-inset-bottom)) + var(--gemini-composer-lift,0px))!important;
       width:auto!important;
       margin:0!important;
       border-radius:28px!important;
@@ -1728,7 +1729,7 @@ body:not([data-orar-theme]):not(.orar-custom-background)::after{
       z-index:10014!important;
       left:max(14px,env(safe-area-inset-left))!important;
       right:max(14px,env(safe-area-inset-right))!important;
-      bottom:calc(max(10px,env(safe-area-inset-bottom)) + var(--gemini-composer-height,58px) + 7px)!important;
+      bottom:calc(max(10px,env(safe-area-inset-bottom)) + var(--gemini-composer-height,58px) + var(--gemini-composer-lift,0px) + 7px)!important;
       width:auto!important;
       max-height:86px;
       overflow:auto;
@@ -2261,15 +2262,6 @@ html,body{
 }
 
 @supports (-webkit-touch-callout:none){
-  /* iOS may pan the visual viewport when the textarea focuses. Offset the
-     fixed Gemini page by exactly that amount so the conversation itself does
-     not jump upward; only the composer follows the keyboard. */
-  body.gemini-keyboard-open .gemini-page{
-    top:var(--gemini-viewport-offset,0px)!important;
-    left:0!important;
-    right:0!important;
-  }
-
   /* No touch-highlight flash anywhere in the main interactive surfaces. */
   :is(
     button,[role="button"],.day-tab,.class-card,.hub-nav-item,
@@ -2277,4 +2269,67 @@ html,body{
   ){
     -webkit-tap-highlight-color:transparent!important;
   }
+}
+
+
+/* v86 premium interaction polish. */
+@media(max-width:900px),(hover:none) and (pointer:coarse){
+  .gemini-chat-menu-toggle{
+    width:48px!important;
+    height:48px!important;
+    top:max(12px,env(safe-area-inset-top))!important;
+    right:max(12px,env(safe-area-inset-right))!important;
+  }
+  .gemini-chat-menu-toggle .gemini-menu-star{
+    width:26px!important;
+    height:26px!important;
+  }
+  .gemini-chat-menu-toggle .gemini-menu-star svg{
+    width:26px!important;
+    height:26px!important;
+  }
+}
+
+/* Opening pages/cards/panels should fade, not shake or jump. */
+@keyframes hub-reveal{from{opacity:0}to{opacity:1}}
+@keyframes classroom-course-reveal{from{opacity:0}to{opacity:1}}
+@keyframes orar-section-enter{from{opacity:0}to{opacity:1}}
+@keyframes orar-card-enter{from{opacity:0}to{opacity:1}}
+@keyframes orar-soft-enter{from{opacity:0}to{opacity:1}}
+@keyframes orar-expand-in{from{opacity:0}to{opacity:1}}
+@keyframes orar-card-soft-in{from{opacity:0}to{opacity:1}}
+@keyframes orar-dialog-in{from{opacity:0}to{opacity:1}}
+@keyframes gemini-drawer-new{from{opacity:0}to{opacity:1}}
+
+/* Remove press-shake from touch UI. State changes are color/opacity fades only. */
+@media (hover:none), (pointer:coarse){
+  :is(
+    button,[role="button"],.day-tab,.class-card,.hub-nav-item,.hub-small-button,
+    .hub-primary,.classroom-course-summary,.drive-card,.mail-card,
+    .gemini-chat-row,.gemini-attach,.gemini-send
+  ):active{
+    transform:none!important;
+  }
+}
+
+/* Keep chevrons/icons smooth, but don't move whole containers. */
+.hub-page.is-entering,
+.hub-page.is-entering .hub-content,
+.planner-page:not(.hub-hidden) .pl-content,
+.hub-page:not(.hub-hidden) :is(
+  .hub-subject,.hub-custom-section,.classroom-course,.classroom-post,.mail-card,.mail-message,.drive-card
+),
+.planner-page:not(.hub-hidden) :is(
+  .pl-card,.pl-hero,.pl-event,.pl-day,.pl-metrics article,.pl-subject-group
+){
+  transform:none!important;
+}
+
+/* Font geometry stays fixed through orientation changes. */
+:is(
+  .subject,.meta-line,.type-row,.time-cell,.head-cell,
+  .edit-input,.edit-select,.time-edit input,#scheduleTitle,#scheduleSubtitle
+){
+  transition:opacity 160ms ease!important;
+  font-synthesis:none;
 }
