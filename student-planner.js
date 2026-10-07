@@ -281,7 +281,21 @@ window.OrarPlanner={mount({root,getSchedule,applySchedule,getSubjects,changeView
  function backup(){return {version:1,kind:'backup',created:new Date().toISOString(),planner:data,homework:homework(),schedule:getSchedule()};}
  function importCoursework(){let count=0;save(d=>{for(const m of d.classroom.posts){const subject=d.courseMap[m.courseId];if(!subject||!m.deadline||m.kind!=='courseWork')continue;const sourceId='classroom:'+m.courseId+':'+m.id,existing=d.tasks.find(t=>t.sourceId===sourceId);if(existing){existing.title=m.title;existing.deadline=m.deadline;existing.subject=subject;continue;}d.tasks.push({id:uid(),sourceId,title:m.title,subject,deadline:m.deadline,status:'todo',priority:'medium',tags:['Classroom'],checklist:[],url:m.url});count++;}},false);return count;}
  let syncing=false;
- async function syncClassroom(){if(syncing)return;syncing=true;say('Se verifică materialele Classroom…');try{const snapshot=await classroom.syncPlanner();receiveClassroom(snapshot);say('Classroom actualizat.');}catch(e){say(e.message||'Classroom nu a putut fi actualizat.');}finally{syncing=false;render();}}
+ async function syncClassroom({quiet=false}={}){
+  if(syncing||!classroom.isConnected())return;
+  syncing=true;
+  if(!quiet)say('Se verifică materialele Classroom…');
+  try{
+   const snapshot=await Promise.race([
+    classroom.syncPlanner(),
+    new Promise((_,reject)=>setTimeout(()=>reject(Error('TIMEOUT')),15000))
+   ]);
+   receiveClassroom(snapshot);
+   if(!quiet)say('Classroom actualizat.');
+  }catch(e){
+   if(!quiet&&e?.message!=='TIMEOUT')say(e.message||'Classroom nu a putut fi actualizat.');
+  }finally{syncing=false;render();}
+ }
  function receiveClassroom(snapshot){const old=new Set(data.classroom.posts.map(m=>m.courseId+':'+m.id)),hadUpdate=Boolean(data.classroom.updated);save(d=>{d.classroom=snapshot;for(const c of snapshot.courses)if(!d.courseMap[c.id]){const found=subjects().find(s=>norm(s.name)===norm(c.name));if(found)d.courseMap[c.id]=found.id;}},false);if(data.settings.autoImport)importCoursework();const added=snapshot.posts.filter(m=>!old.has(m.courseId+':'+m.id));if(hadUpdate&&added.length)notify('Materiale noi în Classroom',added.length+' materiale noi la ultima verificare.');render();}
  async function action(e){const b=e.target.closest('[data-action]');if(!b)return;const a=b.dataset.action,id=b.dataset.id;try{
  if(a==='close-modal'){modal.close();return;}if(a==='navigate'){changeView(b.dataset.view);return;}if(a==='undo'||a==='redo'){history(a);return;}
@@ -347,12 +361,12 @@ window.OrarPlanner={mount({root,getSchedule,applySchedule,getSubjects,changeView
  window.addEventListener('orar-local-change',e=>{if(e.detail?.key===HW&&!writingHomework){const fresh=localStorage.getItem(HW);if(fresh!==knownHomework){undo.push({planner:clone(data),homework:knownHomework});if(undo.length>40)undo.shift();redo.length=0;knownHomework=fresh;}}if(e.detail?.key!==KEY&&isShown&&!page.contains(document.activeElement))render();});
  window.addEventListener('storage',e=>{if(e.key===KEY){try{const fresh=read(KEY,blank());if(fresh.version===1&&Array.isArray(fresh.tasks)){const hadLegacyAttendance=Object.prototype.hasOwnProperty.call(fresh,'attendance');data=validatePlanner(fresh);if(hadLegacyAttendance)try{localStorage.setItem(KEY,JSON.stringify(data));}catch{}appearance();render();}}catch{say('Actualizarea din altă fereastră nu a putut fi citită.');}}});
  window.addEventListener('orar-theme-selected',()=>{appearance();});
- window.addEventListener('orar-classroom-authenticated',()=>{syncClassroom();});
- window.addEventListener('online',()=>{window.dispatchEvent(new CustomEvent('orar-cloud-sync-request'));if(classroom.isConnected())syncClassroom();});
+ window.addEventListener('orar-classroom-authenticated',()=>{syncClassroom({quiet:true});});
+ window.addEventListener('online',()=>{window.dispatchEvent(new CustomEvent('orar-cloud-sync-request'));if(classroom.isConnected())syncClassroom({quiet:true});});
  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){tick();reminders();}});
- setInterval(tick,1000);setInterval(()=>{if(document.visibilityState==='visible')reminders();},60000);setInterval(()=>{if(document.visibilityState==='visible'&&classroom.isConnected())syncClassroom();},15*60000);
+ setInterval(tick,1000);setInterval(()=>{if(document.visibilityState==='visible')reminders();},60000);setInterval(()=>{if(document.visibilityState==='visible'&&classroom.isConnected())syncClassroom({quiet:true});},15*60000);
  function sharedPreview(){if(!location.hash.startsWith('#orar-share='))return;try{const raw=location.hash.slice(12);if(raw.length>20000)throw Error();const decoded=JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(raw),c=>c.charCodeAt(0))));const s=validateSchedule(decoded.schedule);showDialog('Orar partajat · read-only',`<p>Aceasta este o copie; orarul tău nu a fost modificat.</p><h3>${esc(s.title)}</h3>${lessonEvents(s,data.settings,monday(today()),14).map(eventCard).join('')}<button data-action="accept-import">Importă acest template în orarul meu</button>`);importCandidate={kind:'schedule',schedule:s};}catch{say('Linkul de orar este invalid sau prea mare.');}}
- setTimeout(()=>{sharedPreview();reminders();if(classroom.isConnected())syncClassroom();},0);
+ setTimeout(()=>{sharedPreview();reminders();if(classroom.isConnected())syncClassroom({quiet:true});},0);
  return {element:page,show(section='today'){active=section;if(section==='tasks')plannerTab='planner';isShown=true;page.classList.remove('hub-hidden');render();page.querySelector('h1')?.focus({preventScroll:true});},hide(){isShown=false;page.classList.add('hub-hidden');},openTask(id){taskDialog(id);},openSubject(id){resourceSubject=id;changeView('planner:resources');},addTask(task){return addAssistantTask(task);},syncClassroom,
   contextSnapshot(){
    const schedule=getSchedule(),upcoming=lessons(today(),35),deadlines=agenda().slice().sort((a,b)=>String(a.date||'9999').localeCompare(String(b.date||'9999')));
