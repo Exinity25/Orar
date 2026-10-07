@@ -198,26 +198,10 @@
         downloadButton.title=downloadAllowed?'Descarcă fișierul':'Proprietarul a dezactivat descărcarea';
         if(downloadAllowed&&!googleNative)viewerDownload={name:driveName,url:base+'?alt=media',objectUrl:''};
 
-        /* iOS Home Screen apps are unreliable with large authenticated Drive
-           videos rendered from blob: URLs: playback can turn black and the
-           native control hit targets can stop responding. Let Drive's own
-           streaming preview handle video on iPhone/iPad instead. */
-        if(isiOSDevice&&isVideoFile){
-          const driveBox=viewer.querySelector('[data-cr-viewer-content]');
-          const frame=document.createElement('iframe');
-          frame.className='classroom-drive-video-preview';
-          frame.title='Redare '+driveName;
-          frame.src='https://drive.google.com/file/d/'+encodeURIComponent(fileId)+'/preview';
-          frame.setAttribute('allow','autoplay; fullscreen; picture-in-picture; encrypted-media');
-          frame.setAttribute('allowfullscreen','');
-          frame.setAttribute('webkitallowfullscreen','');
-          frame.setAttribute('referrerpolicy','no-referrer-when-downgrade');
-          driveBox.replaceChildren(frame);
-          driveBox.classList.add('has-drive-video');
-          disableViewerZoom();
-          downloadButton.disabled=!viewerDownload;
-          return;
-        }
+        /* Video files now use the same local HTML5 player on iPhone too.
+           Keeping playback outside Drive's cross-origin preview avoids the
+           duplicated Google + iOS controls and gives us a reliable fullscreen
+           button we control ourselves. */
 
         if(nativeGoogleDoc){
           if(!downloadAllowed)throw Error('Proprietarul a dezactivat exportul/descărcarea acestui fișier.');
@@ -551,38 +535,80 @@
           const audio=document.createElement('audio');audio.controls=true;audio.preload='metadata';audio.src=viewerObjectUrl;wrap.append(audio);
           viewer.querySelector('[data-cr-viewer-content]').replaceChildren(wrap);disableViewerZoom();return;
         }
-        if(/\.(mp4|m4v|mov|webm|avi)$/i.test(name)){
+        if(/\.(mp4|m4v|mov|webm|avi)$/i.test(renderName)||renderMime.startsWith('video/')){
           const blob=await response.blob();if(generation!==viewerGeneration)return;
           viewerObjectUrl=URL.createObjectURL(blob);
           const wrap=document.createElement('div');wrap.className='classroom-media-stage classroom-video-stage';
           const shell=document.createElement('div');shell.className='classroom-video-shell';
-          const video=document.createElement('video');video.playsInline=true;video.preload='metadata';video.src=viewerObjectUrl;video.setAttribute('webkit-playsinline','');
-          const isiOS=isiOSDevice;
-          const failCleanly=()=>{if(generation!==viewerGeneration)return;const box=viewer.querySelector('[data-cr-viewer-content]');box.innerHTML='<div class="classroom-viewer-message classroom-video-unsupported" role="alert"><div><strong>Videoclipul nu poate fi redat local pe acest dispozitiv.</strong><p>Formatul '+esc(name.split('.').pop()?.toUpperCase()||'video')+' nu este suportat direct de playerul iPhone. Îl poți deschide în Google Drive sau descărca.</p></div></div>';};
-          let playable=false;video.addEventListener('loadedmetadata',()=>{playable=true;},{once:true});video.addEventListener('error',failCleanly,{once:true});
-          if(isiOS){
-            video.controls=true;
-            shell.append(video);wrap.append(shell);viewer.querySelector('[data-cr-viewer-content]').replaceChildren(wrap);disableViewerZoom();
-            const fs=document.createElement('button');fs.type='button';fs.className='hub-small-button classroom-viewer-media-fullscreen';fs.textContent='⛶ Fullscreen';fs.setAttribute('aria-label','Ecran complet');
-            fs.addEventListener('click',()=>{try{if(typeof video.webkitEnterFullscreen==='function')video.webkitEnterFullscreen();else if(video.requestFullscreen)video.requestFullscreen();}catch{}});
-            viewer.querySelector('.classroom-viewer-actions').prepend(fs);
-            setTimeout(()=>{if(!playable&&video.readyState===0&&!video.error){try{video.load();}catch{}}},250);
-            return;
-          }
+          const video=document.createElement('video');
           video.controls=false;
+          video.playsInline=true;
+          video.preload='metadata';
+          video.src=viewerObjectUrl;
+          video.setAttribute('playsinline','');
+          video.setAttribute('webkit-playsinline','');
+          video.setAttribute('x-webkit-airplay','deny');
+          video.setAttribute('controlslist','nodownload noremoteplayback');
+          try{video.disablePictureInPicture=true;}catch{}
+
           const controls=document.createElement('div');controls.className='classroom-video-controls';
-          controls.innerHTML='<button type="button" class="classroom-video-button classroom-video-play" aria-label="Redă">▶</button><span class="classroom-video-time" data-video-current>0:00</span><input class="classroom-video-progress" type="range" min="0" max="1000" value="0" step="1" aria-label="Poziția în videoclip"><span class="classroom-video-time" data-video-duration>0:00</span><button type="button" class="classroom-video-button" data-video-mute aria-label="Dezactivează sunetul">◖</button><button type="button" class="classroom-video-button classroom-video-fullscreen" data-video-fullscreen aria-label="Ecran complet">⛶</button>';
+          controls.innerHTML='<div class="classroom-video-timeline"><span class="classroom-video-time" data-video-current>0:00</span><input class="classroom-video-progress" type="range" min="0" max="1000" value="0" step="1" aria-label="Poziția în videoclip"><span class="classroom-video-time" data-video-duration>0:00</span></div><div class="classroom-video-actions"><button type="button" class="classroom-video-button classroom-video-mute" data-video-mute aria-label="Dezactivează sunetul">◖</button><button type="button" class="classroom-video-button classroom-video-seek" data-video-back aria-label="Înapoi 10 secunde">−10</button><button type="button" class="classroom-video-button classroom-video-play" aria-label="Redă">▶</button><button type="button" class="classroom-video-button classroom-video-seek" data-video-forward aria-label="Înainte 10 secunde">+10</button><button type="button" class="classroom-video-button classroom-video-fullscreen" data-video-fullscreen aria-label="Ecran complet">⛶</button></div>';
           shell.append(video,controls);wrap.append(shell);viewer.querySelector('[data-cr-viewer-content]').replaceChildren(wrap);disableViewerZoom();
-          const play=controls.querySelector('.classroom-video-play'),progress=controls.querySelector('.classroom-video-progress'),current=controls.querySelector('[data-video-current]'),duration=controls.querySelector('[data-video-duration]'),mute=controls.querySelector('[data-video-mute]'),fullscreen=controls.querySelector('[data-video-fullscreen]');
+
+          const play=controls.querySelector('.classroom-video-play');
+          const progress=controls.querySelector('.classroom-video-progress');
+          const current=controls.querySelector('[data-video-current]');
+          const duration=controls.querySelector('[data-video-duration]');
+          const mute=controls.querySelector('[data-video-mute]');
+          const back=controls.querySelector('[data-video-back]');
+          const forward=controls.querySelector('[data-video-forward]');
+          const fullscreen=controls.querySelector('[data-video-fullscreen]');
+          fullscreen.disabled=true;
+
           const mediaTime=value=>{const seconds=Math.max(0,Math.floor(Number(value)||0)),m=Math.floor(seconds/60),s=String(seconds%60).padStart(2,'0');return m+':'+s;};
           const updatePlay=()=>{play.textContent=video.paused?'▶':'❚❚';play.setAttribute('aria-label',video.paused?'Redă':'Pauză');};
+          const updateMute=()=>{mute.textContent=video.muted?'⌁':'◖';mute.setAttribute('aria-label',video.muted?'Activează sunetul':'Dezactivează sunetul');};
           const updateTime=()=>{current.textContent=mediaTime(video.currentTime);duration.textContent=mediaTime(video.duration);progress.value=Number.isFinite(video.duration)&&video.duration>0?Math.round(video.currentTime/video.duration*1000):0;};
-          play.addEventListener('click',()=>video.paused?video.play().catch(()=>{}):video.pause());video.addEventListener('click',()=>video.paused?video.play().catch(()=>{}):video.pause());
-          video.addEventListener('play',updatePlay);video.addEventListener('pause',updatePlay);video.addEventListener('timeupdate',updateTime);video.addEventListener('loadedmetadata',updateTime);video.addEventListener('durationchange',updateTime);video.addEventListener('ended',updatePlay);
-          progress.addEventListener('input',()=>{if(Number.isFinite(video.duration)&&video.duration>0)video.currentTime=video.duration*Number(progress.value)/1000;});
-          mute.addEventListener('click',()=>{video.muted=!video.muted;mute.textContent=video.muted?'⌁':'◖';});
-          fullscreen.addEventListener('click',async()=>{try{if(document.fullscreenElement){await document.exitFullscreen?.();return;}if(shell.requestFullscreen){await shell.requestFullscreen();return;}if(video.requestFullscreen){await video.requestFullscreen();return;}}catch{}});
-          updatePlay();updateTime();return;
+          const togglePlay=()=>video.paused?video.play().catch(()=>{}):video.pause();
+          const seekBy=amount=>{if(Number.isFinite(video.duration)&&video.duration>0)video.currentTime=Math.max(0,Math.min(video.duration,video.currentTime+amount));};
+
+          play.addEventListener('click',e=>{e.stopPropagation();togglePlay();});
+          video.addEventListener('click',togglePlay);
+          back.addEventListener('click',e=>{e.stopPropagation();seekBy(-10);});
+          forward.addEventListener('click',e=>{e.stopPropagation();seekBy(10);});
+          progress.addEventListener('input',e=>{e.stopPropagation();if(Number.isFinite(video.duration)&&video.duration>0)video.currentTime=video.duration*Number(progress.value)/1000;});
+          mute.addEventListener('click',e=>{e.stopPropagation();video.muted=!video.muted;updateMute();});
+
+          video.addEventListener('play',updatePlay);
+          video.addEventListener('pause',updatePlay);
+          video.addEventListener('timeupdate',updateTime);
+          video.addEventListener('durationchange',updateTime);
+          video.addEventListener('ended',updatePlay);
+          video.addEventListener('loadedmetadata',()=>{fullscreen.disabled=false;updateTime();},{once:true});
+
+          fullscreen.addEventListener('click',async e=>{
+            e.stopPropagation();
+            try{
+              if(isiOSDevice){
+                if(video.webkitDisplayingFullscreen&&typeof video.webkitExitFullscreen==='function'){video.webkitExitFullscreen();return;}
+                if(typeof video.webkitEnterFullscreen==='function'){video.webkitEnterFullscreen();return;}
+                if(typeof video.webkitSetPresentationMode==='function'){video.webkitSetPresentationMode('fullscreen');return;}
+              }
+              if(document.fullscreenElement){await document.exitFullscreen?.();return;}
+              if(shell.requestFullscreen){await shell.requestFullscreen();return;}
+              if(video.requestFullscreen){await video.requestFullscreen();return;}
+            }catch{}
+          });
+
+          const failCleanly=()=>{
+            if(generation!==viewerGeneration)return;
+            const box=viewer.querySelector('[data-cr-viewer-content]');
+            box.innerHTML='<div class="classroom-viewer-message classroom-video-unsupported" role="alert"><div><strong>Formatul video nu este redat nativ de iPhone.</strong><p>Pentru acest fișier '+esc((renderName.split('.').pop()||'video').toUpperCase())+', folosește „Deschide în Drive”. Playerul local rămâne disponibil pentru MP4, MOV, M4V și formatele acceptate de Safari.</p></div></div>';
+          };
+          video.addEventListener('error',failCleanly,{once:true});
+          setTimeout(()=>{if(video.readyState===0&&!video.error){try{video.load();}catch{}}},150);
+
+          updatePlay();updateMute();updateTime();return;
         }
         throw Error('Acest tip de fișier nu are încă viewer local.');
       }catch(error){if(generation===viewerGeneration)viewerMessage(error?.message||'Nu am putut afișa fișierul.','alert');}
