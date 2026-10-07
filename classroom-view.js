@@ -692,19 +692,21 @@
     }
     function saveSession(){
       try{
-        /* Keep the short-lived Google access token only for this browser/PWA
-           session so reloads (including Cloud restore reloads) do not immediately
-           open another Google authorization window. Never persist it in localStorage. */
+        /* Keep the short-lived Google access token only until Google expires it.
+           Persisting that temporary token lets the installed PWA reopen without
+           showing another Google window during the token's normal lifetime. */
         if(token&&expires>Date.now()){
-          sessionStorage.setItem(SESSION_CACHE_KEY,JSON.stringify({
+          const snapshot=JSON.stringify({
             token:String(token),
             expires:Number(expires)||0,
             grantedScopes:String(grantedScopes||'')
-          }));
+          });
+          localStorage.setItem(SESSION_KEY,snapshot);
+          sessionStorage.setItem(SESSION_CACHE_KEY,snapshot);
         }else{
+          localStorage.removeItem(SESSION_KEY);
           sessionStorage.removeItem(SESSION_CACHE_KEY);
         }
-        localStorage.removeItem(SESSION_KEY);
         localStorage.removeItem(OLD_SESSION_KEY);
         localStorage.setItem(AUTH_META_KEY,JSON.stringify({grantedScopes:String(grantedScopes||'')}));
       }catch{}
@@ -985,29 +987,32 @@
       }catch{}
     }
     function restoreSession(){
-      /* Reuse a still-valid token across same-session reloads. This avoids a
-         second Google window after Cloud restore while keeping bearer tokens out
-         of persistent localStorage. */
+      /* Reuse a still-valid Google access token across PWA restarts. Once Google
+         expires it, the app stays quiet and waits for an explicit reconnect
+         instead of opening an OAuth window by itself. */
       try{
         let scopes='';
         const meta=JSON.parse(localStorage.getItem(AUTH_META_KEY)||'null');
         if(meta?.grantedScopes)scopes=String(meta.grantedScopes||'');
-        const legacy=JSON.parse(localStorage.getItem(SESSION_KEY)||'null');
-        if(!scopes&&legacy?.grantedScopes)scopes=String(legacy.grantedScopes||'');
 
         let cached=null;
-        try{cached=JSON.parse(sessionStorage.getItem(SESSION_CACHE_KEY)||'null');}catch{}
+        try{cached=JSON.parse(localStorage.getItem(SESSION_KEY)||'null');}catch{}
+        if(!cached?.token){
+          try{cached=JSON.parse(sessionStorage.getItem(SESSION_CACHE_KEY)||'null');}catch{}
+        }
+
         const cachedExpiry=Number(cached?.expires)||0;
         if(cached?.token&&cachedExpiry>Date.now()+30000){
           token=String(cached.token);
           expires=cachedExpiry;
           grantedScopes=String(cached.grantedScopes||scopes||'');
+          saveSession();
         }else{
-          token='';expires=0;grantedScopes=scopes;
+          token='';expires=0;grantedScopes=String(cached?.grantedScopes||scopes||'');
           sessionStorage.removeItem(SESSION_CACHE_KEY);
+          localStorage.removeItem(SESSION_KEY);
         }
 
-        localStorage.removeItem(SESSION_KEY);
         localStorage.removeItem(OLD_SESSION_KEY);
         if(grantedScopes)localStorage.setItem(AUTH_META_KEY,JSON.stringify({grantedScopes:String(grantedScopes)}));
       }catch{
@@ -1017,20 +1022,12 @@
       return Boolean(token&&Date.now()<expires);
     }
     function scheduleExpiry(){
-      clearTimeout(expireTimer);if(!token||expires<=Date.now())return;
-      const renewAt=Math.max(1000,expires-Date.now()-2*60*1000);
-      expireTimer=setTimeout(()=>{
-        if(client&&rememberedAccount())requestAccess(true,true);
-        else if(token&&expires>Date.now())scheduleHardExpiry();
-      },renewAt);
+      clearTimeout(expireTimer);if(!token)return;
+      if(expires<=Date.now()){clearSession('',false);return;}
+      expireTimer=setTimeout(()=>clearSession('',false),Math.max(1000,expires-Date.now()));
     }
     function scheduleHardExpiry(){
-      clearTimeout(expireTimer);
-      if(!token)return;
-      const retryIn=Math.max(15000,expires>Date.now()?expires-Date.now():15000);
-      expireTimer=setTimeout(()=>{
-        if(client&&rememberedAccount())requestAccess(true,true);
-      },retryIn);
+      scheduleExpiry();
     }
     function clearSession(text='',forgetAccount=false){
       closeViewer(false);generation++;session++;clearTimeout(expireTimer);token='';expires=0;grantedScopes='';cloudFileId='';if(forgetAccount)cloudRestoredAccount='';forgetSession();courses=[];posts=[];selected=null;loading=false;message=text;warning='';reauthenticating=false;silentRenewing=false;authRequestSilent=false;mailItems=[];mailOpen=null;mailBody='';mailUnread=0;mailMessage='';driveItems=[];driveMessage='';window.dispatchEvent(new CustomEvent('orar-mail-unread',{detail:{count:0}}));
@@ -1040,7 +1037,6 @@
       }
       renderProfile(rememberedAccount(),false);
       render();renderMail();renderDrive();
-      if(!forgetAccount&&client&&rememberedAccount())setTimeout(()=>requestAccess(true,true),250);
     }
     function logout(){const old=token;clearSession('',true);if(old && window.google?.accounts?.oauth2)window.google.accounts.oauth2.revoke(old,()=>{});}
     profile.addEventListener('click',e=>{
@@ -1050,9 +1046,18 @@
       if(toggle){const open=profile.classList.toggle('is-open');toggle.setAttribute('aria-expanded',String(open));return;}
       if(e.target.closest('[data-cr-logout]'))logout();
     });
+    async function googleFetch(url,options={},timeoutMs=15000){
+      const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);
+      try{
+        return await fetch(url,{...options,signal:controller.signal});
+      }catch(error){
+        if(error?.name==='AbortError')throw Error('Google nu răspunde momentan. Încearcă din nou.');
+        throw error;
+      }finally{clearTimeout(timer);}
+    }
     async function api(url){
-      if(!token || Date.now()>=expires){clearSession('Sesiunea Google trebuie reînnoită.',false);throw Error('Sesiunea Google trebuie reînnoită.');}
-      const response=await fetch(url,{headers:{Authorization:'Bearer '+token},cache:'no-store',credentials:'omit'});
+      if(!token || Date.now()>=expires){clearSession('',false);throw Error('Sesiunea Google trebuie reînnoită.');}
+      const response=await googleFetch(url,{headers:{Authorization:'Bearer '+token},cache:'no-store',credentials:'omit'});
       if(response.status===401){clearSession('Sesiunea Google trebuie reînnoită.',false);throw Error('Sesiunea Google trebuie reînnoită.');}
       if(!response.ok){
         let payload=null;try{payload=await response.clone().json();}catch{}
@@ -1068,7 +1073,7 @@
     const driveScopeOk=()=>Boolean(token&&Date.now()<expires&&grantedScopes.includes('drive.readonly'));
     async function driveApi(path){
       if(!token||Date.now()>=expires)throw Error('Sesiunea Google trebuie reînnoită.');
-      const response=await fetch('https://www.googleapis.com/drive/v3/'+path,{headers:{Authorization:'Bearer '+token},cache:'no-store',credentials:'omit'});
+      const response=await googleFetch('https://www.googleapis.com/drive/v3/'+path,{headers:{Authorization:'Bearer '+token},cache:'no-store',credentials:'omit'});
       if(response.status===401){clearSession('Sesiunea Google trebuie reînnoită.',false);throw Error('Sesiunea Google trebuie reînnoită.');}
       if(!response.ok){let payload=null;try{payload=await response.clone().json();}catch{}throw Error(payload?.error?.message||'Google Drive nu a putut fi accesat.');}
       return response.json();
@@ -1097,7 +1102,7 @@
     const mailScopeOk=()=>Boolean(token&&Date.now()<expires&&grantedScopes.includes('gmail.modify')&&grantedScopes.includes('gmail.send'));
     async function gmailApi(path,options={}){
       if(!token||Date.now()>=expires)throw Error('Sesiunea Google trebuie reînnoită.');
-      const response=await fetch('https://gmail.googleapis.com/gmail/v1/users/me/'+path,{...options,headers:{Authorization:'Bearer '+token,...(options.headers||{})},cache:'no-store',credentials:'omit'});
+      const response=await googleFetch('https://gmail.googleapis.com/gmail/v1/users/me/'+path,{...options,headers:{Authorization:'Bearer '+token,...(options.headers||{})},cache:'no-store',credentials:'omit'});
       if(response.status===401){clearSession('Sesiunea Google trebuie reînnoită.',false);throw Error('Sesiunea Google trebuie reînnoită.');}
       if(!response.ok){let payload=null;try{payload=await response.clone().json();}catch{}const reason=String(payload?.error?.errors?.[0]?.reason||payload?.error?.status||''),msg=String(payload?.error?.message||''),hay=(reason+' '+msg).toLowerCase();if(hay.includes('accessnotconfigured')||hay.includes('api has not been used')||hay.includes('service disabled'))throw Error('Gmail API nu este activată pentru proiectul Google al aplicației.');if(hay.includes('insufficient')||hay.includes('scope'))throw Error('Reconectează contul Google și acceptă permisiunile pentru Mail.');throw Error(msg||'Gmail nu a putut fi accesat.');}
       if(response.status===204)return null;return response.json();
@@ -1349,7 +1354,7 @@
         if(token){
           scheduleExpiry();
           restoreCloudForAccount(rememberedAccount()?.email||'').catch(()=>{});
-        }else if(rememberedAccount())setTimeout(()=>requestAccess(true,true),0);
+        }
       }catch(e){message=e.message;renderProfile(rememberedAccount(),Boolean(token&&Date.now()<expires));render();renderMail();renderDrive();}
     }
     function hasAllRequestedScopes(){
@@ -1396,15 +1401,11 @@
     }
     window.addEventListener('orar-drive-section-request',e=>{const id=String(e.detail?.id||''),type=String(e.detail?.type||''),title=String(e.detail?.title||'Google Drive');if(!id)return;if(type==='folder'){driveFolderId=id;driveFolderName=/^https?:\/\//i.test(title)?'Folder Drive':title;driveQuery='';driveNext='';driveItems=[];if(driveScopeOk())setTimeout(async()=>{try{const meta=await driveApi('files/'+encodeURIComponent(id)+'?fields=id,name,mimeType');if(meta?.name)driveFolderName=meta.name;}catch{}loadDrive(false,'forward');},0);}else setTimeout(()=>openViewer(id,title),0);});
     const ensureFreshGoogleSession=()=>{
-      if(!client||!rememberedAccount()||reauthenticating||silentRenewing)return;
-      if(!token||expires-Date.now()<2*60*1000)requestAccess(true,true);
+      if(token&&Date.now()>=expires)clearSession('',false);
     };
     const ensureGoogleSessionForSection=()=>{
       prepareSignIn();
-      if(!client||!rememberedAccount()||reauthenticating||silentRenewing)return;
-      /* Do not open a Google window just because the user entered Drive/Mail.
-         Reuse the current token for its full lifetime; renew only when needed. */
-      if(!token||Date.now()>=expires)requestAccess(true,true);
+      if(token&&Date.now()>=expires)clearSession('',false);
     };
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')ensureFreshGoogleSession();});
     window.addEventListener('pageshow',()=>setTimeout(ensureFreshGoogleSession,0),{passive:true});
