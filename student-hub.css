@@ -2901,3 +2901,104 @@ body.classroom-video-app-fullscreen .classroom-viewer-content{
     margin:0 auto!important;
   }
 }
+
+
+/* v114 isolated document viewer + platform-specific video controls. */
+/* When a document is open, the app underneath is truly removed from the
+   interaction/paint layer. Only the document viewer remains visible. */
+body.classroom-viewer-open > .app,
+body.classroom-viewer-open > .schedule-floating-controls,
+body.classroom-viewer-open > .ios-top-fade,
+body.classroom-viewer-open #studentHub > :not(.classroom-viewer){
+  visibility:hidden!important;
+  pointer-events:none!important;
+}
+body.classroom-viewer-open #studentHub > .classroom-viewer{
+  visibility:visible!important;
+  pointer-events:auto!important;
+}
+body.classroom-viewer-open .classroom-viewer-backdrop{
+  background:#05070b!important;
+  -webkit-backdrop-filter:none!important;
+  backdrop-filter:none!important;
+}
+
+/* Clear, consistent speaker glyph instead of the old text symbol. */
+.classroom-video-mute svg{
+  width:19px;
+  height:19px;
+  display:block;
+  fill:currentColor;
+  stroke:currentColor;
+  stroke-width:1.7;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.classroom-video-mute svg path:first-child{
+  stroke:none;
+}
+.classroom-video-mute.is-muted{
+  background:rgba(255,255,255,.07)!important;
+  color:rgba(255,255,255,.7)!important;
+}
+
+/* iPhone: compact touch UI and app-owned fullscreen to avoid WebKit's
+   inconsistent embedded fullscreen controls. */
+.classroom-video-stage.is-ios-player .classroom-video-actions{
+  gap:9px;
+}
+.classroom-video-stage.is-ios-player .classroom-video-button{
+  width:38px!important;
+  height:38px!important;
+  min-width:38px!important;
+}
+.classroom-video-stage.is-ios-player .classroom-video-play{
+  width:44px!important;
+  height:44px!important;
+  min-width:44px!important;
+}
+
+/* Android: larger touch targets; native fullscreen can rotate to landscape. */
+.classroom-video-stage.is-android-player .classroom-video-actions{
+  gap:11px;
+}
+.classroom-video-stage.is-android-player .classroom-video-button{
+  width:42px!important;
+  height:42px!important;
+  min-width:42px!important;
+}
+.classroom-video-stage.is-android-player .classroom-video-play{
+  width:48px!important;
+  height:48px!important;
+  min-width:48px!important;
+}
+.classroom-video-stage.is-android-player .classroom-video-progress{
+  height:26px!important;
+}
+
+/* Desktop/laptop: denser controls, hover feedback and keyboard focus. */
+.classroom-video-stage.is-desktop-player .classroom-video-controls{
+  width:min(820px,100%)!important;
+  padding:8px 11px!important;
+}
+.classroom-video-stage.is-desktop-player .classroom-video-actions{
+  gap:8px;
+}
+.classroom-video-stage.is-desktop-player .classroom-video-button{
+  width:34px!important;
+  height:34px!important;
+  min-width:34px!important;
+  cursor:pointer;
+}
+.classroom-video-stage.is-desktop-player .classroom-video-play{
+  width:40px!important;
+  height:40px!important;
+  min-width:40px!important;
+}
+.classroom-video-stage.is-desktop-player .classroom-video-button:hover{
+  background:rgba(255,255,255,.18)!important;
+}
+.classroom-video-stage.is-desktop-player .classroom-video-shell:focus-visible{
+  outline:2px solid rgba(255,255,255,.7);
+  outline-offset:3px;
+}
