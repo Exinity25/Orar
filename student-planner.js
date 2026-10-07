@@ -113,7 +113,7 @@ window.OrarPlanner={mount({root,getSchedule,applySchedule,getSubjects,changeView
  const subjectName=id=>subjects().find(s=>s.id===id)?.name||id||'General';
  const subjectOptions=(selected='',all=false)=>`<option value="">${all?'Toate materiile':'Fără materie'}</option>`+subjects().map(s=>`<option value="${esc(s.id)}" ${selected===s.id?'selected':''}>${esc(s.name)}</option>`).join('');
  const option=(values,value)=>Object.entries(values).map(([v,label])=>`<option value="${v}" ${v===value?'selected':''}>${label}</option>`).join('');
- function save(mutator,record=true){if(broken){say('Datele salvate nu pot fi citite. Exportă copia brută înainte de a le modifica.');return false;}const prev=clone(data),next=clone(data);mutator(next);try{localStorage.setItem(KEY,JSON.stringify(next));if(record){undo.push({planner:prev,homework:knownHomework});if(undo.length>40)undo.shift();redo.length=0;}data=next;window.dispatchEvent(new CustomEvent('orar-local-change',{detail:{key:KEY}}));return true;}catch{say('Salvarea a eșuat. Verifică spațiul disponibil.');return false;}}
+ function save(mutator,record=true){if(broken){say('Datele salvate nu pot fi citite. Exportă copia brută înainte de a le modifica.');return false;}const prev=clone(data),next=clone(data);mutator(next);try{localStorage.setItem(KEY,JSON.stringify(next));if(record){undo.push({planner:prev,homework:knownHomework});if(undo.length>40){undo.shift();setTimeout(()=>pruneResourceFiles(),0);}redo.length=0;}data=next;window.dispatchEvent(new CustomEvent('orar-local-change',{detail:{key:KEY}}));return true;}catch{say('Salvarea a eșuat. Verifică spațiul disponibil.');return false;}}
  function history(direction){const from=direction==='undo'?undo:redo,to=direction==='undo'?redo:undo;if(!from.length)return;const previous=from.pop(),current={planner:clone(data),homework:localStorage.getItem(HW)};if(save(d=>{for(const k of Object.keys(d))delete d[k];Object.assign(d,previous.planner);},false)){writingHomework=true;try{if(previous.homework===null)localStorage.removeItem(HW);else localStorage.setItem(HW,previous.homework);knownHomework=previous.homework;window.dispatchEvent(new CustomEvent('orar-homework-change'));window.dispatchEvent(new CustomEvent('orar-local-change',{detail:{key:HW}}));to.push(current);render();}finally{writingHomework=false;}}else from.push(previous);}
  function homework(){try{return read(HW,{subjects:{}});}catch{return {subjects:{}};}}
  function tasks(){const hw=homework(),out=data.tasks.map(t=>({...t,uid:t.id}));for(const [sid,v] of Object.entries(hw.subjects||{}))for(const t of v.tasks||[]){const id='hw:'+sid+':'+t.id,m=data.taskMeta[id]||{};out.push({...t,...m,title:t.text,subject:sid,uid:id,legacyId:t.id,status:t.done?'done':(m.status==='done'?'todo':m.status||'todo'),source:'homework'});}return out.map(t=>({...t,title:t.title||t.text||'',status:t.status||'todo',priority:t.priority||'medium',checklist:t.checklist||[],tags:t.tags||[]}));}
@@ -270,7 +270,48 @@ window.OrarPlanner={mount({root,getSchedule,applySchedule,getSubjects,changeView
   }
   for(const m of messages)if(!data.notified.includes(m.id)){notify(m.title,m.body);save(d=>{d.notified.push(m.id);d.notified=d.notified.slice(-500);},false);}
  }
- async function blobStore(op,key,value){return new Promise((resolve,reject)=>{const req=indexedDB.open('orar_planner_files_v1',1);req.onupgradeneeded=()=>req.result.createObjectStore('files');req.onerror=()=>reject(req.error);req.onsuccess=()=>{const db=req.result,tx=db.transaction('files',op==='get'?'readonly':'readwrite'),s=tx.objectStore('files'),r=op==='get'?s.get(key):s.put(value,key);let result;r.onsuccess=()=>{result=r.result;};tx.oncomplete=()=>{db.close();resolve(result);};tx.onerror=()=>{db.close();reject(tx.error);};};});}
+ const RESOURCE_STORAGE_LIMIT=256*1024*1024;
+ async function blobStore(op,key,value){
+  return new Promise((resolve,reject)=>{
+   const req=indexedDB.open('orar_planner_files_v1',1);
+   req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains('files'))req.result.createObjectStore('files');};
+   req.onerror=()=>reject(req.error);
+   req.onsuccess=()=>{
+    const db=req.result,readOnly=op==='get'||op==='usage',tx=db.transaction('files',readOnly?'readonly':'readwrite'),s=tx.objectStore('files');
+    let request=null,result;
+    if(op==='get')request=s.get(key);
+    else if(op==='put')request=s.put(value,key);
+    else if(op==='delete')request=s.delete(key);
+    else if(op==='usage'){
+     let total=0;request=s.openCursor();
+     request.onsuccess=()=>{const cursor=request.result;if(cursor){total+=Number(cursor.value?.size)||0;cursor.continue();}else result=total;};
+    }else if(op==='prune'){
+     const keep=value instanceof Set?value:new Set(value||[]);let removed=0;request=s.openCursor();
+     request.onsuccess=()=>{const cursor=request.result;if(cursor){if(!keep.has(String(cursor.key))){cursor.delete();removed++;}cursor.continue();}else result=removed;};
+    }else{db.close();reject(Error('Operație de stocare necunoscută.'));return;}
+    if(request&&op!=='usage'&&op!=='prune')request.onsuccess=()=>{result=request.result;};
+    tx.oncomplete=()=>{db.close();resolve(result);};
+    tx.onerror=()=>{db.close();reject(tx.error);};
+    tx.onabort=()=>{db.close();reject(tx.error||Error('Stocarea locală a fost întreruptă.'));};
+   };
+  });
+ }
+ async function pruneResourceFiles(){
+  const keep=new Set();
+  const planners=[data,...undo.map(entry=>entry?.planner),...redo.map(entry=>entry?.planner)].filter(Boolean);
+  for(const planner of planners)for(const item of planner.resources||[]){const fileId=String(item?.fileId||'');if(fileId)keep.add(fileId);}
+  try{return await blobStore('prune',null,keep);}catch{return 0;}
+ }
+ async function ensureResourceCapacity(file){
+  await pruneResourceFiles();
+  const used=Number(await blobStore('usage'))||0;
+  if(used+file.size>RESOURCE_STORAGE_LIMIT)throw Error('Fișierele locale din Resurse sunt limitate la 256 MB pentru a proteja spațiul și performanța telefonului. Șterge un fișier vechi înainte de a adăuga altul.');
+  try{
+   const estimate=await navigator.storage?.estimate?.();
+   if(estimate?.quota&&Number(estimate.usage||0)+file.size>estimate.quota*.85)throw Error('Spațiul local al aplicației este aproape plin. Șterge fișiere vechi înainte de a continua.');
+  }catch(error){if(error?.message?.includes('aproape plin'))throw error;}
+ }
+ setTimeout(()=>pruneResourceFiles(),1200);
  function download(name,body,mime='application/json'){const url=URL.createObjectURL(body instanceof Blob?body:new Blob([body],{type:mime})),a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);}
  function exportIcs(){const escape=s=>String(s||'').replace(/\\/g,'\\\\').replace(/\r?\n/g,'\\n').replace(/,/g,'\\,').replace(/;/g,'\\;');const utc=d=>new Date(d).toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,'');const lessonEntries=lessons(today(),90),entries=[...agenda(),...lessonEntries],byDate=new Map();for(const e of lessonEntries){if(!byDate.has(e.date))byDate.set(e.date,[]);byDate.get(e.date).push(e);}const lines=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Orar//Student Planner//RO','CALSCALE:GREGORIAN'];for(const e of entries){if(!e.date)continue;lines.push('BEGIN:VEVENT','UID:'+escape(e.uid||e.id)+'@orar','DTSTAMP:'+utc(new Date()),'SUMMARY:'+escape(e.title||e.subject));if(e.start){lines.push('DTSTART:'+utc(e.date+'T'+e.start),'DTEND:'+utc(e.date+'T'+(e.end||e.start)));}else lines.push('DTSTART;VALUE=DATE:'+e.date.replace(/-/g,''),'DTEND;VALUE=DATE:'+addDays(e.date,1).replace(/-/g,''));lines.push('LOCATION:'+escape(e.location||e.room||''));const alarm=trigger=>lines.push('BEGIN:VALARM','TRIGGER:'+trigger,'ACTION:DISPLAY','DESCRIPTION:'+escape(e.title||e.subject),'END:VALARM');if(e.kind==='lesson'){const dayLessons=byDate.get(e.date)||[],index=dayLessons.findIndex(x=>x.id===e.id),lead=lessonReminderLead(dayLessons,index);if(lead)alarm('-PT'+lead+'M');}else if(e.kind==='task'){alarm('-P2D');alarm('-P1D');}else alarm('-PT24H');lines.push('END:VEVENT');}lines.push('END:VCALENDAR');const fold=line=>{let rows=[],part='',n=0;for(const c of line){const bytes=new TextEncoder().encode(c).length;if(n+bytes>73){rows.push(part);part=' ';n=1;}part+=c;n+=bytes;}rows.push(part);return rows.join('\r\n');};download('orar-calendar.ics',lines.map(fold).join('\r\n')+'\r\n','text/calendar;charset=utf-8');}
  function createStudyPlan(id){const exam=data.exams.find(e=>e.id===id),chapters=String(exam?.chapters||'').split('\n').map(s=>s.trim()).filter(Boolean);if(!exam||!chapters.length){say('Adaugă mai întâi capitolele examenului, câte unul pe rând.');return;}const span=Math.max(0,Math.min(180,daysBetween(today(),exam.date)));if(!span){say('Nu există zile înaintea examenului pentru planificare.');return;}const events=busyEvents(today(),span),slots=[];for(let i=0;i<span;i++){const date=addDays(today(),i);for(const slot of freeSlots(events,date,60)){let from=minutes(slot.start);if(date===today())from=Math.max(from,Math.ceil((new Date().getHours()*60+new Date().getMinutes())/60)*60);for(let m=from;m+60<=minutes(slot.end);m+=60)slots.push({date,start:clock(m),end:clock(m+60)});}}const picked=[],perDay=new Map();for(const chapter of chapters){const candidates=slots.filter(s=>!picked.some(p=>p.date===s.date&&p.start===s.start));candidates.sort((a,b)=>(perDay.get(a.date)||0)-(perDay.get(b.date)||0)||(a.date+a.start).localeCompare(b.date+b.start));const slot=candidates[0];if(!slot)break;perDay.set(slot.date,(perDay.get(slot.date)||0)+1);picked.push({...slot,chapter,subject:exam.subject,examId:id,id:uid(),done:false});}if(!picked.length){say('Nu există intervale libere de o oră înaintea examenului.');return;}showDialog('Plan de studiu propus',`<p>${picked.length} din ${chapters.length} capitole, câte 60 minute. ${picked.length<chapters.length?'Unele capitole nu au încă interval liber.':''}</p>${picked.map(p=>eventCard({...p,title:p.chapter,kind:'study'})).join('')}<button data-action="accept-study">Adaugă sesiunile</button>`);importCandidate={kind:'study',sessions:picked};}
@@ -306,7 +347,7 @@ window.OrarPlanner={mount({root,getSchedule,applySchedule,getSubjects,changeView
  if(a==='toggle-check-item'){const t=tasks().find(x=>x.uid===id),index=Number(b.dataset.index);if(!t||!Number.isInteger(index)||!t.checklist[index])return;const checklist=t.checklist.map((c,i)=>i===index?{...c,done:!c.done}:{...c}),allDone=checklist.length>0&&checklist.every(c=>c.done);updateTask(id,{checklist,status:allDone?'done':(t.status==='done'?'todo':t.status)});if(allDone)say('Checklist complet. Task mutat la Terminat.');render();return;}
  if(a==='new-task'||a==='edit-task'){taskDialog(id);return;}if(a==='focus-task'){if(focus){changeView('planner:focus');return;}const t=tasks().find(x=>x.uid===id);startFocus(t?.title||'Studiu',25*60);return;}
  if(a==='new-note'||a==='edit-note'){noteDialog(id);return;}if(a==='new-exam'||a==='edit-exam'){examDialog(id);return;}if(a==='new-resource'){resourceDialog();return;}
- if(a.startsWith('delete-')){const collection={task:'tasks',note:'notes',exam:'exams',grade:'grades',resource:'resources',study:'studySessions'}[a.slice(7)];if(collection){save(d=>{d[collection]=d[collection].filter(x=>x.id!==id);if(collection==='exams')d.studySessions=d.studySessions.filter(x=>x.examId!==id);});modal.close();render();say('Șters. Poți reveni cu Undo.');}return;}
+ if(a.startsWith('delete-')){const collection={task:'tasks',note:'notes',exam:'exams',grade:'grades',resource:'resources',study:'studySessions'}[a.slice(7)];if(collection){const removed=collection==='resources'?data.resources.find(x=>x.id===id):null;const saved=save(d=>{d[collection]=d[collection].filter(x=>x.id!==id);if(collection==='exams')d.studySessions=d.studySessions.filter(x=>x.examId!==id);});if(saved&&removed?.fileId)setTimeout(()=>pruneResourceFiles(),0);modal.close();render();say('Șters. Poți reveni cu Undo.');}return;}
  if(a==='cal-prev'||a==='cal-next'){const n=a==='cal-next'?1:-1;if(calendarMode==='month'){const d=day(month);d.setMonth(d.getMonth()+n);month=iso(d);}else week=addDays(week,n*7);render();return;}
  if(a==='cal-today'){month=today().slice(0,7)+'-01';week=monday(today());render();return;}
  if(a==='event-info'){const ev=[...agenda(),...lessons(b.dataset.date,1)].find(x=>String(x.id)===id);if(ev)showDialog('Activitate',eventCard(ev));return;}
@@ -341,7 +382,7 @@ window.OrarPlanner={mount({root,getSchedule,applySchedule,getSubjects,changeView
  if(kind==='room'){save(d=>{d.locations[form.dataset.room]={building:value('building'),address:value('address'),travel:Number(value('travel'))};});render();}
  if(kind==='parity'){if(day(value('anchor')).getDay()!==1)throw Error('Alege o zi de luni ca referință.');save(d=>{d.settings.anchor=value('anchor');d.settings.parity=value('parity');});render();}
  if(kind==='focus')startFocus(value('title'),focusDraftSeconds);
- if(kind==='resource'){const r={id:uid(),title:value('title'),subject:value('subject'),url:value('url'),text:value('text')},file=f.get('file');if(r.url&&!safe(r.url))throw Error('Folosește un link http sau https valid.');if(file?.size){if(file.size>20*1024*1024)throw Error('Fișierul trebuie să fie mai mic de 20 MB.');r.fileId=uid();r.fileName=file.name;await blobStore('put',r.fileId,file);}if(save(d=>d.resources.push(r))){modal.close();render();}}
+ if(kind==='resource'){const r={id:uid(),title:value('title'),subject:value('subject'),url:value('url'),text:value('text')},file=f.get('file');let storedFileId='';if(r.url&&!safe(r.url))throw Error('Folosește un link http sau https valid.');if(file?.size){if(file.size>20*1024*1024)throw Error('Fișierul trebuie să fie mai mic de 20 MB.');await ensureResourceCapacity(file);r.fileId=uid();r.fileName=file.name;r.fileSize=file.size;storedFileId=r.fileId;await blobStore('put',r.fileId,file);}if(save(d=>d.resources.push(r))){modal.close();render();}else if(storedFileId)try{await blobStore('delete',storedFileId);}catch{}}
  }catch(error){say(error.message||'Salvarea nu a reușit.');}}
  page.addEventListener('submit',submit);modal.addEventListener('submit',submit);
  async function change(e){const el=e.target,c=el.dataset.control;try{
@@ -358,7 +399,7 @@ window.OrarPlanner={mount({root,getSchedule,applySchedule,getSubjects,changeView
  const custom=root.querySelector('#hubCustomize .hub-content'),settings=document.createElement('section');settings.className='hub-custom-section planner-preferences';settings.innerHTML=`<h2>Preferințe de afișare</h2><form data-form="appearance"><label>Dimensiune text în secțiunile noi (%)<input name="font" type="number" min="85" max="140" step="5" value="${data.settings.font}"></label><label><input name="compact" type="checkbox" ${data.settings.compact?'checked':''}> Mod compact în secțiunile noi</label><button class="hub-primary">Salvează preferințele</button></form>`;custom.append(settings);
  function appearance(){const s=data.settings;document.documentElement.style.setProperty('--planner-font-scale',String(s.font/100));document.body.classList.toggle('planner-compact',s.compact);}
  settings.addEventListener('submit',e=>{e.preventDefault();const f=new FormData(e.target);save(d=>{d.settings.font=Math.max(85,Math.min(140,Number(f.get('font'))||100));d.settings.compact=f.has('compact');});appearance();say('Preferințe salvate.');});appearance();
- window.addEventListener('orar-local-change',e=>{if(e.detail?.key===HW&&!writingHomework){const fresh=localStorage.getItem(HW);if(fresh!==knownHomework){undo.push({planner:clone(data),homework:knownHomework});if(undo.length>40)undo.shift();redo.length=0;knownHomework=fresh;}}if(e.detail?.key!==KEY&&isShown&&!page.contains(document.activeElement))render();});
+ window.addEventListener('orar-local-change',e=>{if(e.detail?.key===HW&&!writingHomework){const fresh=localStorage.getItem(HW);if(fresh!==knownHomework){undo.push({planner:clone(data),homework:knownHomework});if(undo.length>40){undo.shift();setTimeout(()=>pruneResourceFiles(),0);}redo.length=0;knownHomework=fresh;}}if(e.detail?.key!==KEY&&isShown&&!page.contains(document.activeElement))render();});
  window.addEventListener('storage',e=>{if(e.key===KEY){try{const fresh=read(KEY,blank());if(fresh.version===1&&Array.isArray(fresh.tasks)){const hadLegacyAttendance=Object.prototype.hasOwnProperty.call(fresh,'attendance');data=validatePlanner(fresh);if(hadLegacyAttendance)try{localStorage.setItem(KEY,JSON.stringify(data));}catch{}appearance();render();}}catch{say('Actualizarea din altă fereastră nu a putut fi citită.');}}});
  window.addEventListener('orar-theme-selected',()=>{appearance();});
  window.addEventListener('orar-classroom-authenticated',()=>{syncClassroom({quiet:true});});
