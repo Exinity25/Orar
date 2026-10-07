@@ -320,6 +320,7 @@
           if(!vv){
             page.style.setProperty('--gemini-keyboard-inset','0px');
             page.style.setProperty('--gemini-viewport-offset','0px');
+            page.style.removeProperty('--gemini-composer-top');
             document.body.style.setProperty('--gemini-viewport-offset','0px');
             setGeminiMotionTargets(0,0);
             return;
@@ -328,19 +329,24 @@
             geminiUnfocusedViewportHeight=Math.max(1,Math.round(vv.height+Math.max(0,vv.offsetTop)));
             page.style.setProperty('--gemini-keyboard-inset','0px');
             page.style.setProperty('--gemini-viewport-offset','0px');
+            page.style.removeProperty('--gemini-composer-top');
             document.body.style.setProperty('--gemini-viewport-offset','0px');
             setGeminiMotionTargets(0,0);
             return;
           }
           if(!geminiUnfocusedViewportHeight)geminiUnfocusedViewportHeight=Math.max(1,Math.round(vv.height+Math.max(0,vv.offsetTop)));
-          const visibleBottom=vv.height+Math.max(0,vv.offsetTop);
+          const offset=Math.max(0,Math.round(vv.offsetTop));
+          const visibleBottom=Math.round(vv.height+offset);
           const baseHeight=geminiUnfocusedViewportHeight||geminiStageHeight||Math.round(window.innerHeight||visibleBottom);
           const inset=Math.max(0,Math.round(baseHeight-visibleBottom));
-          const offset=Math.max(0,Math.round(vv.offsetTop));
+          const composer=field.closest('.gemini-composer');
+          const composerHeight=Math.max(42,Math.ceil(composer?.getBoundingClientRect().height||58));
+          const composerTop=Math.max(offset+4,visibleBottom-composerHeight-6);
           page.style.setProperty('--gemini-keyboard-inset',inset+'px');
           page.style.setProperty('--gemini-viewport-offset',offset+'px');
+          page.style.setProperty('--gemini-composer-top',composerTop+'px');
           document.body.style.setProperty('--gemini-viewport-offset',offset+'px');
-          setGeminiMotionTargets(offset,inset);
+          setGeminiMotionTargets(offset,0);
           pinConversationToLatest();
         });
       };
@@ -402,7 +408,10 @@
       }
       function renderMessages(chat){
         if(!chat||!chat.messages.length)return '<div class="gemini-empty"><span>✦</span><h2>Cu ce te pot ajuta?</h2><p>Gemini poate folosi contextul aplicației, analiza fișiere și adăuga, modifica sau șterge activități din orar, plus teme în Planificator.</p></div>';
-        return chat.messages.map(message=>`<article class="gemini-message is-${message.role==='model'?'model':'user'}"><div class="gemini-message-label">${message.role==='model'?'Gemini':'Tu'}</div><div class="gemini-message-body">${linkify(message.text||'')}</div>${message.attachments?.length?`<div class="gemini-message-files">${message.attachments.map(file=>`<span>▧ ${esc(file.name)}</span>`).join('')}</div>`:''}</article>`).join('');
+        return chat.messages.map(message=>{
+          const body=String(message.text||message.displayText||'');
+          return `<article class="gemini-message is-${message.role==='model'?'model':'user'}"><div class="gemini-message-label">${message.role==='model'?'Gemini':'Tu'}</div><div class="gemini-message-body">${linkify(body)}</div>${message.attachments?.length?`<div class="gemini-message-files">${message.attachments.map(file=>`<span>▧ ${esc(file.name)}</span>`).join('')}</div>`:''}</article>`;
+        }).join('');
       }
       function syncChatMenuDom(){
         const shell=page.querySelector('.gemini-shell');
@@ -662,7 +671,8 @@
         const controller=new AbortController();
         activeMessageController=controller;
         busy=true;
-        const userMessage={role:'user',text:clean||'Analizează fișierele atașate.',attachments:files.map(file=>({name:file.name,type:file.type,size:file.size})),parts:attachmentParts};
+        const sentText=clean||'Analizează fișierele atașate.';
+        const userMessage={role:'user',text:sentText,displayText:sentText,attachments:files.map(file=>({name:file.name,type:file.type,size:file.size})),parts:attachmentParts};
         chat.messages.push(userMessage);if(chat.title==='Chat nou')chat.title=titleFrom(clean||files[0]?.name);chat.updated=Date.now();writeChats(chats);render();
         try{
           for(const file of files){
@@ -809,6 +819,7 @@
         setTimeout(()=>{
           page.style.setProperty('--gemini-keyboard-inset','0px');
           page.style.setProperty('--gemini-viewport-offset','0px');
+          page.style.removeProperty('--gemini-composer-top');
           document.body.style.setProperty('--gemini-viewport-offset','0px');
           setGeminiMotionTargets(0,0);
           setGeminiKeyboardOpen(false);
