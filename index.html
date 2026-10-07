@@ -1613,6 +1613,8 @@
       slot.className=`slot-cell${item?'':' empty'} day-col day-${day}${item&&!editing&&expandedKey===key?' note-open-slot':''}`;
       if(item){
         slot.innerHTML=renderCard(item,key);
+        const card=slot.querySelector('.class-card');
+        if(card)card.style.setProperty('animation','none','important');
       }else{
         slot.innerHTML=editing?`<button class="add-class" type="button" data-add="${key}">＋ Adaugă${data.classes[key]?' · '+selectedWeek:''}</button>`:'';
       }
@@ -1628,8 +1630,6 @@
       weekFadeMotions = [];
 
       const affectedKeys = parityAffectedKeys();
-      grid.classList.add('is-week-switching');
-
       if(!reduce){
         affectedKeys.forEach(key => {
           const card = grid.querySelector(`[data-key="${key}"] .class-card`);
@@ -1663,10 +1663,7 @@
         });
         Promise.allSettled(weekFadeMotions.map(m=>m.finished)).finally(()=>{
           weekFadeMotions=[];
-          grid.classList.remove('is-week-switching');
         });
-      }else{
-        grid.classList.remove('is-week-switching');
       }
     }
 
