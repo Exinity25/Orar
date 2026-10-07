@@ -97,7 +97,7 @@
   }
   async function transcodeAviForIPhone(blob,onProgress=()=>{}){
     if(!blob||!blob.size)throw Error('Fișierul video este gol.');
-    if(blob.size>96*1024*1024)throw Error('Fișierul AVI este prea mare pentru conversie sigură direct pe iPhone.');
+    if(blob.size>48*1024*1024)throw Error('Fișierul AVI este prea mare pentru conversie sigură direct pe telefon. Deschide-l în Drive sau convertește-l pe un computer.');
     const ffmpeg=await loadVideoTranscoder();
     const stamp=Date.now().toString(36),input='orar_'+stamp+'.avi',output='orar_'+stamp+'.mp4';
     try{
@@ -114,12 +114,16 @@
       );
       const bytes=ffmpeg.FS('readFile',output);
       if(!bytes?.length)throw Error('Conversia AVI nu a produs un videoclip valid.');
+      const copy=new Uint8Array(bytes.length);copy.set(bytes);
       onProgress(1);
-      return new Blob([bytes.buffer],{type:'video/mp4'});
+      return new Blob([copy],{type:'video/mp4'});
     }finally{
       try{ffmpeg.FS('unlink',input);}catch{}
       try{ffmpeg.FS('unlink',output);}catch{}
       if(typeof ffmpeg.setProgress==='function')ffmpeg.setProgress(()=>{});
+      try{if(typeof ffmpeg.exit==='function')ffmpeg.exit();}catch{}
+      if(videoTranscoder===ffmpeg)videoTranscoder=null;
+      videoTranscoderPromise=null;
     }
   }
   function loadGoogle(){
@@ -142,6 +146,7 @@
     const downloadStatus=document.createElement('p');downloadStatus.className='classroom-download-status';downloadStatus.setAttribute('role','status');downloadStatus.hidden=true;viewer.querySelector('.classroom-viewer-header').append(downloadStatus);
     let viewerDownload=null;
     let viewerReturnFocus=null,viewerObjectUrl='',viewerGeneration=0,viewerZoom=1,viewerZoomTarget=null,viewerMinZoom=1;
+    let viewerPdfObserver=null,viewerPdfDocument=null,viewerPdfRenderTasks=new Set();
     let pinchStartDistance=0,pinchStartZoom=1,pinchWorldX=0,pinchWorldY=0,pinchFrame=0;
     function sizeWorkbookStage(){
       if(!viewerZoomTarget?.classList.contains('classroom-excel-document'))return;
@@ -171,6 +176,9 @@
     function disableViewerZoom(){viewer.querySelector('[data-cr-viewer-content]').classList.remove('has-local-zoom');if(pinchFrame)cancelAnimationFrame(pinchFrame);pinchFrame=0;viewerZoomTarget=null;viewerZoom=1;viewerMinZoom=1;pinchStartDistance=0;pinchWorldX=pinchWorldY=0;}
     function resetViewerContent(){
       disableViewerZoom();
+      if(viewerPdfObserver){viewerPdfObserver.disconnect();viewerPdfObserver=null;}
+      for(const task of viewerPdfRenderTasks){try{task.cancel();}catch{}}viewerPdfRenderTasks.clear();
+      if(viewerPdfDocument){const pdf=viewerPdfDocument;viewerPdfDocument=null;Promise.resolve(pdf.destroy?.()).catch(()=>{});}
       if(viewerDownload?.objectUrl)URL.revokeObjectURL(viewerDownload.objectUrl);
       viewerDownload=null;downloadButton.disabled=true;downloadButton.textContent='↓ Descarcă';downloadButton.title='Fișierul se încarcă';downloadStatus.hidden=true;downloadStatus.textContent='';
       viewer.querySelector('.classroom-image-zoom-controls')?.remove();viewer.querySelector('.classroom-viewer-media-fullscreen')?.remove();
@@ -308,28 +316,62 @@
         if(viewerDownload){viewerDownload.objectUrl=URL.createObjectURL(fileBlob);downloadButton.disabled=false;}
         response=new Response(fileBlob,{headers:response.headers});
         if(/\.pdf$/i.test(renderName)||renderMime==='application/pdf'){
+          const mobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+          const localLimit=mobile?48*1024*1024:120*1024*1024;
+          if(fileBlob.size>localLimit){
+            viewerMessage('PDF-ul este prea mare pentru o previzualizare locală sigură pe acest dispozitiv. Folosește „Deschide în Drive” pentru a evita consumul excesiv de memorie.','status');
+            return;
+          }
           const data=await response.arrayBuffer();if(generation!==viewerGeneration)return;
           const pdfjs=await loadPdfJs();if(generation!==viewerGeneration)return;
-          const pdf=await pdfjs.getDocument({data:new Uint8Array(data)}).promise;if(generation!==viewerGeneration)return;
+          const pdf=await pdfjs.getDocument({data:new Uint8Array(data)}).promise;if(generation!==viewerGeneration){pdf.destroy?.();return;}
+          viewerPdfDocument=pdf;
           const box=viewer.querySelector('[data-cr-viewer-content]'),pages=document.createElement('div');pages.className='classroom-pdf-pages';
           box.replaceChildren(pages);
+          const firstPage=await pdf.getPage(1),firstBase=firstPage.getViewport({scale:1});
+          const available=Math.max(280,Math.min(1100,box.clientWidth||window.innerWidth)-24);
+          const defaultScale=Math.min(2,available/firstBase.width),defaultViewport=firstPage.getViewport({scale:defaultScale});
+          try{firstPage.cleanup?.();}catch{}
+          const pageMeta=new Map(),rendered=new Map(),visible=new Set(),queue=[];
+          const maxRendered=mobile?3:5,maxPixels=mobile?4000000:7000000;
+          let pumping=false;
+          const placeholder=(wrap,pageNo)=>{
+            const node=document.createElement('div');node.className='classroom-pdf-placeholder';node.textContent='Pagina '+pageNo;wrap.replaceChildren(node);
+          };
           for(let pageNo=1;pageNo<=pdf.numPages;pageNo++){
-            if(generation!==viewerGeneration)return;
-            const page=await pdf.getPage(pageNo),base=page.getViewport({scale:1});
-            const available=Math.max(280,Math.min(1100,box.clientWidth||window.innerWidth)-24);
-            const scale=Math.min(2,available/base.width),viewport=page.getViewport({scale});
-            const wrap=document.createElement('div');wrap.className='classroom-pdf-page';
+            const wrap=document.createElement('div');wrap.className='classroom-pdf-page';wrap.id='pdf-page-'+pageNo;wrap.dataset.pdfPage=String(pageNo);
+            wrap.style.width=defaultViewport.width+'px';wrap.style.height=defaultViewport.height+'px';
+            placeholder(wrap,pageNo);pages.append(wrap);pageMeta.set(pageNo,{wrap,queued:false});
+          }
+          const touch=pageNo=>{const state=rendered.get(pageNo);if(state)state.last=performance.now();};
+          const enforceLimit=()=>{
+            while(rendered.size>maxRendered){
+              const candidate=[...rendered.entries()].filter(([pageNo])=>!visible.has(pageNo)).sort((a,b)=>a[1].last-b[1].last)[0];
+              if(!candidate)break;
+              const [pageNo]=candidate,meta=pageMeta.get(pageNo);rendered.delete(pageNo);
+              if(meta?.wrap?.isConnected)placeholder(meta.wrap,pageNo);
+            }
+          };
+          const renderPage=async pageNo=>{
+            if(generation!==viewerGeneration||viewerPdfDocument!==pdf)return;
+            if(rendered.has(pageNo)){touch(pageNo);return;}
+            const meta=pageMeta.get(pageNo);if(!meta)return;
+            const page=await pdf.getPage(pageNo);if(generation!==viewerGeneration||viewerPdfDocument!==pdf){try{page.cleanup?.();}catch{}return;}
+            const base=page.getViewport({scale:1}),scale=Math.min(2,available/base.width),viewport=page.getViewport({scale});
+            meta.wrap.style.width=viewport.width+'px';meta.wrap.style.height=viewport.height+'px';
             const canvas=document.createElement('canvas'),dpr=Math.max(1,window.devicePixelRatio||1);
-            const android=/Android/i.test(navigator.userAgent);
-            const preferredRatio=Math.min(android?6:5,Math.max(android?3.75:3,dpr*(android?1.5:1.3))),maxPixels=android?32000000:26000000;
+            const preferredRatio=Math.min(mobile?2.25:3,Math.max(1.5,dpr));
             const safeRatio=Math.sqrt(maxPixels/Math.max(1,viewport.width*viewport.height));
             const ratio=Math.max(1,Math.min(preferredRatio,safeRatio));
             canvas.width=Math.max(1,Math.floor(viewport.width*ratio));canvas.height=Math.max(1,Math.floor(viewport.height*ratio));
             canvas.style.width=viewport.width+'px';canvas.style.height=viewport.height+'px';
-            wrap.append(canvas);pages.append(wrap);
+            meta.wrap.replaceChildren(canvas);
             const ctx=canvas.getContext('2d',{alpha:false,desynchronized:false});
-            if(ctx){ctx.imageSmoothingEnabled=true;if('imageSmoothingQuality' in ctx)ctx.imageSmoothingQuality='high';}
-            await page.render({canvasContext:ctx,viewport,transform:ratio===1?null:[ratio,0,0,ratio,0,0],intent:'display'}).promise;
+            if(ctx){ctx.imageSmoothingEnabled=true;if('imageSmoothingQuality' in ctx)ctx.imageSmoothingQuality='medium';}
+            const renderTask=page.render({canvasContext:ctx,viewport,transform:ratio===1?null:[ratio,0,0,ratio,0,0],intent:'display'});
+            viewerPdfRenderTasks.add(renderTask);
+            try{await renderTask.promise;}catch(error){if(error?.name!=='RenderingCancelledException')throw error;return;}finally{viewerPdfRenderTasks.delete(renderTask);}
+            if(generation!==viewerGeneration||viewerPdfDocument!==pdf)return;
             const links=document.createElement('div');links.className='classroom-pdf-links';links.style.width=viewport.width+'px';links.style.height=viewport.height+'px';
             const seenLinks=new Set();
             const addPdfLink=(href,left,top,width,height,label='Deschide linkul din PDF')=>{
@@ -337,51 +379,62 @@
               const key=[href,Math.round(left),Math.round(top),Math.round(width),Math.round(height)].join('|');if(seenLinks.has(key))return;seenLinks.add(key);
               const a=document.createElement('a');a.className='classroom-pdf-link';a.href=href;a.style.left=Math.max(0,left)+'px';a.style.top=Math.max(0,top)+'px';a.style.width=Math.max(14,width)+'px';a.style.height=Math.max(14,height)+'px';a.setAttribute('aria-label',label);
               a.target='_blank';a.rel='noopener noreferrer';
-              a.addEventListener('click',e=>{
-                e.stopPropagation();
-                if(href.startsWith('#pdf-page-')){e.preventDefault();const target=pages.querySelector(href);if(target)target.scrollIntoView({behavior:'smooth',block:'start'});}
-              });
+              a.addEventListener('click',e=>{e.stopPropagation();if(href.startsWith('#pdf-page-')){e.preventDefault();const target=pages.querySelector(href);if(target)target.scrollIntoView({behavior:'smooth',block:'start'});}});
               links.append(a);
             };
             const annotations=await page.getAnnotations({intent:'display'});
             for(const annotation of annotations||[]){
-              if(annotation.subtype!=='Link' || !annotation.rect)continue;
-              const rawUrl=annotation.url||annotation.unsafeUrl||'';
-              let href=safeURL(rawUrl);
-              if(!href && annotation.dest){
-                try{
-                  const dest=typeof annotation.dest==='string'?await pdf.getDestination(annotation.dest):annotation.dest;
-                  if(dest?.[0]!=null){
-                    const ref=dest[0],index=typeof ref==='object'?await pdf.getPageIndex(ref):Math.max(0,Number(ref)||0);
-                    href='#pdf-page-'+(index+1);
-                  }
-                }catch{}
+              if(annotation.subtype!=='Link'||!annotation.rect)continue;
+              const rawUrl=annotation.url||annotation.unsafeUrl||'';let href=safeURL(rawUrl);
+              if(!href&&annotation.dest){
+                try{const dest=typeof annotation.dest==='string'?await pdf.getDestination(annotation.dest):annotation.dest;if(dest?.[0]!=null){const ref=dest[0],index=typeof ref==='object'?await pdf.getPageIndex(ref):Math.max(0,Number(ref)||0);href='#pdf-page-'+(index+1);}}catch{}
               }
               if(!href)continue;
               const rect=viewport.convertToViewportRectangle(annotation.rect),left=Math.min(rect[0],rect[2]),top=Math.min(rect[1],rect[3]),width=Math.abs(rect[0]-rect[2]),height=Math.abs(rect[1]-rect[3]);
               addPdfLink(href,left,top,width,height);
             }
-            // Some PDFs visually contain URLs but do not encode them as Link annotations.
-            // Detect URL text runs too and place real clickable hit areas over them.
             try{
-              const textContent=await page.getTextContent();
-              const urlRe=/(https?:\/\/[^\s<>"')\]]+|www\.[^\s<>"')\]]+)/gi;
+              const textContent=await page.getTextContent(),urlRe=/(https?:\/\/[^\s<>"')\]]+|www\.[^\s<>"')\]]+)/gi;
               for(const item of textContent.items||[]){
-                const str=String(item.str||'');if(!str)continue;
-                let match;urlRe.lastIndex=0;
+                const str=String(item.str||'');if(!str)continue;let match;urlRe.lastIndex=0;
                 while((match=urlRe.exec(str))){
-                  let raw=match[0].replace(/[.,;!?]+$/,'');
-                  const href=safeURL(/^www\./i.test(raw)?'https://'+raw:raw);if(!href)continue;
+                  const raw=match[0].replace(/[.,;!?]+$/,'');const href=safeURL(/^www\./i.test(raw)?'https://'+raw:raw);if(!href)continue;
                   const tx=pdfjs.Util.transform(viewport.transform,item.transform),fontH=Math.max(10,Math.hypot(tx[2],tx[3]));
                   const fullW=Math.max(fontH,Math.abs(Number(item.width)||0)*viewport.scale),ratioStart=match.index/Math.max(1,str.length),ratioWidth=raw.length/Math.max(1,str.length);
                   addPdfLink(href,tx[4]+fullW*ratioStart,tx[5]-fontH,Math.max(18,fullW*ratioWidth),fontH*1.2,'Deschide '+raw);
                 }
               }
             }catch{}
-            if(links.childElementCount)wrap.append(links);
-            wrap.id='pdf-page-'+pageNo;
-          }
-          enableViewerZoom(pages);return;
+            if(links.childElementCount)meta.wrap.append(links);
+            rendered.set(pageNo,{last:performance.now()});
+            try{page.cleanup?.();}catch{}
+            enforceLimit();
+          };
+          const pump=async()=>{
+            if(pumping)return;pumping=true;
+            try{
+              while(queue.length&&generation===viewerGeneration&&viewerPdfDocument===pdf){
+                const pageNo=queue.shift(),meta=pageMeta.get(pageNo);if(meta)meta.queued=false;
+                await renderPage(pageNo);
+              }
+            }finally{pumping=false;}
+          };
+          const queuePage=pageNo=>{
+            const meta=pageMeta.get(pageNo);if(!meta)return;
+            if(rendered.has(pageNo)){touch(pageNo);return;}
+            if(meta.queued)return;meta.queued=true;queue.push(pageNo);pump().catch(()=>{});
+          };
+          if('IntersectionObserver'in window){
+            viewerPdfObserver=new IntersectionObserver(entries=>{
+              for(const entry of entries){
+                const pageNo=Number(entry.target.dataset.pdfPage||0);if(!pageNo)continue;
+                if(entry.isIntersecting){visible.add(pageNo);queuePage(pageNo);}else visible.delete(pageNo);
+              }
+              enforceLimit();
+            },{root:box,rootMargin:'500px 0px',threshold:.01});
+            for(const {wrap} of pageMeta.values())viewerPdfObserver.observe(wrap);
+          }else{for(let pageNo=1;pageNo<=Math.min(pdf.numPages,maxRendered);pageNo++)queuePage(pageNo);}
+          queuePage(1);enableViewerZoom(pages);return;
         }
         if(/\.(xlsx?|xlsm|csv)$/i.test(renderName)||/(?:spreadsheetml\.sheet|ms-excel)/i.test(renderMime)){
           const data=await response.arrayBuffer();if(generation!==viewerGeneration)return;
@@ -390,11 +443,13 @@
           // SheetJS supplies values and number formats; ExcelJS preserves the XLSX styles.
           let styledWorkbook=null,styleWarning='';
           if(new Uint8Array(data)[0]===0x50 && new Uint8Array(data)[1]===0x4b){
-            try{
-              const ExcelJS=await loadExcelStyles();if(generation!==viewerGeneration)return;
-              styledWorkbook=new ExcelJS.Workbook();await styledWorkbook.xlsx.load(data);
-            }catch{styledWorkbook=null;styleWarning='Formatarea originală nu a putut fi încărcată. Sunt afișate datele foii.';}
-            if(generation!==viewerGeneration)return;
+            if(data.byteLength<=12*1024*1024){
+              try{
+                const ExcelJS=await loadExcelStyles();if(generation!==viewerGeneration)return;
+                styledWorkbook=new ExcelJS.Workbook();await styledWorkbook.xlsx.load(data);
+              }catch{styledWorkbook=null;styleWarning='Formatarea originală nu a putut fi încărcată. Sunt afișate datele foii.';}
+              if(generation!==viewerGeneration)return;
+            }else styleWarning='Fișier mare: stilurile complexe au fost omise pentru a reduce consumul de memorie. Datele sunt afișate normal.';
           }
           if(!workbook.SheetNames.length)throw Error('Fișierul Excel nu conține foi care pot fi afișate.');
           const renderSheet=sheetName=>{
