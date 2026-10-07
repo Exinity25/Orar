@@ -232,7 +232,6 @@ html body[data-ui-glass][data-ui-glass] :is(
     button:not(:disabled),[role="button"]:not([aria-disabled="true"]),a.hub-small-button,a.classroom-viewer-drive
   ):active{
     transform:scale(.985)!important;
-    filter:brightness(.97);
   }
   html body[data-ui-glass][data-ui-glass] :is(
     .day-tab.active,
