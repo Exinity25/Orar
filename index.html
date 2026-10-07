@@ -2023,12 +2023,71 @@
     let lastCompactOverlapView=isCompactOverlapView();
     let lastLandscapePhone=isLandscapePhone();
     let orientationRecoveryTimer=0;
+
+    /* iOS Home Screen can keep the pre-rotation touch map even after it paints
+       the portrait layout correctly. After the first real orientation change,
+       verify each tap against the element's VISUAL bounding box. If WebKit
+       targeted an element whose box is elsewhere, route the tap to the visible
+       control under the finger. Normal taps are left completely untouched. */
+    let iosVisualTapRepairActive=false;
+    let iosRepairTouch=null;
+    const iosTapSelector='button:not([disabled]),a[href],input:not([type="hidden"]):not([disabled]),select:not([disabled]),textarea:not([disabled]),[role="button"]:not([aria-disabled="true"])';
+    const pointInRect=(rect,x,y,pad=1)=>x>=rect.left-pad&&x<=rect.right+pad&&y>=rect.top-pad&&y<=rect.bottom+pad;
+    const visualTapTarget=(x,y)=>{
+      const matches=[];
+      document.querySelectorAll(iosTapSelector).forEach(el=>{
+        if(el.closest('[inert]'))return;
+        const style=getComputedStyle(el);
+        if(style.display==='none'||style.visibility==='hidden'||style.pointerEvents==='none'||Number(style.opacity)===0)return;
+        const rect=el.getBoundingClientRect();
+        if(rect.width<2||rect.height<2||!pointInRect(rect,x,y,0))return;
+        matches.push({el,area:rect.width*rect.height});
+      });
+      matches.sort((a,b)=>a.area-b.area);
+      return matches[0]?.el||null;
+    };
+    if(iosStandaloneWebKit){
+      window.addEventListener('touchstart',event=>{
+        if(!iosVisualTapRepairActive||event.touches.length!==1){iosRepairTouch=null;return;}
+        const t=event.touches[0];
+        iosRepairTouch={x:t.clientX,y:t.clientY,time:performance.now(),moved:false};
+      },{capture:true,passive:true});
+      window.addEventListener('touchmove',event=>{
+        if(!iosRepairTouch||!event.touches.length)return;
+        const t=event.touches[0];
+        if(Math.hypot(t.clientX-iosRepairTouch.x,t.clientY-iosRepairTouch.y)>10)iosRepairTouch.moved=true;
+      },{capture:true,passive:true});
+      window.addEventListener('touchend',event=>{
+        const state=iosRepairTouch;iosRepairTouch=null;
+        if(!iosVisualTapRepairActive||!state||state.moved||performance.now()-state.time>700||event.changedTouches.length!==1)return;
+        const t=event.changedTouches[0],x=t.clientX,y=t.clientY;
+        const nativeTarget=event.target?.closest?.(iosTapSelector)||null;
+        if(nativeTarget){
+          const rect=nativeTarget.getBoundingClientRect();
+          if(pointInRect(rect,x,y,3))return;
+        }
+        const intended=visualTapTarget(x,y);
+        if(!intended||intended===nativeTarget)return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        try{
+          if(intended.matches('input,textarea,select')){
+            intended.focus({preventScroll:true});
+            if(typeof intended.showPicker==='function'){
+              try{intended.showPicker();}catch{}
+            }else intended.click();
+          }else intended.click();
+        }catch{}
+      },{capture:true,passive:false});
+    }
     const recoverScheduleAfterRotation=()=>{
       clearTimeout(orientationRecoveryTimer);
+      if(iosStandaloneWebKit)iosVisualTapRepairActive=true;
       orientationRecoveryTimer=setTimeout(()=>{
         const appScroller=document.querySelector('.app');
         const previousScrollTop=appScroller?.scrollTop||0;
         blurScheduleEditor();
+        try{window.scrollTo(0,0);document.documentElement.scrollTop=0;document.body.scrollTop=0;}catch{}
         resetScheduleInteractionState();
         render();
         updateUndoButton();
