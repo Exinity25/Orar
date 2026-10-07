@@ -62,7 +62,7 @@
           <section class="hub-custom-section" aria-labelledby="hubThemeHeading">
             <div class="hub-custom-section-head"><div><span class="hub-eyebrow">Aspect</span><h2 id="hubThemeHeading">Theme</h2></div><small>DEFAULT păstrează exact aspectul actual.</small></div>
             <div class="hub-theme-grid" id="hubThemeGrid">
-              <button class="hub-theme-card" type="button" data-theme-choice="default" aria-pressed="false"><span class="hub-theme-preview theme-preview-default"><i></i><i></i><i></i></span><strong>DEFAULT</strong><small>Negru · roșu</small></button>
+              <button class="hub-theme-card" type="button" data-theme-choice="default" aria-pressed="false"><span class="hub-theme-preview theme-preview-default"><i></i><i></i><i></i></span><strong>DEFAULT</strong><small>Negru · roșu · alb</small></button>
               <button class="hub-theme-card" type="button" data-theme-choice="ice" aria-pressed="false"><span class="hub-theme-preview theme-preview-ice"><i></i><i></i><i></i></span><strong>ICE</strong><small>Alb · albastru · negru</small></button>
               <button class="hub-theme-card" type="button" data-theme-choice="ocean" aria-pressed="false"><span class="hub-theme-preview theme-preview-ocean"><i></i><i></i><i></i></span><strong>OCEAN</strong><small>Navy · cyan · alb</small></button>
               <button class="hub-theme-card" type="button" data-theme-choice="forest" aria-pressed="false"><span class="hub-theme-preview theme-preview-forest"><i></i><i></i><i></i></span><strong>FOREST</strong><small>Grafit · verde · alb</small></button>
