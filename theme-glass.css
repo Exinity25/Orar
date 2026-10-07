@@ -340,3 +340,27 @@ html body[data-ui-glass][data-ui-glass] .app .schedule-view-bar button[aria-pres
   color:#fff!important;
   box-shadow:0 8px 18px rgba(201,17,55,.18)!important;
 }
+
+
+/* iOS PWA bottom safe-area continuation: no bottom bar and no bottom blur. */
+@supports (padding-bottom: env(safe-area-inset-bottom)){
+  @media (max-width:900px), (hover:none) and (pointer:coarse){
+    html,body{
+      min-height:calc(100dvh + env(safe-area-inset-bottom))!important;
+    }
+    body::before,
+    body::after{
+      top:0!important;
+      right:0!important;
+      bottom:auto!important;
+      left:0!important;
+      height:calc(100dvh + env(safe-area-inset-bottom))!important;
+      min-height:calc(100dvh + env(safe-area-inset-bottom))!important;
+    }
+    .app,
+    .hub-page{
+      height:calc(100dvh + env(safe-area-inset-bottom))!important;
+      min-height:calc(100dvh + env(safe-area-inset-bottom))!important;
+    }
+  }
+}
