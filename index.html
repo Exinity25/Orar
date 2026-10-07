@@ -1613,23 +1613,19 @@
       weekFadeMotions = [];
 
       const affectedKeys = parityAffectedKeys();
+      grid.classList.add('is-week-switching');
 
       if(!reduce){
         affectedKeys.forEach(key => {
           const card = grid.querySelector(`[data-key="${key}"] .class-card`);
           if(!card || !card.animate) return;
           const motion = card.animate(
-            [
-              {opacity:1,transform:'translateY(0) scale(1)'},
-              {opacity:0,transform:'translateY(-5px) scale(.985)'}
-            ],
-            {duration:120,easing:'cubic-bezier(.4,0,1,1)',fill:'forwards'}
+            [{opacity:1},{opacity:0}],
+            {duration:170,easing:'ease-out',fill:'forwards'}
           );
           weekFadeMotions.push(motion);
         });
-        if(weekFadeMotions.length){
-          await Promise.allSettled(weekFadeMotions.map(m => m.finished));
-        }
+        if(weekFadeMotions.length)await Promise.allSettled(weekFadeMotions.map(m => m.finished));
       }
 
       selectedWeek = week;
@@ -1643,17 +1639,17 @@
           const card = grid.querySelector(`[data-key="${key}"] .class-card`);
           if(!card || !card.animate) return;
           const motion = card.animate(
-            [
-              {opacity:0,transform:'translateY(6px) scale(.985)'},
-              {opacity:1,transform:'translateY(0) scale(1)'}
-            ],
-            {duration:180,easing:'cubic-bezier(.16,1,.3,1)'}
+            [{opacity:0},{opacity:1}],
+            {duration:220,easing:'ease-out'}
           );
           weekFadeMotions.push(motion);
         });
-        Promise.allSettled(weekFadeMotions.map(m => m.finished)).then(() => {
+        Promise.allSettled(weekFadeMotions.map(m => m.finished)).finally(() => {
           weekFadeMotions = [];
+          grid.classList.remove('is-week-switching');
         });
+      }else{
+        grid.classList.remove('is-week-switching');
       }
     }
 
