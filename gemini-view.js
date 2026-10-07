@@ -388,6 +388,30 @@
         if(!chat||!chat.messages.length)return '<div class="gemini-empty"><span>✦</span><h2>Cu ce te pot ajuta?</h2><p>Gemini poate folosi contextul aplicației, analiza fișiere și adăuga, modifica sau șterge activități din orar, plus teme în Planificator.</p></div>';
         return chat.messages.map(message=>`<article class="gemini-message is-${message.role==='model'?'model':'user'}"><div class="gemini-message-label">${message.role==='model'?'Gemini':'Tu'}</div><div class="gemini-message-body">${linkify(message.text||'')}</div>${message.attachments?.length?`<div class="gemini-message-files">${message.attachments.map(file=>`<span>▧ ${esc(file.name)}</span>`).join('')}</div>`:''}</article>`).join('');
       }
+      function syncChatMenuDom(){
+        const shell=page.querySelector('.gemini-shell');
+        if(!shell)return;
+        shell.classList.toggle('is-chats-open',chatMenuOpen);
+        const toggle=shell.querySelector('[data-gemini-chat-menu]');
+        if(toggle){
+          toggle.setAttribute('aria-expanded',chatMenuOpen?'true':'false');
+          toggle.setAttribute('aria-label',chatMenuOpen?'Închide conversațiile Gemini':'Deschide conversațiile Gemini');
+        }
+        const sidebar=shell.querySelector('.gemini-sidebar');
+        if(sidebar){
+          sidebar.setAttribute('aria-hidden',chatMenuOpen?'false':'true');
+          sidebar.inert=!chatMenuOpen;
+        }
+      }
+      function setChatMenuOpen(open){
+        const next=Boolean(open);
+        if(next&&composerField()===document.activeElement){
+          try{document.activeElement.blur();}catch{}
+        }
+        chatMenuOpen=next;
+        syncChatMenuDom();
+      }
+
       function render(){
         const chat=activeChat();
         page.innerHTML=`<div class="gemini-shell ${chatMenuOpen?'is-chats-open':''}">
@@ -412,6 +436,7 @@
             </form>
           </section>
         </div>`;
+        syncChatMenuDom();
         requestAnimationFrame(()=>{
           const box=page.querySelector('[data-gemini-conversation]');if(box)box.scrollTop=box.scrollHeight;
           autosizeComposer();
@@ -708,9 +733,9 @@
       }
 
       page.addEventListener('click',e=>{
-        if(e.target.closest('[data-gemini-chat-menu]')){chatMenuOpen=!chatMenuOpen;render();return;}
-        if(e.target.closest('[data-gemini-chat-backdrop]')){chatMenuOpen=false;render();return;}
-        if(e.target.closest('[data-gemini-drawer-close]')){chatMenuOpen=false;render();return;}
+        if(e.target.closest('[data-gemini-chat-menu]')){setChatMenuOpen(!chatMenuOpen);return;}
+        if(e.target.closest('[data-gemini-chat-backdrop]')){setChatMenuOpen(false);return;}
+        if(e.target.closest('[data-gemini-drawer-close]')){setChatMenuOpen(false);return;}
         if(e.target.closest('[data-gemini-new]')){createChat();return;}
         const chatButton=e.target.closest('[data-gemini-chat]');if(chatButton){activeId=chatButton.dataset.geminiChat;if(window.innerWidth<=900)chatMenuOpen=false;render();return;}
         const del=e.target.closest('[data-gemini-delete]');if(del){deleteChat(del.dataset.geminiDelete);return;}
