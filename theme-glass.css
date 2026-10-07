@@ -40,7 +40,7 @@ html body[data-ui-glass][data-ui-glass] :is(.planner-page,.planner-dialog,.plann
   }
 }
 /* Selected states share the current theme accent, including custom accents. */
-html body[data-ui-glass][data-ui-glass] :is(.head-cell:not(.time-head),.day-tab.active,.hub-nav-item[aria-current="page"],.hub-primary,.classroom-course.is-open,.pl-day.pl-today,.hub-theme-card[aria-pressed="true"],.edit-toggle[aria-pressed="true"],.card-color-menu button[aria-checked="true"]){
+html body[data-ui-glass][data-ui-glass] :is(.head-cell:not(.time-head),.day-tab.active,.hub-nav-item[aria-current="page"],.hub-primary,.pl-day.pl-today,.hub-theme-card[aria-pressed="true"],.edit-toggle[aria-pressed="true"],.card-color-menu button[aria-checked="true"]){
   background:color-mix(in srgb,var(--accent) 23%,rgba(var(--glass-base),.82))!important;
   border-color:color-mix(in srgb,var(--accent) 78%,var(--glass-border))!important;
   color:var(--glass-ink)!important;
@@ -271,4 +271,41 @@ html body[data-ui-glass][data-ui-glass] :is(
   ):active{
     transform:none!important;
   }
+}
+
+
+/* v87 Classroom selected color is a true opacity fade, not an instant repaint. */
+html body[data-ui-glass][data-ui-glass] .classroom-course{
+  position:relative;
+  isolation:isolate;
+  background:var(--glass-surface)!important;
+  border-color:var(--glass-border)!important;
+  transition:border-color 220ms ease,box-shadow 240ms ease!important;
+}
+html body[data-ui-glass][data-ui-glass] .classroom-course::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:0;
+  pointer-events:none;
+  border-radius:inherit;
+  background:color-mix(in srgb,var(--accent) 23%,rgba(var(--glass-base),.82));
+  opacity:0;
+  transition:opacity 240ms ease;
+}
+html body[data-ui-glass][data-ui-glass] .classroom-course>*{
+  position:relative;
+  z-index:1;
+}
+html body[data-ui-glass][data-ui-glass] .classroom-course.is-open::before{opacity:1}
+html body[data-ui-glass][data-ui-glass] .classroom-course.is-open{
+  border-color:color-mix(in srgb,var(--accent) 78%,var(--glass-border))!important;
+  box-shadow:inset 0 1px 0 var(--glass-highlight),0 5px 22px color-mix(in srgb,var(--accent) 14%,transparent)!important;
+}
+html body[data-ui-glass][data-ui-glass] .classroom-course.is-open.is-opening::before,
+html body[data-ui-glass][data-ui-glass] .classroom-course.is-open.is-closing-accent::before{opacity:0}
+html body[data-ui-glass][data-ui-glass] .classroom-course.is-open.is-opening,
+html body[data-ui-glass][data-ui-glass] .classroom-course.is-open.is-closing-accent{
+  border-color:var(--glass-border)!important;
+  box-shadow:var(--glass-shadow)!important;
 }
