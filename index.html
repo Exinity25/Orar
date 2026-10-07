@@ -1002,8 +1002,8 @@
     <button class="schedule-manager-toggle" id="scheduleManagerToggle" type="button" aria-label="Gestionează orarele">Orare</button>
     <header class="topbar">
       <div class="title-wrap">
-        <h1 id="scheduleTitle" data-placeholder="Titlu orar">C_11/1</h1>
-        <div class="subtitle" id="scheduleSubtitle" data-placeholder="Subtitlu opțional">Facultatea de Inginerie</div>
+        <h1 id="scheduleTitle" data-placeholder="Titlu orar">Orar</h1>
+        <div class="subtitle" id="scheduleSubtitle" data-placeholder="Subtitlu opțional"></div>
         <button class="cloud-sync-button" id="cloudSyncButton" type="button">Cloud sync</button>
         <div class="save-state" id="saveState" aria-hidden="true"></div>
       </div>
@@ -1015,7 +1015,7 @@
     </nav>
 
     <main class="schedule-shell">
-      <section class="schedule-grid" id="scheduleGrid" aria-label="Orar săptămânal"><div class="head-cell time-head">ORA</div><div class="head-cell day-col day-0">LUNI</div><div class="time-cell"><div>08:00</div><div>09:30</div></div><div class="slot-cell day-col day-0"><article class="class-card"><div class="type-row"><span>CURS</span></div><div class="subject">Algebra liniară</div><div class="meta-stack"><div class="meta-line"><span class="meta-icon">♙</span><span>ȚÎNCU Ioan</span></div><div class="meta-line"><span class="meta-icon">⌖</span><span>B403</span></div></div></article></div><div class="time-cell"><div>09:40</div><div>11:10</div></div><div class="slot-cell day-col day-0"><article class="class-card"><div class="type-row"><span>CURS</span></div><div class="subject">Fizica</div><div class="meta-stack"><div class="meta-line"><span class="meta-icon">♙</span><span>BÎRSAN Eugen</span></div><div class="meta-line"><span class="meta-icon">⌖</span><span>B403</span></div></div></article></div><div class="time-cell"><div>11:20</div><div>12:50</div></div><div class="slot-cell day-col day-0"><article class="class-card"><div class="type-row"><span>CURS</span></div><div class="subject">Bazele programării calculatoarelor</div><div class="meta-stack"><div class="meta-line"><span class="meta-icon">♙</span><span>FLOREA Adrian</span></div><div class="meta-line"><span class="meta-icon">⌖</span><span>B403</span></div></div></article></div><div class="time-cell"><div>13:00</div><div>14:30</div></div><div class="slot-cell empty day-col day-0"></div><div class="time-cell"><div>14:40</div><div>16:10</div></div><div class="slot-cell empty day-col day-0"></div><div class="time-cell"><div>16:20</div><div>17:50</div></div><div class="slot-cell empty day-col day-0"></div><div class="time-cell"><div>18:00</div><div>19:30</div></div><div class="slot-cell empty day-col day-0"></div><div class="time-cell"><div>19:40</div><div>21:10</div></div><div class="slot-cell empty day-col day-0"></div></section>
+      <section class="schedule-grid" id="scheduleGrid" aria-label="Orar săptămânal"></section>
     </main>
     </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -1044,33 +1044,13 @@
     };
 
     const initialData = {
-      title:'C_11/1',
-      subtitle:'Facultatea de Inginerie',
+      title:'Orar',
+      subtitle:'',
       times: [
         ['08:00','09:30'],['09:40','11:10'],['11:20','12:50'],['13:00','14:30'],
         ['14:40','16:10'],['16:20','17:50'],['18:00','19:30'],['19:40','21:10']
       ],
-      classes: {
-        '0-0': {type:'CURS', subject:'Algebra liniară', professor:'ȚÎNCU Ioan', location:'B403', note:'', deadline:''},
-        '0-2': {type:'CURS', subject:'Limbaje de programare', professor:'PITIC Antoniu Gabriel', location:'AUMOVIO_Aula', week:'PARĂ', note:'', deadline:''},
-        '0-3': {type:'LABORATOR', subject:'Fizica', professor:'BÎRSAN Eugen', location:'B009-Fizica', week:'PARĂ', note:'', deadline:''},
-
-        '1-0': {type:'CURS', subject:'Fizica', professor:'BÎRSAN Eugen', location:'B403', note:'', deadline:''},
-        '1-1': {type:'SEMINAR', subject:'Analiza matematică', professor:'ȚÎNCU Ioan', location:'Sala A16 · Corp A', note:'', deadline:''},
-        '1-2': {type:'CURS', subject:'Limbaje de programare', professor:'PITIC Antoniu Gabriel', location:'AUMOVIO_Aula', note:'', deadline:''},
-        '1-3': {type:'SEMINAR', subject:'Algebra liniară', professor:'ȚÎNCU Ioan', location:'Sala A16 · Corp A', note:'', deadline:''},
-
-        '2-0': {type:'CURS', subject:'Bazele programării calculatoarelor', professor:'FLOREA Adrian', location:'B403', note:'', deadline:''},
-        '2-1': {type:'CURS', subject:'Analiza matematică', professor:'ȚÎNCU Ioan', location:'Sala A17 · Corp A', note:'', deadline:''},
-        '2-2': {type:'CURS', subject:'Informatica aplicată', professor:'BRAD Raluca Irina', location:'AUMOVIO_Aula', note:'', deadline:''},
-        '2-3': {type:'LABORATOR', subject:'Informatica aplicată', professor:'BRAD Raluca Irina', location:'IE005', note:'', deadline:''},
-
-        '3-3': {type:'SEMINAR', subject:'Limba germană', professor:'GINGHINA Elena', location:'IE101', note:'', deadline:''},
-        '4-3': {type:'SEMINAR', subject:'Limba engleză', professor:'TEODORESCU Andreea Maria', location:'Litere', note:'', deadline:''},
-
-        '6-1': {type:'LABORATOR', subject:'Limbaje de programare', professor:'TECU Alexandru', location:'IE005', note:'', deadline:''},
-        '7-1': {type:'SEMINAR', subject:'Bazele programării calculatoarelor', professor:'PAUNESCU Georgiana Malvina', location:'IE303', note:'', deadline:''}
-      }
+      classes: {}
     };
 
     function storageGet(key){
