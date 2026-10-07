@@ -2191,3 +2191,11 @@ body:not([data-orar-theme]):not(.orar-custom-background)::after{
     max-height:var(--gemini-stage-height,100lvh)!important;
   }
 }
+
+
+/* v84: schedule-only controls must stay out of every non-schedule view.
+   This overrides the iOS display:contents rule used for hit-test isolation. */
+.schedule-floating-controls[hidden],
+.schedule-floating-controls.hub-hidden{
+  display:none!important;
+}
