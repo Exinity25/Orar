@@ -1976,3 +1976,9 @@ body:not([data-orar-theme]):not(.orar-custom-background)::after{
     transition:none!important;
   }
 }
+
+
+/* v80 iOS rotation hit-target fix.
+   Schedule floating controls live outside the fixed, scrollable .app root.
+   This avoids WebKit keeping their landscape hit boxes after returning to portrait. */
+.schedule-floating-controls{display:contents}
