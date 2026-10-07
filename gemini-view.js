@@ -135,47 +135,67 @@
       let geminiViewportRaf=0;
       const geminiViewport=()=>window.visualViewport||null;
       const composerField=()=>page.querySelector('.gemini-composer textarea');
-      const translateYOf=el=>{
-        if(!el)return 0;
-        try{
-          const transform=getComputedStyle(el).transform;
-          if(!transform||transform==='none')return 0;
-          return new DOMMatrixReadOnly(transform).m42||0;
-        }catch{return 0;}
+      /* visualViewport emits several uneven resize steps while the iOS keyboard
+         animates. Keep one compositor-only RAF loop alive and only update its
+         targets. This avoids cancel/restart jank and makes the motion a true
+         continuous A-to-B morph. */
+      const geminiMotion={
+        scene:0,
+        sceneTarget:0,
+        composer:0,
+        composerTarget:0,
+        raf:0,
+        last:0
       };
-      const morphY=(el,target,{duration=440,delay=0}={})=>{
-        if(!el)return;
+      const applyGeminiMotion=()=>{
+        const header=page.querySelector('.gemini-header');
+        const conversation=page.querySelector('.gemini-conversation');
+        const composer=page.querySelector('.gemini-composer');
+        const pending=page.querySelector('.gemini-pending-files');
+        const scene=`translate3d(0,${geminiMotion.scene.toFixed(2)}px,0)`;
+        const composerY=`translate3d(0,${(-geminiMotion.composer).toFixed(2)}px,0)`;
+        if(header)header.style.transform=scene;
+        if(conversation)conversation.style.transform=scene;
+        if(composer)composer.style.transform=composerY;
+        if(pending)pending.style.transform=composerY;
+      };
+      const runGeminiMotion=now=>{
         const reduce=window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
-        const from=translateYOf(el);
-        try{el._geminiMorph?.cancel?.();}catch{}
-        if(reduce||Math.abs(target-from)<.5){
-          el.style.transform=`translate3d(0,${target}px,0)`;
-          el._geminiMorph=null;
+        if(reduce){
+          geminiMotion.scene=geminiMotion.sceneTarget;
+          geminiMotion.composer=geminiMotion.composerTarget;
+          applyGeminiMotion();
+          geminiMotion.raf=0;geminiMotion.last=0;
           return;
         }
-        el.style.transform=`translate3d(0,${from}px,0)`;
-        const animation=el.animate(
-          [
-            {transform:`translate3d(0,${from}px,0)`},
-            {transform:`translate3d(0,${target}px,0)`}
-          ],
-          {duration,delay,easing:'cubic-bezier(.16,1,.3,1)',fill:'forwards'}
-        );
-        el._geminiMorph=animation;
-        animation.onfinish=()=>{
-          el.style.transform=`translate3d(0,${target}px,0)`;
-          try{animation.cancel();}catch{}
-          if(el._geminiMorph===animation)el._geminiMorph=null;
-        };
+        const dt=Math.min(.034,Math.max(.008,geminiMotion.last?(now-geminiMotion.last)/1000:.016));
+        geminiMotion.last=now;
+        const sceneAlpha=1-Math.exp(-11.5*dt);
+        const composerAlpha=1-Math.exp(-14.5*dt);
+        geminiMotion.scene+=(geminiMotion.sceneTarget-geminiMotion.scene)*sceneAlpha;
+        geminiMotion.composer+=(geminiMotion.composerTarget-geminiMotion.composer)*composerAlpha;
+        if(Math.abs(geminiMotion.sceneTarget-geminiMotion.scene)<.18)geminiMotion.scene=geminiMotion.sceneTarget;
+        if(Math.abs(geminiMotion.composerTarget-geminiMotion.composer)<.18)geminiMotion.composer=geminiMotion.composerTarget;
+        applyGeminiMotion();
+        const moving=Math.abs(geminiMotion.sceneTarget-geminiMotion.scene)>.01||Math.abs(geminiMotion.composerTarget-geminiMotion.composer)>.01;
+        if(moving)geminiMotion.raf=requestAnimationFrame(runGeminiMotion);
+        else{geminiMotion.raf=0;geminiMotion.last=0;}
       };
-      const morphGeminiScene=offset=>{
-        morphY(page.querySelector('.gemini-header'),offset,{duration:390});
-        morphY(page.querySelector('.gemini-conversation'),offset,{duration:500,delay:18});
+      const setGeminiMotionTargets=(sceneOffset,composerInset)=>{
+        geminiMotion.sceneTarget=Math.max(0,Number(sceneOffset)||0);
+        geminiMotion.composerTarget=Math.max(0,Number(composerInset)||0);
+        if(!geminiMotion.raf){
+          geminiMotion.last=0;
+          geminiMotion.raf=requestAnimationFrame(runGeminiMotion);
+        }
       };
-      const morphGeminiComposer=inset=>{
-        const target=-Math.max(0,inset);
-        morphY(page.querySelector('.gemini-composer'),target,{duration:420});
-        morphY(page.querySelector('.gemini-pending-files'),target,{duration:420,delay:12});
+      const resetGeminiMotion=(snap=false)=>{
+        geminiMotion.sceneTarget=0;geminiMotion.composerTarget=0;
+        if(snap){
+          if(geminiMotion.raf)cancelAnimationFrame(geminiMotion.raf);
+          geminiMotion.raf=0;geminiMotion.last=0;geminiMotion.scene=0;geminiMotion.composer=0;
+          applyGeminiMotion();
+        }else setGeminiMotionTargets(0,0);
       };
       const captureGeminiStage=()=>{
         const rect=page.getBoundingClientRect(),vv=geminiViewport();
@@ -218,8 +238,7 @@
             page.style.setProperty('--gemini-keyboard-inset','0px');
             page.style.setProperty('--gemini-viewport-offset','0px');
             document.body.style.setProperty('--gemini-viewport-offset','0px');
-            morphGeminiScene(0);
-            morphGeminiComposer(0);
+            setGeminiMotionTargets(0,0);
             return;
           }
           if(!focused){
@@ -227,8 +246,7 @@
             page.style.setProperty('--gemini-keyboard-inset','0px');
             page.style.setProperty('--gemini-viewport-offset','0px');
             document.body.style.setProperty('--gemini-viewport-offset','0px');
-            morphGeminiScene(0);
-            morphGeminiComposer(0);
+            setGeminiMotionTargets(0,0);
             return;
           }
           if(!geminiUnfocusedViewportHeight)geminiUnfocusedViewportHeight=Math.max(1,Math.round(vv.height+Math.max(0,vv.offsetTop)));
@@ -239,8 +257,7 @@
           page.style.setProperty('--gemini-keyboard-inset',inset+'px');
           page.style.setProperty('--gemini-viewport-offset',offset+'px');
           document.body.style.setProperty('--gemini-viewport-offset',offset+'px');
-          morphGeminiScene(offset);
-          morphGeminiComposer(inset);
+          setGeminiMotionTargets(offset,inset);
         });
       };
 
@@ -634,8 +651,7 @@
           page.style.setProperty('--gemini-keyboard-inset','0px');
           page.style.setProperty('--gemini-viewport-offset','0px');
           document.body.style.setProperty('--gemini-viewport-offset','0px');
-          morphGeminiScene(0);
-          morphGeminiComposer(0);
+          setGeminiMotionTargets(0,0);
           setGeminiKeyboardOpen(false);
           geminiStageHeight=0;
           geminiStageWidth=0;
@@ -697,7 +713,7 @@
       return {
         element:page,
         show(){chatMenuOpen=false;setGeminiKeyboardOpen(false);geminiStageHeight=0;geminiStageWidth=0;page.classList.remove('is-entering');void page.offsetWidth;page.classList.add('is-entering');render();requestAnimationFrame(captureGeminiStage);page.querySelector('#geminiHeading')?.focus({preventScroll:true});},
-        hide(){setGeminiKeyboardOpen(false);page.style.setProperty('--gemini-keyboard-inset','0px');page.style.setProperty('--gemini-viewport-offset','0px');document.body.style.setProperty('--gemini-viewport-offset','0px');morphGeminiScene(0);morphGeminiComposer(0);},
+        hide(){setGeminiKeyboardOpen(false);page.style.setProperty('--gemini-keyboard-inset','0px');page.style.setProperty('--gemini-viewport-offset','0px');document.body.style.setProperty('--gemini-viewport-offset','0px');resetGeminiMotion(true);},
         openScheduleImport,
         contextSnapshot(){return {chats:chats.map(chat=>({id:chat.id,title:chat.title,updated:chat.updated,messages:chat.messages.slice(-20).map(m=>({role:m.role,text:m.text,attachments:m.attachments}))}))};}
       };
