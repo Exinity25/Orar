@@ -998,13 +998,16 @@
       const renewAt=Math.max(1000,expires-Date.now()-2*60*1000);
       expireTimer=setTimeout(()=>{
         if(client&&rememberedAccount())requestAccess(true,true);
-        else if(Date.now()>=expires)clearSession('Sesiunea Google trebuie reînnoită.',false);
+        else if(token&&expires>Date.now())scheduleHardExpiry();
       },renewAt);
     }
     function scheduleHardExpiry(){
       clearTimeout(expireTimer);
-      if(token&&expires>Date.now())expireTimer=setTimeout(()=>clearSession('Sesiunea Google trebuie reînnoită.',false),Math.max(1000,expires-Date.now()));
-      else if(token)clearSession('Sesiunea Google trebuie reînnoită.',false);
+      if(!token)return;
+      const retryIn=Math.max(15000,expires>Date.now()?expires-Date.now():15000);
+      expireTimer=setTimeout(()=>{
+        if(client&&rememberedAccount())requestAccess(true,true);
+      },retryIn);
     }
     function clearSession(text='',forgetAccount=false){
       closeViewer(false);generation++;session++;clearTimeout(expireTimer);token='';expires=0;grantedScopes='';cloudFileId='';if(forgetAccount)cloudRestoredAccount='';forgetSession();courses=[];posts=[];selected=null;loading=false;message=text;warning='';reauthenticating=false;silentRenewing=false;authRequestSilent=false;mailItems=[];mailOpen=null;mailBody='';mailUnread=0;mailMessage='';driveItems=[];driveMessage='';window.dispatchEvent(new CustomEvent('orar-mail-unread',{detail:{count:0}}));
@@ -1370,6 +1373,11 @@
       if(!client||!rememberedAccount()||reauthenticating||silentRenewing)return;
       if(!token||expires-Date.now()<2*60*1000)requestAccess(true,true);
     };
+    const ensureGoogleSessionForSection=()=>{
+      prepareSignIn();
+      if(!client||!rememberedAccount()||reauthenticating||silentRenewing)return;
+      if(!token||expires-Date.now()<5*60*1000)requestAccess(true,true);
+    };
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')ensureFreshGoogleSession();});
     window.addEventListener('pageshow',()=>setTimeout(ensureFreshGoogleSession,0),{passive:true});
     window.addEventListener('focus',ensureFreshGoogleSession,{passive:true});
@@ -1390,7 +1398,7 @@
         mail:{unread:mailUnread,items:mailItems.slice(0,50).map(m=>({subject:m.subject,from:m.from,date:m.date,snippet:m.snippet,unread:m.unread})),open:mailOpen?{...mailOpen,body:mailBody}:null},
         drive:{folder:driveFolderName||'',query:driveQuery,items:driveItems.slice(0,80).map(file=>({name:file.name,mimeType:file.mimeType,modifiedTime:file.modifiedTime}))}
       }),
-      isConnected:()=>Boolean(token&&Date.now()<expires),showDrive(){driveVisible=true;const shouldLoad=driveScopeOk()&&!driveLoading&&!driveItems.length;if(shouldLoad)driveLoading=true;renderDrive();prepareSignIn();if(shouldLoad){driveLoading=false;loadDrive(false);}drivePage.classList.remove('is-entering');drivePage.querySelector('h1')?.focus({preventScroll:true});},showMail(){mailVisible=true;const shouldLoad=mailScopeOk()&&!mailLoading&&!mailItems.length;if(shouldLoad)mailLoading=true;renderMail();prepareSignIn();if(shouldLoad){mailLoading=false;refreshMail();}mailPage.classList.remove('is-entering');mailPage.querySelector('h1')?.focus({preventScroll:true});},show(){
+      isConnected:()=>Boolean(token&&Date.now()<expires),showDrive(){driveVisible=true;ensureGoogleSessionForSection();const shouldLoad=driveScopeOk()&&!driveLoading&&!driveItems.length;if(shouldLoad)driveLoading=true;renderDrive();if(shouldLoad){driveLoading=false;loadDrive(false);}drivePage.classList.remove('is-entering');drivePage.querySelector('h1')?.focus({preventScroll:true});},showMail(){mailVisible=true;ensureGoogleSessionForSection();const shouldLoad=mailScopeOk()&&!mailLoading&&!mailItems.length;if(shouldLoad)mailLoading=true;renderMail();if(shouldLoad){mailLoading=false;refreshMail();}mailPage.classList.remove('is-entering');mailPage.querySelector('h1')?.focus({preventScroll:true});},show(){
       visible=true;const shouldLoad=Boolean(token&&Date.now()<expires&&!courses.length&&!loading);if(shouldLoad)loading=true;render();prepareSignIn();
       if(shouldLoad){loading=false;loadCourses();}
       page.classList.remove('is-entering');page.querySelector('h1').focus({preventScroll:true});
