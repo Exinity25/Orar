@@ -2333,3 +2333,39 @@ html,body{
   transition:opacity 160ms ease!important;
   font-synthesis:none;
 }
+
+
+/* v87 Google views: no full-screen/card flash on render.
+   Mail, Drive and Classroom stay visually stable; only the piece whose state
+   changed fades. */
+#hubClassroomPage.is-entering,
+#hubMailPage.is-entering,
+#hubDrivePage.is-entering,
+#hubClassroomPage.is-entering .hub-content,
+#hubMailPage.is-entering .hub-content,
+#hubDrivePage.is-entering .hub-content{
+  animation:none!important;
+}
+#hubClassroomPage :is(.classroom-course,.classroom-post,.classroom-notice),
+#hubMailPage :is(.mail-card,.mail-message,.classroom-notice),
+#hubDrivePage :is(.drive-card,.classroom-notice){
+  animation:none!important;
+}
+#hubClassroomPage .classroom-course-panel{
+  animation:none!important;
+}
+#hubClassroomPage .classroom-course-summary,
+#hubMailPage .mail-card,
+#hubDrivePage .drive-card{
+  transition:
+    opacity 160ms ease,
+    color 180ms ease,
+    background-color 220ms ease,
+    border-color 220ms ease,
+    box-shadow 240ms ease!important;
+}
+#hubClassroomPage.is-data-loading,
+#hubMailPage.is-data-loading,
+#hubDrivePage.is-data-loading{
+  cursor:progress;
+}
