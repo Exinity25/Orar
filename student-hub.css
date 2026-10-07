@@ -3020,3 +3020,25 @@ body.classroom-viewer-open .classroom-viewer-backdrop{
 .gemini-send.is-stop:active .gemini-stop-icon{
   transform:scale(.88);
 }
+
+
+/* v116 Gemini sent-message visibility + keyboard flush positioning. */
+.gemini-message.is-user .gemini-message-body{
+  display:block!important;
+  min-height:1.4em;
+  color:var(--glass-ink,#fff)!important;
+  opacity:1!important;
+  visibility:visible!important;
+}
+@supports (-webkit-touch-callout:none){
+  @media(max-width:900px){
+    body.gemini-keyboard-open .gemini-composer{
+      top:var(--gemini-composer-top,auto)!important;
+      bottom:auto!important;
+    }
+    body.gemini-keyboard-open .gemini-pending-files{
+      top:calc(var(--gemini-composer-top,0px) - 94px)!important;
+      bottom:auto!important;
+    }
+  }
+}
