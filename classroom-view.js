@@ -986,8 +986,8 @@
       const targetHeight=(summary?.getBoundingClientRect().height||0)+(parseFloat(style.borderTopWidth)||0)+(parseFloat(style.borderBottomWidth)||0);
       card.style.height=fromHeight+'px';card.style.overflow='hidden';card.style.willChange='height';
       if(panel){panel.style.animation='none';panel.style.willChange='opacity';}
-      const animations=[card.animate([{height:fromHeight+'px'},{height:targetHeight+'px'}],{duration:190,easing:'cubic-bezier(.22,.75,.2,1)',fill:'forwards'})];
-      if(panel)animations.push(panel.animate([{opacity:1},{opacity:0}],{duration:190,easing:'ease-out',fill:'forwards'}));
+      const animations=[card.animate([{height:fromHeight+'px'},{height:targetHeight+'px'}],{duration:240,easing:'cubic-bezier(.22,.75,.2,1)',fill:'forwards'})];
+      if(panel)animations.push(panel.animate([{opacity:1},{opacity:0}],{duration:220,easing:'ease-out',fill:'forwards'}));
       await Promise.allSettled(animations.map(animation=>animation.finished));
       if(motion!==courseToggleMotion)return;
       animations.forEach(animation=>animation.cancel());
