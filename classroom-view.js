@@ -694,11 +694,16 @@
           controls.addEventListener('click',e=>{e.stopPropagation();if(wrap.classList.contains('is-app-fullscreen'))showFullscreenControls();});
           controls.addEventListener('pointerdown',e=>{e.stopPropagation();if(wrap.classList.contains('is-app-fullscreen')){clearControlsHide();controls.classList.remove('is-hidden');}});
           controls.addEventListener('pointerup',()=>{if(wrap.classList.contains('is-app-fullscreen'))showFullscreenControls();});
-          wrap.addEventListener('click',e=>{
+          wrap.addEventListener('pointerdown',e=>{
             if(!wrap.classList.contains('is-app-fullscreen')||e.target.closest('.classroom-video-controls'))return;
+            e.preventDefault();e.stopPropagation();
             if(controls.classList.contains('is-hidden'))showFullscreenControls();
             else hideFullscreenControls();
-          });
+          },{capture:true});
+          wrap.addEventListener('click',e=>{
+            if(!wrap.classList.contains('is-app-fullscreen')||e.target.closest('.classroom-video-controls'))return;
+            e.preventDefault();e.stopPropagation();
+          },{capture:true});
           fullscreen.addEventListener('click',async e=>{
             e.stopPropagation();
             if(isiOSDevice){
@@ -777,7 +782,8 @@
     const ACCOUNT_KEY='orar_classroom_account_v1';
     let token='',expires=0,grantedScopes='',client=null,courses=[],posts=[],selected=null,loading=false,message='',warning='',generation=0,session=0,expireTimer,visible=false,reauthenticating=false,silentRenewing=false,authRequestSilent=false;
     let mailItems=[],mailLoading=false,mailMessage='',mailOpen=null,mailBody='',mailBodyHtml='',mailUnread=0,mailVisible=false,mailNext='';
-    let driveItems=[],driveLoading=false,driveMessage='',driveVisible=false,driveNext='',driveQuery='',driveFolderId='',driveFolderName='';
+    let driveItems=[],driveLoading=false,driveMessage='',driveVisible=false,driveNext='',driveQuery='',driveFolderId='',driveFolderName='',driveLoadSerial=0;
+    const driveFolderStack=[];
     let courseToggleMotion=0,courseAccentOpeningId='';
     const reduceGoogleMotion=()=>Boolean(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
     function renderGoogleStage(page,{stageClass,headingId,title,intro,body,motion=''}) {
@@ -1228,24 +1234,96 @@
     }
     async function loadDrive(append=false,motion=''){
       if(!driveScopeOk()){driveItems=[];driveMessage='Reconectează contul Google și acceptă accesul la Drive.';renderDrive();return;}
-      driveLoading=true;driveMessage='';drivePage.classList.add('is-data-loading');
+      const requestId=++driveLoadSerial;
+      driveLoading=true;driveMessage='';
+      drivePage.classList.add('is-data-loading');
+      renderDrive(motion);
       try{
-        const q=driveQuery.trim(),params=new URLSearchParams({pageSize:'50',orderBy:'folder,name',fields:'nextPageToken,files(id,name,mimeType,modifiedTime,webViewLink,iconLink,size,capabilities(canDownload))'}),folderFilter=driveFolderId?"'"+driveFolderId.replace(/'/g,"\\'")+"' in parents and ":'';
+        const q=driveQuery.trim();
+        const params=new URLSearchParams({
+          pageSize:'50',
+          orderBy:'folder,name',
+          fields:'nextPageToken,files(id,name,mimeType,modifiedTime,webViewLink,iconLink,size,capabilities(canDownload))',
+          supportsAllDrives:'true',
+          includeItemsFromAllDrives:'true'
+        });
+        const folderFilter=driveFolderId?"'"+driveFolderId.replace(/'/g,"\\'")+"' in parents and ":'';
         params.set('q',folderFilter+"trashed = false"+(q?" and name contains '"+q.replace(/'/g,"\\'")+"'":''));
         if(append&&driveNext)params.set('pageToken',driveNext);
-        const result=await driveApi('files?'+params.toString()),next=result.files||[];
-        driveItems=append?[...driveItems,...next.filter(row=>!driveItems.some(old=>old.id===row.id))]:next;driveNext=String(result.nextPageToken||'');
-      }catch(e){driveMessage=e.message||'Fișierele Drive nu au putut fi încărcate.';}finally{driveLoading=false;drivePage.classList.remove('is-data-loading');renderDrive(motion);}
+        const result=await driveApi('files?'+params.toString());
+        if(requestId!==driveLoadSerial)return;
+        const next=result.files||[];
+        driveItems=append?[...driveItems,...next.filter(row=>!driveItems.some(old=>old.id===row.id))]:next;
+        driveNext=String(result.nextPageToken||'');
+      }catch(e){
+        if(requestId!==driveLoadSerial)return;
+        driveMessage=e.message||'Fișierele Drive nu au putut fi încărcate.';
+      }finally{
+        if(requestId===driveLoadSerial){
+          driveLoading=false;
+          drivePage.classList.remove('is-data-loading');
+          renderDrive();
+        }
+      }
+    }
+    function goBackDriveFolder(){
+      if(!driveFolderId)return false;
+      const previous=driveFolderStack.pop()||{id:'',name:'',query:''};
+      driveFolderId=previous.id||'';
+      driveFolderName=previous.name||'';
+      driveQuery=previous.query||'';
+      driveNext='';
+      driveItems=[];
+      loadDrive(false,'back');
+      return true;
+    }
+    function enterDriveFolder(id,title){
+      const folderId=String(id||'');if(!folderId)return;
+      driveFolderStack.push({id:driveFolderId,name:driveFolderName,query:driveQuery});
+      driveFolderId=folderId;
+      driveFolderName=String(title||'Folder');
+      driveQuery='';
+      driveNext='';
+      driveItems=[];
+      loadDrive(false,'forward');
+    }
+    function runDriveSearch(){
+      const input=drivePage.querySelector('[data-drive-search] input[name="q"]');
+      driveQuery=String(input?.value||'').trim();
+      driveNext='';
+      driveItems=[];
+      loadDrive(false);
     }
     function renderDrive(motion=''){
       const connected=Boolean(token&&Date.now()<expires),scope=driveScopeOk();let body='';
       if(!connected)body='<div class="classroom-welcome"><h2>Conectează contul Google</h2><p>Drive folosește același cont conectat pentru Classroom și Mail.</p><button class="hub-primary" data-drive-connect>Conectează contul Google</button></div>';
       else if(!scope)body='<div class="classroom-welcome"><h2>Activează Drive</h2><p>Reconectează contul și acceptă accesul read-only la Google Drive.</p><button class="hub-primary" data-drive-connect>Activează accesul Drive</button></div>';
-      else{const rows=driveItems.map(file=>{const folder=file.mimeType==='application/vnd.google-apps.folder';return '<button class="drive-card '+(folder?'is-folder':'')+'" type="button" '+(folder?'data-drive-folder':'data-drive-open')+'="'+esc(file.id)+'" data-drive-title="'+esc(file.name)+'"><span class="drive-file-icon">'+(folder?'▱':'▧')+'</span><span><strong>'+esc(file.name)+'</strong><small>'+(folder?'Folder':esc(file.mimeType||'Fișier'))+' · '+(file.modifiedTime?new Date(file.modifiedTime).toLocaleString('ro-RO'):'')+'</small></span></button>';}).join('');body=(driveFolderId?'<div class="drive-folder-head"><button class="hub-small-button" type="button" data-drive-root>← Drive</button><strong>'+esc(driveFolderName||'Folder')+'</strong></div>':'')+'<form class="drive-toolbar" data-drive-search><input name="q" type="search" value="'+esc(driveQuery)+'" placeholder="'+(driveFolderId?'Caută în folder…':'Caută în Drive…')+'" aria-label="Caută în Google Drive"><button class="hub-primary">Caută</button><button type="button" class="hub-small-button" data-drive-refresh>Actualizează</button></form>'+(driveMessage?'<p class="classroom-notice" role="alert">'+esc(driveMessage)+'</p>':'')+'<div class="drive-list">'+(rows||(driveLoading?'':'<p class="hub-empty">Nu am găsit fișiere.</p>'))+'</div>'+(driveNext?'<button class="hub-small-button drive-more" data-drive-more '+(driveLoading?'disabled':'')+'>Încarcă mai multe</button>':'');}
+      else{
+        const rows=driveItems.map(file=>{const folder=file.mimeType==='application/vnd.google-apps.folder';return '<button class="drive-card '+(folder?'is-folder':'')+'" type="button" '+(folder?'data-drive-folder':'data-drive-open')+'="'+esc(file.id)+'" data-drive-title="'+esc(file.name)+'"><span class="drive-file-icon">'+(folder?'▱':'▧')+'</span><span><strong>'+esc(file.name)+'</strong><small>'+(folder?'Folder':esc(file.mimeType||'Fișier'))+' · '+(file.modifiedTime?new Date(file.modifiedTime).toLocaleString('ro-RO'):'')+'</small></span></button>';}).join('');
+        body=(driveFolderId?'<div class="drive-folder-head"><button class="hub-small-button" type="button" data-drive-root>← Înapoi</button><strong>'+esc(driveFolderName||'Folder')+'</strong></div>':'')+
+          '<form class="drive-toolbar" data-drive-search><input name="q" type="search" value="'+esc(driveQuery)+'" placeholder="'+(driveFolderId?'Caută în folder…':'Caută în Drive…')+'" aria-label="Caută în Google Drive"><button type="button" class="hub-primary" data-drive-search-submit '+(driveLoading?'disabled':'')+'>'+(driveLoading?'Se caută…':'Caută')+'</button><button type="button" class="hub-small-button" data-drive-refresh '+(driveLoading?'disabled':'')+'>'+(driveLoading?'Se actualizează…':'Actualizează')+'</button></form>'+
+          (driveMessage?'<p class="classroom-notice" role="alert">'+esc(driveMessage)+'</p>':'')+
+          '<div class="drive-list">'+(rows||(driveLoading?'<p class="classroom-notice" role="status">Se încarcă…</p>':'<p class="hub-empty">Nu am găsit fișiere.</p>'))+'</div>'+
+          (driveNext?'<button class="hub-small-button drive-more" data-drive-more '+(driveLoading?'disabled':'')+'>Încarcă mai multe</button>':'');
+      }
       renderGoogleStage(drivePage,{stageClass:'drive-view-stage',headingId:'driveHeading',title:'Drive',intro:'Fișierele contului Google, deschise direct în aplicație.',body,motion});
     }
-    drivePage.addEventListener('click',e=>{if(e.target.closest('[data-drive-connect]')){requestAccess(Boolean(rememberedAccount()));return;}if(e.target.closest('[data-drive-root]')){driveFolderId='';driveFolderName='';driveQuery='';driveNext='';loadDrive(false,'back');return;}if(e.target.closest('[data-drive-refresh]')){driveNext='';loadDrive(false);return;}if(e.target.closest('[data-drive-more]')){loadDrive(true);return;}const folder=e.target.closest('[data-drive-folder]');if(folder){driveFolderId=folder.dataset.driveFolder;driveFolderName=folder.dataset.driveTitle||'Folder';driveQuery='';driveNext='';loadDrive(false,'forward');return;}const open=e.target.closest('[data-drive-open]');if(open)openViewer(open.dataset.driveOpen,open.dataset.driveTitle);});
-    drivePage.addEventListener('submit',e=>{const form=e.target.closest('[data-drive-search]');if(!form)return;e.preventDefault();driveQuery=String(new FormData(form).get('q')||'').trim();driveNext='';loadDrive(false);});
+    drivePage.addEventListener('click',e=>{
+      if(e.target.closest('[data-drive-connect]')){requestAccess(Boolean(rememberedAccount()));return;}
+      if(e.target.closest('[data-drive-root]')){goBackDriveFolder();return;}
+      if(e.target.closest('[data-drive-search-submit]')){runDriveSearch();return;}
+      if(e.target.closest('[data-drive-refresh]')){driveNext='';driveItems=[];loadDrive(false);return;}
+      if(e.target.closest('[data-drive-more]')){loadDrive(true);return;}
+      const folder=e.target.closest('[data-drive-folder]');
+      if(folder){enterDriveFolder(folder.dataset.driveFolder,folder.dataset.driveTitle||'Folder');return;}
+      const open=e.target.closest('[data-drive-open]');
+      if(open)openViewer(open.dataset.driveOpen,open.dataset.driveTitle);
+    });
+    drivePage.addEventListener('submit',e=>{
+      const form=e.target.closest('[data-drive-search]');if(!form)return;
+      e.preventDefault();
+      runDriveSearch();
+    });
     function openDriveLink(raw,title='Fișier Google Drive'){const target=driveTargetFromUrl(raw);if(!target)return false;window.dispatchEvent(new CustomEvent('orar-drive-section-request',{detail:{...target,title}}));return true;}
     const mailScopeOk=()=>Boolean(token&&Date.now()<expires&&grantedScopes.includes('gmail.modify')&&grantedScopes.includes('gmail.send'));
     async function gmailApi(path,options={}){
@@ -1350,6 +1428,35 @@
     }
     function composeMail(){mailModal.innerHTML='<div class="pl-dialog-head"><h2>Mail nou</h2><button type="button" data-mail-close aria-label="Închide">✕</button></div><form data-mail-form><label>Către<input name="to" type="email" required autocomplete="email"></label><label>Subiect<input name="subject" maxlength="300"></label><label>Mesaj<textarea name="body" rows="10" required maxlength="50000"></textarea></label><label class="mail-attachment-picker">Fișiere sau poze<input name="attachments" type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip"></label><div class="mail-attachment-note">Poți selecta mai multe fișiere. Gmail acceptă în mod normal maximum aproximativ 25 MB per mesaj.</div><button class="hub-primary">Trimite</button></form>';if(!mailModal.open)mailModal.showModal();}
     mailPage.addEventListener('click',e=>{const linkEl=e.target.closest('a[href]');if(linkEl&&openDriveLink(linkEl.href,linkEl.textContent||'Fișier Google Drive')){e.preventDefault();return;}if(e.target.closest('[data-mail-connect]')){requestAccess(Boolean(rememberedAccount()));return;}if(e.target.closest('[data-mail-refresh]')){refreshMail();return;}if(e.target.closest('[data-mail-more]')){loadMailBatch(true);return;}if(e.target.closest('[data-mail-compose]')){composeMail();return;}if(e.target.closest('[data-mail-back]')){mailOpen=null;mailBody='';mailBodyHtml='';renderMail('back');return;}const open=e.target.closest('[data-mail-open]');if(open)openMail(open.dataset.mailOpen);});
+    function installEdgeBackGesture(element,canGoBack,goBack){
+      let tracking=false,startX=0,startY=0,lastX=0,lastY=0;
+      element.addEventListener('touchstart',e=>{
+        if(e.touches.length!==1||!canGoBack())return;
+        const touch=e.touches[0];
+        if(touch.clientX>32)return;
+        tracking=true;startX=lastX=touch.clientX;startY=lastY=touch.clientY;
+      },{passive:true});
+      element.addEventListener('touchmove',e=>{
+        if(!tracking||e.touches.length!==1)return;
+        const touch=e.touches[0];lastX=touch.clientX;lastY=touch.clientY;
+        const dx=lastX-startX,dy=lastY-startY;
+        if(dx>12&&Math.abs(dx)>Math.abs(dy)*1.25)e.preventDefault();
+      },{passive:false});
+      const finish=e=>{
+        if(!tracking)return;
+        if(e.changedTouches?.length){lastX=e.changedTouches[0].clientX;lastY=e.changedTouches[0].clientY;}
+        tracking=false;
+        const dx=lastX-startX,dy=lastY-startY;
+        if(dx>=72&&Math.abs(dy)<=64&&dx>Math.abs(dy)*1.35)goBack();
+      };
+      element.addEventListener('touchend',finish,{passive:true});
+      element.addEventListener('touchcancel',()=>{tracking=false;},{passive:true});
+    }
+    installEdgeBackGesture(drivePage,()=>Boolean(driveFolderId),()=>goBackDriveFolder());
+    installEdgeBackGesture(mailPage,()=>Boolean(mailOpen),()=>{
+      mailOpen=null;mailBody='';mailBodyHtml='';renderMail('back');
+    });
+
     mailModal.addEventListener('click',e=>{if(e.target.closest('[data-mail-close]'))mailModal.close();});
     mailModal.addEventListener('submit',async e=>{const form=e.target.closest('[data-mail-form]');if(!form)return;e.preventDefault();const fd=new FormData(form),to=String(fd.get('to')||'').trim(),subject=String(fd.get('subject')||'').trim(),body=String(fd.get('body')||''),files=[...form.querySelector('[name=attachments]').files];if(!to||!body)return;const total=files.reduce((n,file)=>n+file.size,0);if(total>25*1024*1024){mailMessage='Atașamentele depășesc 25 MB. Elimină unul sau mai multe fișiere.';mailModal.close();renderMail();return;}const boundary='orar_'+Date.now().toString(36),parts=['To: '+to,'Subject: '+subject,'MIME-Version: 1.0','Content-Type: multipart/mixed; boundary="'+boundary+'"','','--'+boundary,'Content-Type: text/plain; charset="UTF-8"','Content-Transfer-Encoding: 8bit','',body];for(const file of files){const bytes=new Uint8Array(await file.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));const encoded=btoa(binary).match(/.{1,76}/g)?.join('\r\n')||'';parts.push('--'+boundary,'Content-Type: '+(file.type||'application/octet-stream')+'; name="'+file.name.replace(/["\r\n]/g,'_')+'"','Content-Disposition: attachment; filename="'+file.name.replace(/["\r\n]/g,'_')+'"','Content-Transfer-Encoding: base64','',encoded);}parts.push('--'+boundary+'--','');const raw=parts.join('\r\n'),button=form.querySelector('button');button.disabled=true;button.textContent='Se trimite…';try{await gmailApi('messages/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({raw:encodeMailRaw(raw)})});mailModal.close();mailMessage=files.length?'Mail trimis cu '+files.length+' atașament'+(files.length===1?'':'e')+'.':'Mail trimis.';renderMail();}catch(err){mailMessage=err.message||'Mailul nu a putut fi trimis.';mailModal.close();renderMail();}});
     async function listAll(path,field,currentGeneration){
@@ -1547,7 +1654,7 @@
       if(failures)throw Error('Nu s-au putut actualiza toate secțiunile Classroom. Datele locale sunt păstrate; reîncearcă.');
       return {courses:courseList.map(c=>({id:String(c.id),name:c.name})),posts:items,updated:new Date().toISOString()};
     }
-    window.addEventListener('orar-drive-section-request',e=>{const id=String(e.detail?.id||''),type=String(e.detail?.type||''),title=String(e.detail?.title||'Google Drive');if(!id)return;if(type==='folder'){driveFolderId=id;driveFolderName=/^https?:\/\//i.test(title)?'Folder Drive':title;driveQuery='';driveNext='';driveItems=[];if(driveScopeOk())setTimeout(async()=>{try{const meta=await driveApi('files/'+encodeURIComponent(id)+'?fields=id,name,mimeType');if(meta?.name)driveFolderName=meta.name;}catch{}loadDrive(false,'forward');},0);}else setTimeout(()=>openViewer(id,title),0);});
+    window.addEventListener('orar-drive-section-request',e=>{const id=String(e.detail?.id||''),type=String(e.detail?.type||''),title=String(e.detail?.title||'Google Drive');if(!id)return;if(type==='folder'){driveFolderStack.length=0;driveFolderId=id;driveFolderName=/^https?:\/\//i.test(title)?'Folder Drive':title;driveQuery='';driveNext='';driveItems=[];if(driveScopeOk())setTimeout(async()=>{try{const meta=await driveApi('files/'+encodeURIComponent(id)+'?fields=id,name,mimeType');if(meta?.name)driveFolderName=meta.name;}catch{}loadDrive(false,'forward');},0);}else setTimeout(()=>openViewer(id,title),0);});
     const ensureFreshGoogleSession=()=>{
       if(token&&Date.now()>=expires)clearSession('',false);
     };
