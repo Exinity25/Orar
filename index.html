@@ -1069,6 +1069,7 @@
     let selectedWeek = storageGet('c11_1_selected_week') === 'IMPARĂ' ? 'IMPARĂ' : 'PARĂ';
     let editing = false;
     let expandedKey = null;
+    const iosStandaloneWebKit=Boolean(window.CSS&&CSS.supports&&CSS.supports('-webkit-touch-callout','none'));
     let selectedDay = Number(storageGet('c11_1_selected_day') || 0);
     if (!Number.isInteger(selectedDay) || selectedDay < 0 || selectedDay > 4) selectedDay = 0;
 
@@ -1435,6 +1436,10 @@
     function animateSchedule(direction=0){
       if(!grid.animate || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
       if(gridMotion) gridMotion.cancel();
+      if(iosStandaloneWebKit){
+        gridMotion=grid.animate([{opacity:.45},{opacity:1}],{duration:190,easing:'ease-out'});
+        return;
+      }
       const from = direction === 1 ? 'translateX(24px)' : direction === -1 ? 'translateX(-24px)' : 'translateY(4px)';
       gridMotion = grid.animate([
         {opacity:.35,transform:from},
@@ -1458,14 +1463,16 @@
 
       if(grid.animate && !reduce){
         const outX = forward ? '-105%' : '105%';
-        const outgoing = grid.animate([
-          {transform:'translateX(0)',opacity:1},
-          {transform:`translateX(${outX})`,opacity:1}
-        ],{
-          duration:180,
-          easing:'cubic-bezier(.55,.05,.85,.35)',
-          fill:'forwards'
-        });
+        const outgoing = grid.animate(
+          iosStandaloneWebKit
+            ? [{opacity:1},{opacity:.12}]
+            : [{transform:'translateX(0)',opacity:1},{transform:`translateX(${outX})`,opacity:1}],
+          {
+            duration:iosStandaloneWebKit?120:180,
+            easing:iosStandaloneWebKit?'ease-out':'cubic-bezier(.55,.05,.85,.35)',
+            fill:'forwards'
+          }
+        );
 
         gridMotion = outgoing;
 
@@ -1487,13 +1494,15 @@
 
       if(grid.animate && !reduce){
         const inX = forward ? '105%' : '-105%';
-        const incoming = grid.animate([
-          {transform:`translateX(${inX})`,opacity:1},
-          {transform:'translateX(0)',opacity:1}
-        ],{
-          duration:230,
-          easing:'cubic-bezier(.16,1,.3,1)'
-        });
+        const incoming = grid.animate(
+          iosStandaloneWebKit
+            ? [{opacity:.12},{opacity:1}]
+            : [{transform:`translateX(${inX})`,opacity:1},{transform:'translateX(0)',opacity:1}],
+          {
+            duration:iosStandaloneWebKit?170:230,
+            easing:iosStandaloneWebKit?'ease-out':'cubic-bezier(.16,1,.3,1)'
+          }
+        );
 
         gridMotion = incoming;
         incoming.finished.then(() => {
@@ -1973,7 +1982,7 @@
       });
       grid.querySelectorAll('.card-color-picker[open]').forEach(picker=>picker.open=false);
       if(gridMotion){try{gridMotion.cancel();}catch{}gridMotion=null;}
-      try{grid.getAnimations().forEach(animation=>animation.cancel());}catch{}
+      try{grid.getAnimations({subtree:true}).forEach(animation=>animation.cancel());}catch{}
       grid.style.removeProperty('transform');
       grid.style.removeProperty('opacity');
       grid.style.removeProperty('pointer-events');
@@ -2025,7 +2034,13 @@
         updateUndoButton();
         requestAnimationFrame(()=>{
           resetScheduleInteractionState();
+          try{grid.getAnimations({subtree:true}).forEach(animation=>animation.cancel());}catch{}
+          grid.querySelectorAll('.class-card,.slot-cell').forEach(node=>{
+            node.style.removeProperty('transform');
+            node.style.removeProperty('translate');
+          });
           appScroller?.scrollTo({top:previousScrollTop,left:0,behavior:'auto'});
+          void grid.offsetHeight;
           void scheduleFloatingControls.offsetHeight;
           window.dispatchEvent(new CustomEvent('orar-orientation-recover'));
         });
