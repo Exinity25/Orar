@@ -3002,3 +3002,21 @@ body.classroom-viewer-open .classroom-viewer-backdrop{
   outline:2px solid rgba(255,255,255,.7);
   outline-offset:3px;
 }
+
+
+/* v115 Gemini stop-generation control. */
+.gemini-send.is-stop{
+  border-radius:14px!important;
+  background:var(--accent)!important;
+  color:#fff!important;
+}
+.gemini-stop-icon{
+  display:block;
+  width:13px;
+  height:13px;
+  border-radius:2px;
+  background:currentColor;
+}
+.gemini-send.is-stop:active .gemini-stop-icon{
+  transform:scale(.88);
+}
