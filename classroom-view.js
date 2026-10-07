@@ -702,7 +702,7 @@
     const CLOUD_VERSION=3;
     const CLOUD_SKIP=new Set([SESSION_KEY,OLD_SESSION_KEY,AUTH_META_KEY,ACCOUNT_KEY,'orar_google_session_v1','orar_cloud_pending_v1','orar_gemini_api_key_v1']);
     const cloudKeys=()=>Object.keys(localStorage).filter(key=>!CLOUD_SKIP.has(key));
-    let cloudFileId='',cloudTimer=0,cloudApplying=false,cloudUploading=false;
+    let cloudFileId='',cloudTimer=0,cloudApplying=false,cloudUploading=false,cloudRestoredAccount='';
     const PENDING_KEY='orar_cloud_pending_v1';
     const pendingCloud=()=>{try{return JSON.parse(localStorage.getItem(PENDING_KEY)||'{}');}catch{return {};}};
     function acknowledgeCloud(sent){const pending=pendingCloud();for(const key of Object.keys(sent))if(pending[key]===sent[key])delete pending[key];localStorage.setItem(PENDING_KEY,JSON.stringify(pending));if(Object.keys(pending).length)scheduleCloudUpload();}
@@ -906,28 +906,43 @@
       }finally{cloudUploading=false;}
     }
     function scheduleCloudUpload(){clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>uploadCloud().catch(()=>{}),450);}
-    async function restoreCloud(){
+    async function restoreCloud({preferRemote=false}={}){
       if(!token||Date.now()>=expires||!grantedScopes.includes('drive.appdata'))return false;
-      if(Object.keys(pendingCloud()).length)await uploadCloud();
-      const id=await findCloudFile();if(!id){await uploadCloud();return;}
-      const r=await fetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(id)+'?alt=media',{headers:{Authorization:'Bearer '+token},cache:'no-store'});if(!r.ok)return;
-      const remote=await r.json();if(!remote?.values)return;
+      if(!preferRemote&&Object.keys(pendingCloud()).length)await uploadCloud();
+      const id=await findCloudFile();if(!id){await uploadCloud();return false;}
+      const r=await fetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(id)+'?alt=media',{headers:{Authorization:'Bearer '+token},cache:'no-store'});if(!r.ok)return false;
+      const remote=await r.json();if(!remote?.values)return false;
+      const pending=pendingCloud(),remotePendingKeys=[];
       cloudApplying=true;let changed=false,needsBackfill=false;
       for(const key of new Set([...cloudKeys(),...Object.keys(remote.values||{})])){
-        if(CLOUD_SKIP.has(key)||pendingCloud()[key])continue;
+        if(CLOUD_SKIP.has(key)||(!preferRemote&&pending[key]))continue;
         const hasRemote=Object.prototype.hasOwnProperty.call(remote.values,key),local=localStorage.getItem(key);
         if(hasRemote){
           const value=String(remote.values[key]);
           if(local!==value){localStorage.setItem(key,value);changed=true;}
+          if(preferRemote&&pending[key])remotePendingKeys.push(key);
         }else if(local!==null)needsBackfill=true;
       }
       const assetRestore=await restoreCloudAssets(remote);
       changed=changed||assetRestore.changed;
       needsBackfill=needsBackfill||assetRestore.needsBackfill;
       cloudApplying=false;
+      if(preferRemote&&remotePendingKeys.length){
+        const latest=pendingCloud();
+        for(const key of remotePendingKeys)delete latest[key];
+        localStorage.setItem(PENDING_KEY,JSON.stringify(latest));
+      }
       if(changed){location.reload();return true;}
-      if(needsBackfill)scheduleCloudUpload();
+      if(needsBackfill||Object.keys(pendingCloud()).length)scheduleCloudUpload();
       return false;
+    }
+    async function restoreCloudForAccount(email=''){
+      const accountKey=String(email||'').trim().toLowerCase()||'__current__';
+      if(cloudRestoredAccount&&cloudRestoredAccount!==accountKey)cloudFileId='';
+      const preferRemote=cloudRestoredAccount!==accountKey;
+      const changed=await restoreCloud({preferRemote});
+      cloudRestoredAccount=accountKey;
+      return changed;
     }
     if(!window.__orarStorageObserverInstalled){
       window.__orarStorageObserverInstalled=true;
@@ -992,7 +1007,7 @@
       else if(token)clearSession('Sesiunea Google trebuie reînnoită.',false);
     }
     function clearSession(text='',forgetAccount=false){
-      closeViewer(false);generation++;session++;clearTimeout(expireTimer);token='';expires=0;grantedScopes='';forgetSession();courses=[];posts=[];selected=null;loading=false;message=text;warning='';reauthenticating=false;silentRenewing=false;authRequestSilent=false;mailItems=[];mailOpen=null;mailBody='';mailUnread=0;mailMessage='';driveItems=[];driveMessage='';window.dispatchEvent(new CustomEvent('orar-mail-unread',{detail:{count:0}}));
+      closeViewer(false);generation++;session++;clearTimeout(expireTimer);token='';expires=0;grantedScopes='';cloudFileId='';if(forgetAccount)cloudRestoredAccount='';forgetSession();courses=[];posts=[];selected=null;loading=false;message=text;warning='';reauthenticating=false;silentRenewing=false;authRequestSilent=false;mailItems=[];mailOpen=null;mailBody='';mailUnread=0;mailMessage='';driveItems=[];driveMessage='';window.dispatchEvent(new CustomEvent('orar-mail-unread',{detail:{count:0}}));
       if(forgetAccount){
         forgetSession({forgetMeta:true});
         try{localStorage.removeItem(ACCOUNT_KEY);}catch{}
@@ -1288,6 +1303,7 @@
             reauthenticating=false;token=response.access_token;expires=Date.now()+Number(response.expires_in||3600)*1000;grantedScopes=String(response.scope||grantedScopes||'');saveSession();scheduleExpiry();const authSession=++session;
             message='';renderProfile(rememberedAccount(),true);render();renderMail();renderDrive();
             if(wasSilent){
+              restoreCloudForAccount(rememberedAccount()?.email||'').catch(()=>{});
               if(mailScopeOk()){refreshMailSummary();if(mailVisible&&!mailLoading)refreshMail();}
               if(driveVisible&&driveScopeOk()&&!driveLoading&&!driveItems.length)loadDrive(false);
               return;
@@ -1295,7 +1311,7 @@
             loadCourses();
             try{const user=await api('https://openidconnect.googleapis.com/v1/userinfo');if(authSession!==session || !token)return;
               const account={name:user.name||'Cont Google',email:user.email||'',picture:safeURL(user.picture)||''};
-              if(account.email){try{localStorage.setItem(ACCOUNT_KEY,JSON.stringify(account));}catch{}renderProfile(account,true);} restoreCloud().catch(()=>{});if(mailScopeOk()){refreshMailSummary();if(mailVisible)refreshMail();}else if(mailVisible)renderMail();if(driveVisible&&driveScopeOk())loadDrive(false);
+              if(account.email){try{localStorage.setItem(ACCOUNT_KEY,JSON.stringify(account));}catch{}renderProfile(account,true);} restoreCloudForAccount(account.email||'').catch(()=>{});if(mailScopeOk()){refreshMailSummary();if(mailVisible)refreshMail();}else if(mailVisible)renderMail();if(driveVisible&&driveScopeOk())loadDrive(false);
             }catch{renderProfile(rememberedAccount(),true);}
           },error_callback:()=>{
             const wasSilent=authRequestSilent;authRequestSilent=false;silentRenewing=false;reauthenticating=false;
