@@ -629,7 +629,7 @@
     let token='',expires=0,grantedScopes='',client=null,courses=[],posts=[],selected=null,loading=false,message='',warning='',generation=0,session=0,expireTimer,visible=false,reauthenticating=false,silentRenewing=false,authRequestSilent=false;
     let mailItems=[],mailLoading=false,mailMessage='',mailOpen=null,mailBody='',mailBodyHtml='',mailUnread=0,mailVisible=false,mailNext='';
     let driveItems=[],driveLoading=false,driveMessage='',driveVisible=false,driveNext='',driveQuery='',driveFolderId='',driveFolderName='';
-    let courseToggleMotion=0;
+    let courseToggleMotion=0,courseAccentOpeningId='';
     const configured=()=>/^[\w.-]+\.apps\.googleusercontent\.com$/.test(window.ORAR_CLASSROOM_CLIENT_ID||'');
     function rememberedAccount(){try{const value=JSON.parse(localStorage.getItem(ACCOUNT_KEY)||'null');return value&&value.email?value:null;}catch{return null;}}
     function renderProfile(account,connected=Boolean(token&&Date.now()<expires)){
@@ -814,14 +814,14 @@
     }
     async function loadDrive(append=false){
       if(!driveScopeOk()){driveItems=[];driveMessage='Reconectează contul Google și acceptă accesul la Drive.';renderDrive();return;}
-      driveLoading=true;driveMessage='';renderDrive();
+      driveLoading=true;driveMessage='';drivePage.classList.add('is-data-loading');
       try{
         const q=driveQuery.trim(),params=new URLSearchParams({pageSize:'50',orderBy:'folder,name',fields:'nextPageToken,files(id,name,mimeType,modifiedTime,webViewLink,iconLink,size,capabilities(canDownload))'}),folderFilter=driveFolderId?"'"+driveFolderId.replace(/'/g,"\\'")+"' in parents and ":'';
         params.set('q',folderFilter+"trashed = false"+(q?" and name contains '"+q.replace(/'/g,"\\'")+"'":''));
         if(append&&driveNext)params.set('pageToken',driveNext);
         const result=await driveApi('files?'+params.toString()),next=result.files||[];
         driveItems=append?[...driveItems,...next.filter(row=>!driveItems.some(old=>old.id===row.id))]:next;driveNext=String(result.nextPageToken||'');
-      }catch(e){driveMessage=e.message||'Fișierele Drive nu au putut fi încărcate.';}finally{driveLoading=false;renderDrive();}
+      }catch(e){driveMessage=e.message||'Fișierele Drive nu au putut fi încărcate.';}finally{driveLoading=false;drivePage.classList.remove('is-data-loading');renderDrive();}
     }
     function renderDrive(){
       const connected=Boolean(token&&Date.now()<expires),scope=driveScopeOk();let body='';
@@ -918,14 +918,14 @@
     async function refreshMailSummary(){if(!mailScopeOk())return;try{const label=await gmailApi('labels/INBOX');mailUnread=Number(label?.messagesUnread)||0;window.dispatchEvent(new CustomEvent('orar-mail-unread',{detail:{count:mailUnread}}));}catch{}}
     async function loadMailBatch(append=false){
       if(!mailScopeOk())return;
-      mailLoading=true;mailMessage='';renderMail();
-      try{const suffix=append&&mailNext?'&pageToken='+encodeURIComponent(mailNext):'',list=await gmailApi('messages?labelIds=INBOX&maxResults=50'+suffix),ids=(list?.messages||[]).map(x=>x.id),rows=await Promise.all(ids.map(async id=>{const q=new URLSearchParams({format:'metadata'});for(const h of ['Subject','From','Date'])q.append('metadataHeaders',h);return gmailApi('messages/'+encodeURIComponent(id)+'?'+q.toString());})),nextRows=rows.map(row=>({id:row.id,subject:mailHeader(row,'Subject')||'(fără subiect)',from:mailHeader(row,'From')||'Expeditor necunoscut',date:mailHeader(row,'Date'),snippet:row.snippet||'',unread:(row.labelIds||[]).includes('UNREAD')}));mailItems=append?[...mailItems,...nextRows.filter(row=>!mailItems.some(old=>old.id===row.id))]:nextRows;mailNext=String(list?.nextPageToken||'');await refreshMailSummary();}catch(e){mailMessage=e.message||'Nu am putut încărca mail-urile.';}finally{mailLoading=false;renderMail();}
+      mailLoading=true;mailMessage='';mailPage.classList.add('is-data-loading');
+      try{const suffix=append&&mailNext?'&pageToken='+encodeURIComponent(mailNext):'',list=await gmailApi('messages?labelIds=INBOX&maxResults=50'+suffix),ids=(list?.messages||[]).map(x=>x.id),rows=await Promise.all(ids.map(async id=>{const q=new URLSearchParams({format:'metadata'});for(const h of ['Subject','From','Date'])q.append('metadataHeaders',h);return gmailApi('messages/'+encodeURIComponent(id)+'?'+q.toString());})),nextRows=rows.map(row=>({id:row.id,subject:mailHeader(row,'Subject')||'(fără subiect)',from:mailHeader(row,'From')||'Expeditor necunoscut',date:mailHeader(row,'Date'),snippet:row.snippet||'',unread:(row.labelIds||[]).includes('UNREAD')}));mailItems=append?[...mailItems,...nextRows.filter(row=>!mailItems.some(old=>old.id===row.id))]:nextRows;mailNext=String(list?.nextPageToken||'');await refreshMailSummary();}catch(e){mailMessage=e.message||'Nu am putut încărca mail-urile.';}finally{mailLoading=false;mailPage.classList.remove('is-data-loading');renderMail();}
     }
     async function refreshMail(){
       if(!mailScopeOk()){mailLoading=false;mailItems=[];mailNext='';mailMessage='Pentru Mail, reconectează contul Google și acceptă accesul Gmail.';renderMail();return;}
       mailNext='';await loadMailBatch(false);
     }
-    async function openMail(id){if(!mailScopeOk())return;mailLoading=true;renderMail();try{const row=await gmailApi('messages/'+encodeURIComponent(id)+'?format=full');mailOpen={id:row.id,subject:mailHeader(row,'Subject')||'(fără subiect)',from:mailHeader(row,'From')||'',date:mailHeader(row,'Date')||''};mailBody=mailPlain(row.payload)||row.snippet||'(Mesaj fără conținut text.)';mailBodyHtml=await mailRichHtml(row);if((row.labelIds||[]).includes('UNREAD')){await gmailApi('messages/'+encodeURIComponent(id)+'/modify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({removeLabelIds:['UNREAD']})});const item=mailItems.find(x=>x.id===id);if(item)item.unread=false;await refreshMailSummary();}}catch(e){mailMessage=e.message||'Mesajul nu a putut fi deschis.';}finally{mailLoading=false;renderMail();}}
+    async function openMail(id){if(!mailScopeOk())return;mailLoading=true;mailPage.classList.add('is-data-loading');try{const row=await gmailApi('messages/'+encodeURIComponent(id)+'?format=full');mailOpen={id:row.id,subject:mailHeader(row,'Subject')||'(fără subiect)',from:mailHeader(row,'From')||'',date:mailHeader(row,'Date')||''};mailBody=mailPlain(row.payload)||row.snippet||'(Mesaj fără conținut text.)';mailBodyHtml=await mailRichHtml(row);if((row.labelIds||[]).includes('UNREAD')){await gmailApi('messages/'+encodeURIComponent(id)+'/modify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({removeLabelIds:['UNREAD']})});const item=mailItems.find(x=>x.id===id);if(item)item.unread=false;await refreshMailSummary();}}catch(e){mailMessage=e.message||'Mesajul nu a putut fi deschis.';}finally{mailLoading=false;mailPage.classList.remove('is-data-loading');renderMail();}}
     function renderMail(){
       const connected=Boolean(token&&Date.now()<expires),gmail=mailScopeOk(),account=rememberedAccount();let body='';
       if(!connected)body='<div class="classroom-welcome"><h2>Conectează contul Google</h2><p>Mail folosește același cont conectat pentru Classroom și Drive.</p><button class="hub-primary" data-mail-connect>Conectează contul Google</button></div>';
@@ -948,10 +948,10 @@
       return items;
     }
     async function loadCourses(){
-      const g=++generation;selected=null;posts=[];loading=true;message='';warning='';render();
+      const g=++generation;selected=null;posts=[];loading=true;message='';warning='';page.classList.add('is-data-loading');
       try{const result=await listAll('courses','courses',g);if(g!==generation)return;courses=result.filter(c=>!['DECLINED','SUSPENDED'].includes(c.courseState));window.dispatchEvent(new CustomEvent('orar-classroom-authenticated'));}
       catch(e){if(g===generation)message=e.message;}
-      finally{if(g===generation){loading=false;render();}}
+      finally{if(g===generation){loading=false;page.classList.remove('is-data-loading');render();}}
     }
     function findCourseCard(id){
       const target=String(id);
@@ -963,12 +963,12 @@
       if(!card || !panel || !fromHeight || reduceCourseMotion() || !card.animate)return;
       const targetHeight=Math.max(fromHeight,card.scrollHeight);
       card.style.height=fromHeight+'px';card.style.overflow='hidden';card.style.willChange='height';
-      panel.style.animation='none';panel.style.opacity='0';panel.style.transform='translateY(-6px)';panel.style.willChange='opacity, transform';
+      panel.style.animation='none';panel.style.opacity='0';panel.style.transform='none';panel.style.willChange='opacity';
       requestAnimationFrame(()=>requestAnimationFrame(async()=>{
         if(motion!==courseToggleMotion || !card.isConnected)return;
         const animations=[
           card.animate([{height:fromHeight+'px'},{height:targetHeight+'px'}],{duration:220,easing:'cubic-bezier(.22,.75,.2,1)',fill:'forwards'}),
-          panel.animate([{opacity:0,transform:'translateY(-6px)'},{opacity:1,transform:'translateY(0)'}],{duration:180,easing:'ease-out',fill:'forwards'})
+          panel.animate([{opacity:0},{opacity:1}],{duration:200,easing:'ease-out',fill:'forwards'})
         ];
         await Promise.allSettled(animations.map(animation=>animation.finished));
         if(motion!==courseToggleMotion || !card.isConnected)return;
@@ -981,12 +981,13 @@
       const card=findCourseCard(id),motion=++courseToggleMotion;
       if(!card || reduceCourseMotion() || !card.animate){generation++;selected=null;posts=[];loading=false;warning='';message='';render();return;}
       const panel=card.querySelector('.classroom-course-panel'),summary=card.querySelector('.classroom-course-summary');
+      card.classList.add('is-closing-accent');
       const fromHeight=card.getBoundingClientRect().height,style=getComputedStyle(card);
       const targetHeight=(summary?.getBoundingClientRect().height||0)+(parseFloat(style.borderTopWidth)||0)+(parseFloat(style.borderBottomWidth)||0);
       card.style.height=fromHeight+'px';card.style.overflow='hidden';card.style.willChange='height';
-      if(panel){panel.style.animation='none';panel.style.willChange='opacity, transform';}
+      if(panel){panel.style.animation='none';panel.style.willChange='opacity';}
       const animations=[card.animate([{height:fromHeight+'px'},{height:targetHeight+'px'}],{duration:190,easing:'cubic-bezier(.22,.75,.2,1)',fill:'forwards'})];
-      if(panel)animations.push(panel.animate([{opacity:1,transform:'translateY(0)'},{opacity:0,transform:'translateY(-5px)'}],{duration:145,easing:'ease-out',fill:'forwards'}));
+      if(panel)animations.push(panel.animate([{opacity:1},{opacity:0}],{duration:190,easing:'ease-out',fill:'forwards'}));
       await Promise.allSettled(animations.map(animation=>animation.finished));
       if(motion!==courseToggleMotion)return;
       animations.forEach(animation=>animation.cancel());
@@ -995,8 +996,17 @@
     async function loadCourse(id){
       const course=courses.find(c=>c.id===id);if(!course)return;
       const wasOpen=Boolean(selected?.id===id),fromHeight=wasOpen?0:(findCourseCard(id)?.getBoundingClientRect().height||0),motion=++courseToggleMotion;
-      selected=course;posts=[];loading=true;message='';warning='';const g=++generation;render();
-      if(!wasOpen)animateCourseOpen(id,fromHeight,motion);
+      selected=course;posts=[];loading=true;message='';warning='';const g=++generation;
+      if(!wasOpen)courseAccentOpeningId=id;
+      render();
+      if(!wasOpen){
+        requestAnimationFrame(()=>requestAnimationFrame(()=>{
+          const opened=findCourseCard(id);
+          opened?.classList.remove('is-opening');
+          if(courseAccentOpeningId===id)courseAccentOpeningId='';
+        }));
+        animateCourseOpen(id,fromHeight,motion);
+      }
       const definitions=[['courseWorkMaterials','courseWorkMaterial','Material','Materiale'],['courseWork','courseWork','Temă','Teme'],['announcements','announcements','Anunț','Anunțuri']];
       const results=await Promise.allSettled(definitions.map(async([endpoint,field,kind,label])=>({label,items:(await listAll('courses/'+encodeURIComponent(id)+'/'+endpoint,field,g)).map(item=>({...item,kind}))})));
       if(g!==generation)return;
@@ -1143,10 +1153,10 @@
         mail:{unread:mailUnread,items:mailItems.slice(0,50).map(m=>({subject:m.subject,from:m.from,date:m.date,snippet:m.snippet,unread:m.unread})),open:mailOpen?{...mailOpen,body:mailBody}:null},
         drive:{folder:driveFolderName||'',query:driveQuery,items:driveItems.slice(0,80).map(file=>({name:file.name,mimeType:file.mimeType,modifiedTime:file.modifiedTime}))}
       }),
-      isConnected:()=>Boolean(token&&Date.now()<expires),showDrive(){driveVisible=true;renderDrive();prepareSignIn();if(driveScopeOk()&&!driveLoading&&!driveItems.length)loadDrive(false);drivePage.classList.remove('is-entering');void drivePage.offsetWidth;drivePage.classList.add('is-entering');drivePage.querySelector('h1')?.focus({preventScroll:true});},showMail(){mailVisible=true;renderMail();prepareSignIn();if(mailScopeOk()&&!mailLoading&&!mailItems.length)refreshMail();mailPage.classList.remove('is-entering');void mailPage.offsetWidth;mailPage.classList.add('is-entering');mailPage.querySelector('h1')?.focus({preventScroll:true});},show(){
+      isConnected:()=>Boolean(token&&Date.now()<expires),showDrive(){driveVisible=true;renderDrive();prepareSignIn();if(driveScopeOk()&&!driveLoading&&!driveItems.length)loadDrive(false);drivePage.classList.remove('is-entering');drivePage.querySelector('h1')?.focus({preventScroll:true});},showMail(){mailVisible=true;renderMail();prepareSignIn();if(mailScopeOk()&&!mailLoading&&!mailItems.length)refreshMail();mailPage.classList.remove('is-entering');mailPage.querySelector('h1')?.focus({preventScroll:true});},show(){
       visible=true;render();prepareSignIn();
       if(token && Date.now()<expires){if(!courses.length&&!loading)loadCourses();}
-      page.classList.remove('is-entering');void page.offsetWidth;page.classList.add('is-entering');page.querySelector('h1').focus({preventScroll:true});
+      page.classList.remove('is-entering');page.querySelector('h1').focus({preventScroll:true});
     }};
   }};
 })();
