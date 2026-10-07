@@ -309,3 +309,23 @@ html body[data-ui-glass][data-ui-glass] .classroom-course.is-open.is-closing-acc
   border-color:var(--glass-border)!important;
   box-shadow:var(--glass-shadow)!important;
 }
+
+
+/* v93: menu buttons are visually stable while the drawer opens/closes.
+   The drawer itself carries the motion; individual glass items never animate
+   or keep a synthetic touch hover state. */
+html body[data-ui-glass][data-ui-glass] .hub-drawer .hub-nav-item{
+  animation:none!important;
+  transition:none!important;
+  -webkit-tap-highlight-color:transparent!important;
+}
+@media (hover:none), (pointer:coarse){
+  html body[data-ui-glass][data-ui-glass] .hub-drawer .hub-nav-item:not([aria-current="page"]):hover,
+  html body[data-ui-glass][data-ui-glass] .hub-drawer .hub-nav-item:not([aria-current="page"]):active{
+    color:var(--glass-ink)!important;
+    background:var(--glass-surface)!important;
+    border-color:var(--glass-border)!important;
+    box-shadow:inset 0 1px 0 var(--glass-highlight),0 4px 14px rgba(var(--glass-base),.14)!important;
+    transform:none!important;
+  }
+}
