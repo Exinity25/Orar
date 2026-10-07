@@ -106,8 +106,12 @@
     const models=Array.isArray(options.models)&&options.models.length?options.models:[MODEL,FALLBACK_MODEL];
     const attempts=Math.max(1,Number(options.attempts)||2);
     const onStatus=typeof options.onStatus==='function'?options.onStatus:()=>{};
+    const externalSignal=options.signal||null;
     const request=async model=>{
+      if(externalSignal?.aborted)throw Error('CANCELLED');
       const controller=new AbortController();
+      const abortFromExternal=()=>controller.abort();
+      externalSignal?.addEventListener('abort',abortFromExternal,{once:true});
       const timer=setTimeout(()=>controller.abort(),timeoutMs);
       try{
         const generationConfig={};
@@ -127,24 +131,34 @@
         let payload=null;try{payload=await response.json();}catch{}
         return {response,payload};
       }catch(error){
-        if(error?.name==='AbortError')throw Error('TIMEOUT');
+        if(error?.name==='AbortError'){
+          if(externalSignal?.aborted)throw Error('CANCELLED');
+          throw Error('TIMEOUT');
+        }
         throw error;
       }finally{
         clearTimeout(timer);
+        externalSignal?.removeEventListener('abort',abortFromExternal);
       }
     };
     let transient=false,lastMessage='',saw429=false,sawUnavailable=false,sawTimeout=false;
     for(let modelIndex=0;modelIndex<models.length;modelIndex++){
+      if(externalSignal?.aborted)throw Error('CANCELLED');
       const model=models[modelIndex];
       onStatus(modelIndex?'Gemini reîncearcă analiza…':'Gemini analizează…');
       for(let attempt=0;attempt<attempts;attempt++){
+        if(externalSignal?.aborted)throw Error('CANCELLED');
         let result;
         try{result=await request(model);}
         catch(error){
+          if(error?.message==='CANCELLED')throw error;
           transient=true;
           if(error?.message==='TIMEOUT'){sawTimeout=true;lastMessage='Analiza a durat prea mult.';}
           else lastMessage=error?.message||'Eroare de rețea';
-          if(attempt<attempts-1)await sleep(500*Math.pow(2,attempt));
+          if(attempt<attempts-1){
+            await sleep(500*Math.pow(2,attempt));
+            if(externalSignal?.aborted)throw Error('CANCELLED');
+          }
           continue;
         }
         const {response,payload}=result;
@@ -186,6 +200,8 @@
       let activeId=chats[0]?.id||'';
       let chatMenuOpen=false;
       let busy=false;
+      let messageRunId=0;
+      let activeMessageController=null;
       let pendingFiles=[];
 
       const iosKeyboardMode=Boolean(window.CSS&&CSS.supports&&CSS.supports('-webkit-touch-callout','none'));
@@ -432,7 +448,7 @@
             <form class="gemini-composer" data-gemini-form>
               <label class="gemini-attach" aria-label="Atașează fișiere">＋<input type="file" data-gemini-files multiple accept="image/*,.pdf,.txt,.md,.csv,.json,.xml,.html,.doc,.docx,.ppt,.pptx,.xls,.xlsx"></label>
               <textarea name="message" rows="1" maxlength="20000" placeholder="Mesaj pentru Gemini…" aria-label="Mesaj pentru Gemini"></textarea>
-              <button class="gemini-send" type="submit" ${busy?'disabled':''} aria-label="Trimite">↑</button>
+              <button class="gemini-send ${busy?'is-stop':''}" type="${busy?'button':'submit'}" ${busy?'data-gemini-stop':''} aria-label="${busy?'Oprește răspunsul':'Trimite'}">${busy?'<span class="gemini-stop-icon" aria-hidden="true"></span>':'↑'}</button>
             </form>
           </section>
         </div>`;
@@ -621,31 +637,61 @@
         throw Error('Acțiunea cerută nu este suportată.');
       }
 
+      function stopMessage(){
+        if(!busy)return;
+        messageRunId++;
+        try{activeMessageController?.abort();}catch{}
+        activeMessageController=null;
+        busy=false;
+        render();
+        requestAnimationFrame(()=>{
+          const field=composerField();
+          if(field){field.focus({preventScroll:true});autosizeComposer(field);}
+        });
+      }
+
       async function sendMessage(text){
+        if(busy)return;
         const clean=String(text||'').trim();
         if(!clean&&pendingFiles.length===0)return;
         const accessToken=String(getGoogleToken?.()||'');if(!accessToken){requestGoogleAccess?.();tell?.('Acceptă permisiunea Gemini pentru contul Google conectat, apoi încearcă din nou.');return;}
         if(!activeChat())createChat();
         const chat=activeChat(),files=pendingFiles.slice();pendingFiles=[];
         const attachmentParts=[];
+        const runId=++messageRunId;
+        const controller=new AbortController();
+        activeMessageController=controller;
         busy=true;
         const userMessage={role:'user',text:clean||'Analizează fișierele atașate.',attachments:files.map(file=>({name:file.name,type:file.type,size:file.size})),parts:attachmentParts};
         chat.messages.push(userMessage);if(chat.title==='Chat nou')chat.title=titleFrom(clean||files[0]?.name);chat.updated=Date.now();writeChats(chats);render();
         try{
-          for(const file of files)attachmentParts.push(await filePart(file));
+          for(const file of files){
+            attachmentParts.push(await filePart(file));
+            if(runId!==messageRunId||controller.signal.aborted)return;
+          }
           const recent=chat.messages.slice(-24);
           const history=recent.map((message,index)=>({role:message.role,parts:messageParts(message,index===recent.length-1)}));
-          const raw=await generate(accessToken,history,systemPrompt(),true),envelope=parseAssistantEnvelope(raw);
+          const raw=await generate(accessToken,history,systemPrompt(),true,{signal:controller.signal});
+          if(runId!==messageRunId||controller.signal.aborted)return;
+          const envelope=parseAssistantEnvelope(raw);
           let answer=envelope.reply;
           if(envelope.action){
             try{const confirmation=executeAssistantAction(envelope.action);answer=confirmation;}
             catch(error){answer='Nu am putut face modificarea: '+(error?.message||'acțiune invalidă.');}
           }
+          if(runId!==messageRunId||controller.signal.aborted)return;
           answer=displayDate(answer||'Nu am primit un răspuns utilizabil.');
           chat.messages.push({role:'model',text:answer,attachments:[]});chat.updated=Date.now();writeChats(chats);
         }catch(error){
+          if(runId!==messageRunId||controller.signal.aborted||error?.message==='CANCELLED')return;
           chat.messages.push({role:'model',text:'Eroare: '+displayDate(error?.message||'Gemini nu a răspuns.'),attachments:[]});writeChats(chats);
-        }finally{busy=false;render();}
+        }finally{
+          if(runId===messageRunId){
+            activeMessageController=null;
+            busy=false;
+            render();
+          }
+        }
       }
 
       function cleanScheduleObject(raw,current){
@@ -779,12 +825,23 @@
         const selected=[...input.files].filter(file=>file.size<=MAX_FILE_BYTES).slice(0,8);
         pendingFiles=[...pendingFiles,...selected].slice(0,8);render();
       });
+      page.addEventListener('click',e=>{
+        if(e.target.closest('[data-gemini-stop]')){e.preventDefault();stopMessage();}
+      });
       page.addEventListener('submit',e=>{
-        const form=e.target.closest('[data-gemini-form]');if(!form)return;e.preventDefault();const field=form.elements.message;const text=field.value;field.value='';autosizeComposer(field);sendMessage(text);
+        const form=e.target.closest('[data-gemini-form]');if(!form)return;
+        e.preventDefault();
+        if(busy)return;
+        const field=form.elements.message,text=field.value;
+        field.value='';autosizeComposer(field);sendMessage(text);
       });
       page.addEventListener('keydown',e=>{
         const field=e.target.closest('.gemini-composer textarea');if(!field)return;
-        if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();const text=field.value;field.value='';autosizeComposer(field);sendMessage(text);}
+        if(e.key==='Enter'&&!e.shiftKey){
+          e.preventDefault();
+          if(busy)return;
+          const text=field.value;field.value='';autosizeComposer(field);sendMessage(text);
+        }
       });
       importDialog.addEventListener('click',e=>{if(e.target.closest('[data-gemini-dialog-close]'))importDialog.close();});
       importDialog.addEventListener('submit',async e=>{
