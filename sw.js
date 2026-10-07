@@ -1,4 +1,4 @@
-const CACHE = 'orar-v88-parity-mail-drive-liquid-glass';
+const CACHE = 'orar-v89-parity-slot-only';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './student-hub.css', './student-hub.js', './classroom-config.js', './classroom-view.js', './student-planner.js', './gemini-view.js', './student-planner.css', './theme-glass.css'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
