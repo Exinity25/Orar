@@ -1670,6 +1670,10 @@
         ${open?`<div class="classroom-course-panel"><div class="classroom-course-panel-head">${link(course.alternateLink,'Deschide clasa în Classroom')}</div><div class="classroom-posts">${postsMarkup()}</div></div>`:''}
       </section>`;
     }
+    function refreshGoogleSectionsInBackground(){
+      if(mailScopeOk()&&!mailLoading)refreshMail().catch(()=>{});
+      if(driveScopeOk()&&!driveLoading)loadDrive(false).catch(()=>{});
+    }
     function render(){
       const signed=Boolean(token && Date.now()<expires),remembered=rememberedAccount();
       page.innerHTML=`<div class="hub-content"><header class="hub-page-header"><h1 class="hub-heading" id="classroomHeading" tabindex="-1">Classroom</h1><p class="hub-intro">Clasele și materialele tale, într-un singur loc.</p></header>
@@ -1694,14 +1698,13 @@
             message='';renderProfile(rememberedAccount(),true);render();renderMail();renderDrive();
             if(wasSilent){
               restoreCloudForAccount(rememberedAccount()?.email||'').catch(()=>{});
-              if(mailScopeOk()){refreshMailSummary();if(mailVisible&&!mailLoading)refreshMail();}
-              if(driveVisible&&driveScopeOk()&&!driveLoading&&!driveItems.length)loadDrive(false);
+              refreshGoogleSectionsInBackground();
               return;
             }
             loadCourses();
             try{const user=await api('https://openidconnect.googleapis.com/v1/userinfo');if(authSession!==session || !token)return;
               const account={name:user.name||'Cont Google',email:user.email||'',picture:safeURL(user.picture)||''};
-              if(account.email){try{localStorage.setItem(ACCOUNT_KEY,JSON.stringify(account));}catch{}renderProfile(account,true);} restoreCloudForAccount(account.email||'').catch(()=>{});if(mailScopeOk()){refreshMailSummary();if(mailVisible)refreshMail();}else if(mailVisible)renderMail();if(driveVisible&&driveScopeOk())loadDrive(false);
+              if(account.email){try{localStorage.setItem(ACCOUNT_KEY,JSON.stringify(account));}catch{}renderProfile(account,true);} restoreCloudForAccount(account.email||'').catch(()=>{});refreshGoogleSectionsInBackground();if(mailVisible&&!mailScopeOk())renderMail();
             }catch{renderProfile(rememberedAccount(),true);}
           },error_callback:()=>{
             const wasSilent=authRequestSilent;authRequestSilent=false;silentRenewing=false;reauthenticating=false;
@@ -1713,6 +1716,7 @@
         if(token){
           scheduleExpiry();
           restoreCloudForAccount(rememberedAccount()?.email||'').catch(()=>{});
+          refreshGoogleSectionsInBackground();
         }
       }catch(e){message=e.message;renderProfile(rememberedAccount(),Boolean(token&&Date.now()<expires));render();renderMail();renderDrive();}
     }
