@@ -2598,3 +2598,114 @@ body.orar-custom-background:not(.classroom-viewer-open):is(
     linear-gradient(rgba(2,5,11,.42),rgba(2,5,11,.58)),
     linear-gradient(90deg,rgba(0,0,0,.22),rgba(0,0,0,0) 18%,rgba(0,0,0,0) 82%,rgba(0,0,0,.22))!important;
 }
+
+
+/* v109 iPhone video player: one custom control surface, one timeline. */
+.classroom-video-controls{
+  left:12px!important;
+  right:12px!important;
+  bottom:12px!important;
+  transform:none!important;
+  width:auto!important;
+  display:grid!important;
+  grid-template-columns:1fr!important;
+  gap:8px!important;
+  padding:9px 10px!important;
+  border-radius:16px!important;
+  background:rgba(18,20,25,.78)!important;
+  -webkit-backdrop-filter:blur(18px) saturate(145%)!important;
+  backdrop-filter:blur(18px) saturate(145%)!important;
+}
+.classroom-video-timeline{
+  display:grid;
+  grid-template-columns:38px minmax(0,1fr) 38px;
+  align-items:center;
+  gap:8px;
+  min-width:0;
+}
+.classroom-video-actions{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+}
+.classroom-video-button{
+  flex:0 0 auto;
+  width:38px!important;
+  height:38px!important;
+  min-width:38px!important;
+  border-radius:50%!important;
+  font-size:14px!important;
+}
+.classroom-video-play{
+  width:44px!important;
+  height:44px!important;
+  min-width:44px!important;
+  font-size:17px!important;
+  background:rgba(255,255,255,.16)!important;
+}
+.classroom-video-seek{
+  width:42px!important;
+  height:38px!important;
+  min-width:42px!important;
+  border-radius:14px!important;
+  font-size:10px!important;
+  font-weight:800!important;
+  letter-spacing:-.2px;
+}
+.classroom-video-progress{
+  -webkit-appearance:none;
+  appearance:none;
+  height:22px!important;
+  margin:0!important;
+  touch-action:pan-x;
+}
+.classroom-video-progress::-webkit-slider-runnable-track{
+  height:3px!important;
+  background:rgba(255,255,255,.34)!important;
+}
+.classroom-video-progress::-webkit-slider-thumb{
+  width:12px!important;
+  height:12px!important;
+  margin-top:-4.5px!important;
+}
+.classroom-video-time{
+  width:38px;
+  text-align:center;
+  font-size:10px!important;
+}
+.classroom-video-shell video{
+  touch-action:manipulation;
+  -webkit-touch-callout:none;
+}
+.classroom-video-button:disabled{
+  opacity:.35!important;
+  pointer-events:none!important;
+}
+@supports (-webkit-touch-callout:none){
+  @media(max-width:900px){
+    .classroom-video-stage{
+      padding:0!important;
+      align-items:center!important;
+      justify-content:center!important;
+    }
+    .classroom-video-shell{
+      width:100%!important;
+      max-height:calc(100dvh - 118px)!important;
+      border-radius:0!important;
+      box-shadow:none!important;
+    }
+    .classroom-video-controls{
+      left:10px!important;
+      right:10px!important;
+      bottom:max(10px,env(safe-area-inset-bottom))!important;
+      padding:8px 9px!important;
+      border-radius:15px!important;
+    }
+    .classroom-video-actions{gap:9px}
+    .classroom-video-button{width:36px!important;height:36px!important;min-width:36px!important}
+    .classroom-video-play{width:42px!important;height:42px!important;min-width:42px!important}
+    .classroom-video-seek{width:40px!important;min-width:40px!important}
+    .classroom-video-fullscreen{font-size:17px!important}
+  }
+}
