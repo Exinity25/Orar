@@ -1,4 +1,4 @@
-const CACHE = 'orar-v115-gemini-stop-response';
+const CACHE = 'orar-v116-gemini-keyboard-google-refresh';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './student-hub.css', './student-hub.js', './classroom-config.js', './classroom-view.js', './student-planner.js', './gemini-view.js', './student-planner.css', './theme-glass.css'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
