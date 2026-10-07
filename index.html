@@ -64,6 +64,21 @@
         linear-gradient(90deg, rgba(0,0,0,.22), rgba(0,0,0,0) 18%, rgba(0,0,0,0) 82%, rgba(0,0,0,.22));
     }
 
+    /* Real top surface for iOS 26/27 chrome sampling + a soft fade over the safe area. */
+    .ios-top-fade{
+      position:fixed;
+      inset:0 0 auto 0;
+      height:calc(env(safe-area-inset-top) + 72px);
+      pointer-events:none;
+      z-index:2;
+      background-color:rgba(5,7,12,.72);
+      background-image:linear-gradient(180deg,rgba(5,7,12,.42) 0%,rgba(5,7,12,.22) 52%,rgba(5,7,12,0) 100%);
+      -webkit-backdrop-filter:blur(18px) saturate(120%);
+      backdrop-filter:blur(18px) saturate(120%);
+      -webkit-mask-image:linear-gradient(to bottom,#000 0%,#000 56%,transparent 100%);
+      mask-image:linear-gradient(to bottom,#000 0%,#000 56%,transparent 100%);
+    }
+
     button,input,textarea,select{font:inherit}
     button{color:inherit}
     .app{position:relative;z-index:1;height:100vh;height:100svh;overflow-y:auto;overflow-x:hidden;padding:38px 5.8vw 56px;-webkit-overflow-scrolling:touch}
@@ -962,6 +977,7 @@
   <link rel="stylesheet" href="./theme-glass.css" />
 </head>
 <body data-ui-glass class="mobile-day-0">
+  <div class="ios-top-fade" aria-hidden="true"></div>
   <div class="app">
     <button class="undo-toggle" id="undoToggle" type="button" aria-label="Nu există modificări de anulat" title="Undo" disabled>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7 4 12l5 5"/><path d="M5 12h8a6 6 0 0 1 6 6"/></svg>
