@@ -94,6 +94,7 @@
     let planner=null,gemini=null;
     const $ = selector => root.querySelector(selector);
     const menu=$('#hubMenu'), layer=$('#hubLayer'), page=$('#hubSubjects'), customPage=$('#hubCustomize'), list=$('#hubSubjectList');
+    const scheduleControls=document.getElementById('scheduleFloatingControls');
     layer.inert = true;
 
     const THEME_KEY='orar_theme_v1',BG_MODE_KEY='orar_background_mode_v1',BG_NAME_KEY='orar_background_name_v1',CUSTOM_ACCENT_KEY='orar_custom_accent_v1',CUSTOM_APPEARANCE_KEY='orar_custom_appearance_v1';
@@ -314,12 +315,12 @@
 
     const closeMenu = (restore=true) => {
       layer.classList.remove('is-open');layer.setAttribute('aria-hidden','true');layer.inert=true;
-      menu.setAttribute('aria-expanded','false');app.inert=false;page.inert=false;customPage.inert=false;classroom.element.inert=false;if(classroom.mailElement)classroom.mailElement.inert=false;if(classroom.driveElement)classroom.driveElement.inert=false;if(gemini)gemini.element.inert=false;menu.inert=false;if(planner)planner.element.inert=false;
+      menu.setAttribute('aria-expanded','false');app.inert=false;if(scheduleControls)scheduleControls.inert=false;page.inert=false;customPage.inert=false;classroom.element.inert=false;if(classroom.mailElement)classroom.mailElement.inert=false;if(classroom.driveElement)classroom.driveElement.inert=false;if(gemini)gemini.element.inert=false;menu.inert=false;if(planner)planner.element.inert=false;
       if(restore)menu.focus({preventScroll:true});
     };
     const openMenu = () => {
       layer.inert=false;layer.setAttribute('aria-hidden','false');layer.classList.add('is-open');menu.setAttribute('aria-expanded','true');
-      app.inert=true;page.inert=true;customPage.inert=true;classroom.element.inert=true;if(classroom.mailElement)classroom.mailElement.inert=true;if(classroom.driveElement)classroom.driveElement.inert=true;if(gemini)gemini.element.inert=true;menu.inert=true;if(planner)planner.element.inert=true;$('#hubClose').focus({preventScroll:true});
+      app.inert=true;if(scheduleControls)scheduleControls.inert=true;page.inert=true;customPage.inert=true;classroom.element.inert=true;if(classroom.mailElement)classroom.mailElement.inert=true;if(classroom.driveElement)classroom.driveElement.inert=true;if(gemini)gemini.element.inert=true;menu.inert=true;if(planner)planner.element.inert=true;$('#hubClose').focus({preventScroll:true});
     };
     const changeView = next => {
       const leavingGemini=view==='gemini'&&next!=='gemini';
@@ -328,7 +329,7 @@
       }
       if(leavingGemini)gemini?.hide?.();
       view=next;closeMenu(false);if(planner){planner.hide();if(view.startsWith('planner:'))planner.show(view.slice(8));}
-      app.classList.toggle('hub-hidden',view!=='schedule');page.classList.toggle('hub-hidden',view!=='subjects');customPage.classList.toggle('hub-hidden',view!=='customize');classroom.element.classList.toggle('hub-hidden',view!=='classroom');if(classroom.mailElement)classroom.mailElement.classList.toggle('hub-hidden',view!=='mail');if(classroom.driveElement)classroom.driveElement.classList.toggle('hub-hidden',view!=='drive');if(gemini)gemini.element.classList.toggle('hub-hidden',view!=='gemini');
+      app.classList.toggle('hub-hidden',view!=='schedule');if(scheduleControls)scheduleControls.classList.toggle('hub-hidden',view!=='schedule');page.classList.toggle('hub-hidden',view!=='subjects');customPage.classList.toggle('hub-hidden',view!=='customize');classroom.element.classList.toggle('hub-hidden',view!=='classroom');if(classroom.mailElement)classroom.mailElement.classList.toggle('hub-hidden',view!=='mail');if(classroom.driveElement)classroom.driveElement.classList.toggle('hub-hidden',view!=='drive');if(gemini)gemini.element.classList.toggle('hub-hidden',view!=='gemini');
       root.querySelectorAll('[data-hub-view]').forEach(el=>el.dataset.hubView===view?el.setAttribute('aria-current','page'):el.removeAttribute('aria-current'));
       if(view==='subjects'){
         renderSubjects();page.classList.remove('is-entering');void page.offsetWidth;page.classList.add('is-entering');$('#hubHeading').focus({preventScroll:true});
@@ -344,6 +345,7 @@
     window.addEventListener('orar-orientation-recover',()=>{
       closeMenu(false);
       app.inert=false;
+      if(scheduleControls)scheduleControls.inert=false;
       page.inert=false;
       customPage.inert=false;
       classroom.element.inert=false;
