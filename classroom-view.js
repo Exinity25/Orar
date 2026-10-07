@@ -839,6 +839,32 @@
       return cloudFileId;
     }
     async function writeCloudSnapshot(id,body){
+      const byteLength=new Blob([body]).size;
+      if(byteLength>4*1024*1024){
+        const initUrl=id
+          ?'https://www.googleapis.com/upload/drive/v3/files/'+encodeURIComponent(id)+'?uploadType=resumable&fields=id'
+          :'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id';
+        const metadata=id?{}:{name:CLOUD_FILE,parents:['appDataFolder']};
+        const init=await fetch(initUrl,{
+          method:id?'PATCH':'POST',
+          headers:{
+            Authorization:'Bearer '+token,
+            'Content-Type':'application/json; charset=UTF-8',
+            'X-Upload-Content-Type':'application/json',
+            'X-Upload-Content-Length':String(byteLength)
+          },
+          body:JSON.stringify(metadata)
+        });
+        const uploadUrl=init.headers.get('Location');
+        if(init.ok&&uploadUrl){
+          const upload=await fetch(uploadUrl,{method:'PUT',headers:{'Content-Type':'application/json'},body});
+          if(upload.ok){
+            if(id)return id;
+            try{return (await upload.json()).id||'';}catch{return '';}
+          }
+        }
+        if(id)throw Error('Nu s-a putut înlocui backup-ul mare existent.');
+      }
       if(id){
         const r=await fetch('https://www.googleapis.com/upload/drive/v3/files/'+encodeURIComponent(id)+'?uploadType=media',{
           method:'PATCH',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body
