@@ -972,7 +972,8 @@
       }catch{}
     }
     const CLOUD_FILE='orar-sync.json';
-    const CLOUD_VERSION=3;
+    const CLOUD_VERSION=4;
+    const CLOUD_ASSET_PREFIX='orar-asset-v1-';
     const CLOUD_SKIP=new Set([SESSION_KEY,OLD_SESSION_KEY,AUTH_META_KEY,ACCOUNT_KEY,'orar_google_session_v1','orar_cloud_pending_v1','orar_gemini_api_key_v1','orar_published_version_v1']);
     const cloudKeys=()=>Object.keys(localStorage).filter(key=>!CLOUD_SKIP.has(key));
     let cloudFileId='',cloudTimer=0,cloudApplying=false,cloudUploading=false,cloudRestoredAccount='';
@@ -1014,16 +1015,6 @@
       }
       return String(blob.size||0)+':'+String(blob.type||'');
     }
-    async function blobToCloudRecord(blob){
-      if(!blob)return null;
-      const data=await new Promise((resolve,reject)=>{
-        const reader=new FileReader();
-        reader.onload=()=>{const value=String(reader.result||''),comma=value.indexOf(',');resolve(comma>=0?value.slice(comma+1):'');};
-        reader.onerror=()=>reject(reader.error||Error('Fișierul local nu a putut fi citit.'));
-        reader.readAsDataURL(blob);
-      });
-      return {type:String(blob.type||'application/octet-stream'),size:Number(blob.size)||0,hash:await blobHash(blob),data};
-    }
     function cloudRecordToBlob(record){
       if(!record||typeof record.data!=='string')return null;
       const binary=atob(record.data),parts=[];
@@ -1040,37 +1031,124 @@
         return [...new Set((planner?.resources||[]).map(item=>String(item?.fileId||'').trim()).filter(Boolean))];
       }catch{return [];}
     }
-    async function captureCloudAssets(){
-      const assets={background:null,plannerFiles:{}};
-      const missing={background:false,plannerFiles:[]};
-      const wantsBackground=localStorage.getItem('orar_background_mode_v1')==='custom';
-      if(wantsBackground){
-        try{
-          const blob=await backupDbGet('orar_customization_v1','assets','background');
-          if(blob)assets.background=await blobToCloudRecord(blob);
-          else missing.background=true;
-        }catch{missing.background=true;}
+    const cloudAssetName=(kind,id='')=>CLOUD_ASSET_PREFIX+kind+(id?'-'+String(id).replace(/[^A-Za-z0-9_-]/g,'_'):'');
+    const externalAssetRecord=record=>record&&record.fileId?{
+      fileId:String(record.fileId),
+      type:String(record.type||'application/octet-stream'),
+      size:Number(record.size)||0,
+      hash:String(record.hash||'')
+    }:null;
+    async function findCloudAssetByName(name){
+      const q=encodeURIComponent("name='"+String(name).replace(/'/g,"\\'")+"' and 'appDataFolder' in parents and trashed=false");
+      const r=await fetch('https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q='+q+'&fields=files(id,name,modifiedTime)&orderBy=modifiedTime%20desc&pageSize=10',{headers:{Authorization:'Bearer '+token},cache:'no-store'});
+      if(!r.ok)return '';
+      const files=(await r.json()).files||[];
+      if(files.length>1)Promise.allSettled(files.slice(1).map(file=>fetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(file.id),{method:'DELETE',headers:{Authorization:'Bearer '+token}}))).catch(()=>{});
+      return files[0]?.id||'';
+    }
+    async function uploadCloudAsset(existingId,name,blob){
+      let id=String(existingId||'');
+      if(!id)id=await findCloudAssetByName(name);
+      if(id){
+        const update=await fetch('https://www.googleapis.com/upload/drive/v3/files/'+encodeURIComponent(id)+'?uploadType=media&fields=id',{
+          method:'PATCH',
+          headers:{Authorization:'Bearer '+token,'Content-Type':String(blob.type||'application/octet-stream')},
+          body:blob
+        });
+        if(update.ok)return id;
+        if(update.status!==404)throw Error('Nu s-a putut actualiza un fișier din backup.');
+        id='';
       }
-      for(const id of plannerCloudFileIds()){
-        try{
-          const blob=await backupDbGet('orar_planner_files_v1','files',id);
-          if(blob)assets.plannerFiles[id]=await blobToCloudRecord(blob);
-          else missing.plannerFiles.push(id);
-        }catch{missing.plannerFiles.push(id);}
+      const init=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id',{
+        method:'POST',
+        headers:{
+          Authorization:'Bearer '+token,
+          'Content-Type':'application/json; charset=UTF-8',
+          'X-Upload-Content-Type':String(blob.type||'application/octet-stream'),
+          'X-Upload-Content-Length':String(blob.size||0)
+        },
+        body:JSON.stringify({name,parents:['appDataFolder']})
+      });
+      const uploadUrl=init.headers.get('Location');
+      if(!init.ok||!uploadUrl)throw Error('Nu s-a putut pregăti backup-ul unui fișier.');
+      const upload=await fetch(uploadUrl,{method:'PUT',headers:{'Content-Type':String(blob.type||'application/octet-stream')},body:blob});
+      if(!upload.ok)throw Error('Nu s-a putut salva un fișier în backup.');
+      try{return (await upload.json()).id||'';}catch{return '';}
+    }
+    async function deleteCloudAsset(fileId){
+      if(!fileId)return;
+      try{await fetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(fileId),{method:'DELETE',headers:{Authorization:'Bearer '+token}});}catch{}
+    }
+    async function downloadCloudAsset(record){
+      if(!record)return null;
+      if(record.data)return cloudRecordToBlob(record);
+      if(!record.fileId)return null;
+      const r=await fetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(record.fileId)+'?alt=media',{headers:{Authorization:'Bearer '+token},cache:'no-store'});
+      if(!r.ok)return null;
+      return await r.blob();
+    }
+    async function recordForCloudAsset(blob,existingId,name){
+      const fileId=await uploadCloudAsset(existingId,name,blob);
+      return {fileId,type:String(blob.type||'application/octet-stream'),size:Number(blob.size)||0,hash:await blobHash(blob)};
+    }
+    async function syncCloudAssets(remoteAssets,{plannerDirty=false,backgroundDirty=false,creating=false,migrate=false}={}){
+      const remote=remoteAssets&&typeof remoteAssets==='object'?remoteAssets:{};
+      const assets={background:externalAssetRecord(remote.background),plannerFiles:{}},deletions=[];
+      for(const [id,record] of Object.entries(remote.plannerFiles||{})){
+        const clean=externalAssetRecord(record);if(clean)assets.plannerFiles[id]=clean;
       }
-      return {assets,missing};
+
+      if(backgroundDirty||creating||migrate){
+        const wantsBackground=localStorage.getItem('orar_background_mode_v1')==='custom',old=remote.background||null;
+        if(!wantsBackground){
+          if(old?.fileId)deletions.push(String(old.fileId));
+          assets.background=null;
+        }else{
+          let blob=null;
+          try{blob=await backupDbGet('orar_customization_v1','assets','background');}catch{}
+          if(!blob&&old?.data)blob=cloudRecordToBlob(old);
+          if(blob){
+            const oldExternal=externalAssetRecord(old);
+            if(oldExternal&&oldExternal.hash&&oldExternal.hash===await blobHash(blob)&&oldExternal.size===blob.size)assets.background=oldExternal;
+            else assets.background=await recordForCloudAsset(blob,oldExternal?.fileId||'',cloudAssetName('background'));
+          }else assets.background=externalAssetRecord(old);
+        }
+      }
+
+      if(plannerDirty||creating||migrate){
+        const currentIds=new Set(plannerCloudFileIds());
+        for(const [id,record] of Object.entries(remote.plannerFiles||{})){
+          if(!currentIds.has(id)&&record?.fileId)deletions.push(String(record.fileId));
+        }
+        assets.plannerFiles={};
+        for(const id of currentIds){
+          const old=remote.plannerFiles?.[id]||null,oldExternal=externalAssetRecord(old);
+          if(oldExternal&&!migrate){assets.plannerFiles[id]=oldExternal;continue;}
+          if(oldExternal&&migrate){assets.plannerFiles[id]=oldExternal;continue;}
+          let blob=null;
+          try{blob=await backupDbGet('orar_planner_files_v1','files',id);}catch{}
+          if(!blob&&old?.data)blob=cloudRecordToBlob(old);
+          if(blob)assets.plannerFiles[id]=await recordForCloudAsset(blob,oldExternal?.fileId||'',cloudAssetName('resource',id));
+        }
+      }
+      return {assets,deletions};
     }
     async function restoreCloudAssets(remote){
-      if(Number(remote?.version||0)<CLOUD_VERSION||!remote?.assets||typeof remote.assets!=='object')return {changed:false,needsBackfill:true};
+      if(!remote?.assets||typeof remote.assets!=='object')return {changed:false,needsBackfill:true};
+      const migrate=Number(remote?.version||0)<CLOUD_VERSION;
       let changed=false;
       const remoteBackground=remote.assets.background||null;
       const wantsBackground=String(remote.values?.['orar_background_mode_v1']||'')==='custom';
       if(wantsBackground&&remoteBackground){
         try{
           const local=await backupDbGet('orar_customization_v1','assets','background');
-          const same=local&&remoteBackground.hash&&await blobHash(local)===remoteBackground.hash;
+          let same=false;
+          if(local){
+            if(remoteBackground.hash)same=await blobHash(local)===String(remoteBackground.hash);
+            else same=Number(remoteBackground.size||0)===Number(local.size||0);
+          }
           if(!same){
-            const blob=cloudRecordToBlob(remoteBackground);
+            const blob=await downloadCloudAsset(remoteBackground);
             if(blob){await backupDbPut('orar_customization_v1','assets','background',blob);changed=true;}
           }
         }catch{}
@@ -1080,24 +1158,22 @@
           if(local){await backupDbPut('orar_customization_v1','assets','background',null);changed=true;}
         }catch{}
       }
+      const referenced=new Set(plannerCloudFileIds());
       for(const [id,record] of Object.entries(remote.assets.plannerFiles||{})){
-        if(!id||!record?.data)continue;
+        if(!id||!referenced.has(id))continue;
         try{
           const local=await backupDbGet('orar_planner_files_v1','files',id);
-          const same=local&&record.hash&&await blobHash(local)===record.hash;
-          if(!same){
-            const blob=cloudRecordToBlob(record);
-            if(blob){await backupDbPut('orar_planner_files_v1','files',id,blob);changed=true;}
-          }
+          if(local)continue;
+          const blob=await downloadCloudAsset(record);
+          if(blob){await backupDbPut('orar_planner_files_v1','files',id,blob);changed=true;}
         }catch{}
       }
-      return {changed,needsBackfill:false};
+      return {changed,needsBackfill:migrate};
     }
-    async function cloudPayload(){
+    function localCloudValues(){
       const values={};
       for(const key of cloudKeys()){const value=localStorage.getItem(key);if(value!==null)values[key]=value;}
-      const captured=await captureCloudAssets();
-      return {version:CLOUD_VERSION,updatedAt:Date.now(),values,assets:captured.assets,_missingAssets:captured.missing};
+      return values;
     }
     async function findCloudFile(){
       if(cloudFileId)return cloudFileId;
@@ -1158,18 +1234,18 @@
       if(cloudUploading)return false;
       cloudUploading=true;
       try{
-        const sent=pendingCloud(),dirtyKeys=Object.keys(sent),localPayload=await cloudPayload(),id=await findCloudFile();
-        let payload=localPayload;
-
+        const sent=pendingCloud(),dirtyKeys=Object.keys(sent),id=await findCloudFile();
+        let remote=null;
         if(id){
           const previous=await fetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(id)+'?alt=media',{headers:{Authorization:'Bearer '+token},cache:'no-store'});
           if(!previous.ok)throw Error('Nu s-a putut verifica backup-ul existent.');
-          const remote=await previous.json();
+          remote=await previous.json();
+          if(!dirtyKeys.length&&Number(remote?.version||0)>=CLOUD_VERSION)return true;
+        }
 
-          /* Start from the newest cloud snapshot and apply only values that were
-             actually changed on this device. This is what makes edits from a
-             laptop survive a later autosave from a phone, and vice versa. */
-          const mergedValues={};
+        let mergedValues;
+        if(remote){
+          mergedValues={};
           for(const [key,value] of Object.entries(remote.values||{})){
             if(!CLOUD_SKIP.has(key)&&typeof value==='string')mergedValues[key]=value;
           }
@@ -1179,45 +1255,21 @@
             if(local===null)delete mergedValues[key];
             else mergedValues[key]=local;
           }
+        }else mergedValues=localCloudValues();
 
-          const remoteAssets=remote.assets&&typeof remote.assets==='object'?remote.assets:{};
-          const mergedAssets={
-            background:remoteAssets.background||null,
-            plannerFiles:{...(remoteAssets.plannerFiles||{})}
-          };
-
-          /* Binary assets follow the local keys that describe them. */
-          const backgroundDirty=dirtyKeys.includes('orar_background_mode_v1')||dirtyKeys.includes('orar_background_name_v1');
-          if(backgroundDirty){
-            mergedAssets.background=localPayload.assets?.background||null;
-          }else if(!mergedAssets.background&&localPayload.assets?.background){
-            mergedAssets.background=localPayload.assets.background;
-          }
-
-          if(dirtyKeys.includes('orar_planner_v1')){
-            const currentIds=new Set(plannerCloudFileIds());
-            for(const id of Object.keys(mergedAssets.plannerFiles))if(!currentIds.has(id))delete mergedAssets.plannerFiles[id];
-            for(const [id,record] of Object.entries(localPayload.assets?.plannerFiles||{}))mergedAssets.plannerFiles[id]=record;
-          }else{
-            for(const [id,record] of Object.entries(localPayload.assets?.plannerFiles||{})){
-              if(!mergedAssets.plannerFiles[id])mergedAssets.plannerFiles[id]=record;
-            }
-          }
-
-          payload={
-            version:CLOUD_VERSION,
-            updatedAt:Date.now(),
-            values:mergedValues,
-            assets:mergedAssets
-          };
-        }else{
-          delete payload._missingAssets;
-        }
-
-        if(id&&!dirtyKeys.length)return true;
-        delete payload._missingAssets;
+        const migrate=Boolean(remote)&&Number(remote?.version||0)<CLOUD_VERSION;
+        const backgroundDirty=!remote||dirtyKeys.includes('orar_background_mode_v1')||dirtyKeys.includes('orar_background_name_v1');
+        const plannerDirty=!remote||dirtyKeys.includes('orar_planner_v1');
+        const synced=await syncCloudAssets(remote?.assets||{},{
+          plannerDirty,
+          backgroundDirty,
+          creating:!remote,
+          migrate
+        });
+        const payload={version:CLOUD_VERSION,updatedAt:Date.now(),values:mergedValues,assets:synced.assets};
         const body=JSON.stringify(payload);
         cloudFileId=await writeCloudSnapshot(id,body);
+        if(synced.deletions.length)Promise.allSettled([...new Set(synced.deletions)].map(deleteCloudAsset)).catch(()=>{});
         acknowledgeCloud(sent);
         return true;
       }finally{cloudUploading=false;}
