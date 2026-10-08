@@ -211,6 +211,22 @@
       let geminiViewportRaf=0;
       const geminiViewport=()=>window.visualViewport||null;
       const composerField=()=>page.querySelector('.gemini-composer textarea');
+      const pendingFilesMarkup=()=>pendingFiles.map((file,index)=>`<span>▧ ${esc(file.name)} <button type="button" data-gemini-remove-file="${index}" aria-label="Elimină fișierul">×</button></span>`).join('');
+      const syncPendingFilesGeometry=()=>{
+        const pending=page.querySelector('.gemini-pending-files');
+        const height=pending?.childElementCount?Math.ceil(pending.getBoundingClientRect().height):0;
+        page.style.setProperty('--gemini-pending-height',height+'px');
+        page.style.setProperty('--gemini-pending-gap',height?'7px':'0px');
+      };
+      const updatePendingFiles=()=>{
+        const pending=page.querySelector('.gemini-pending-files');
+        if(!pending)return;
+        pending.innerHTML=pendingFilesMarkup();
+        syncPendingFilesGeometry();
+        const field=composerField();
+        if(field===document.activeElement)pinComposerAboveKeyboard(field);
+        pinConversationToLatest();
+      };
       const pinConversationToLatest=()=>{
         const box=page.querySelector('[data-gemini-conversation]');
         if(!box)return;
@@ -303,6 +319,7 @@
         if(!iosKeyboardMode||!field||field!==document.activeElement)return;
         const vv=geminiViewport(),composer=field.closest('.gemini-composer');
         if(!vv||!composer)return;
+        syncPendingFilesGeometry();
         const offset=Math.max(0,Math.round(vv.offsetTop));
         const visibleBottom=Math.round(vv.height+offset);
         const composerHeight=Math.max(42,Math.ceil(composer.getBoundingClientRect().height||58));
@@ -473,7 +490,7 @@
           <section class="gemini-main">
             <header class="gemini-header"><div><span class="hub-eyebrow">AI</span><h1 id="geminiHeading" tabindex="-1">Gemini</h1></div><small>gemini-3.8-flash · fallback 3.5-flash-lite · Cont Google</small></header>
             <div class="gemini-conversation" data-gemini-conversation>${renderMessages(chat)}${busy?'<div class="gemini-thinking"><i></i><i></i><i></i></div>':''}</div>
-            <div class="gemini-pending-files">${pendingFiles.map((file,index)=>`<span>▧ ${esc(file.name)} <button type="button" data-gemini-remove-file="${index}" aria-label="Elimină fișierul">×</button></span>`).join('')}</div>
+            <div class="gemini-pending-files">${pendingFilesMarkup()}</div>
             <form class="gemini-composer" data-gemini-form>
               <label class="gemini-attach" aria-label="Atașează fișiere">＋<input type="file" data-gemini-files multiple accept="image/*,.pdf,.txt,.md,.csv,.json,.xml,.html,.doc,.docx,.ppt,.pptx,.xls,.xlsx"></label>
               <textarea name="message" rows="1" maxlength="20000" placeholder="Mesaj pentru Gemini…" aria-label="Mesaj pentru Gemini"></textarea>
@@ -484,6 +501,7 @@
         syncChatMenuDom();
         requestAnimationFrame(()=>{
           const box=page.querySelector('[data-gemini-conversation]');if(box)box.scrollTop=box.scrollHeight;
+          syncPendingFilesGeometry();
           autosizeComposer();
           if(composerField()!==document.activeElement)captureGeminiStage();
           syncGeminiKeyboard();
@@ -815,7 +833,7 @@
         if(e.target.closest('[data-gemini-new]')){createChat();return;}
         const chatButton=e.target.closest('[data-gemini-chat]');if(chatButton){activeId=chatButton.dataset.geminiChat;if(window.innerWidth<=900)chatMenuOpen=false;render();return;}
         const del=e.target.closest('[data-gemini-delete]');if(del){deleteChat(del.dataset.geminiDelete);return;}
-        const remove=e.target.closest('[data-gemini-remove-file]');if(remove){pendingFiles.splice(Number(remove.dataset.geminiRemoveFile),1);render();}
+        const remove=e.target.closest('[data-gemini-remove-file]');if(remove){pendingFiles.splice(Number(remove.dataset.geminiRemoveFile),1);updatePendingFiles();}
       });
       page.addEventListener('input',e=>{
         const field=e.target.closest('.gemini-composer textarea');if(!field)return;
@@ -855,7 +873,9 @@
       page.addEventListener('change',e=>{
         const input=e.target.closest('[data-gemini-files]');if(!input)return;
         const selected=[...input.files].filter(file=>file.size<=MAX_FILE_BYTES).slice(0,8);
-        pendingFiles=[...pendingFiles,...selected].slice(0,8);render();
+        pendingFiles=[...pendingFiles,...selected].slice(0,8);
+        input.value='';
+        updatePendingFiles();
       });
       page.addEventListener('click',e=>{
         if(e.target.closest('[data-gemini-stop]')){e.preventDefault();stopMessage();}
