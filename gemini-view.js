@@ -312,12 +312,21 @@
       };
       const autosizeComposer=(field=composerField())=>{
         if(!field)return;
-        field.style.height='0px';
+        // Measure the rendered lines, not the textarea's animated height.
+        field.style.height='auto';
+        const style=getComputedStyle(field);
+        const lineHeight=parseFloat(style.lineHeight)||parseFloat(style.fontSize)*1.35||21.6;
+        const padding=(parseFloat(style.paddingTop)||0)+(parseFloat(style.paddingBottom)||0);
+        const rows=Math.max(1,Math.round((field.scrollHeight-padding)/lineHeight));
         const maxHeight=132;
-        const next=Math.max(42,Math.min(maxHeight,Math.ceil(field.scrollHeight||42)));
+        const next=Math.max(42,Math.min(maxHeight,Math.ceil(padding+rows*lineHeight)));
         field.style.height=next+'px';
-        field.classList.toggle('is-scrollable',(field.scrollHeight||0)>maxHeight);
+        field.classList.toggle('is-scrollable',field.scrollHeight>maxHeight);
+        // Reposition the composer only when a complete line changes its height.
+        if(field.dataset.geminiHeight===String(next))return;
+        field.dataset.geminiHeight=String(next);
         requestAnimationFrame(()=>{
+          if(!field.isConnected)return;
           const composer=field.closest('.gemini-composer');
           if(composer)page.style.setProperty('--gemini-composer-height',Math.ceil(composer.getBoundingClientRect().height)+'px');
           if(field===document.activeElement){
@@ -811,7 +820,7 @@
       page.addEventListener('input',e=>{
         const field=e.target.closest('.gemini-composer textarea');if(!field)return;
         autosizeComposer(field);
-        if(field===document.activeElement)requestAnimationFrame(()=>pinComposerAboveKeyboard(field));
+        if(field===document.activeElement)pinConversationToLatest();
       });
       page.addEventListener('focusin',e=>{
         const field=e.target.closest('.gemini-composer textarea');if(!field)return;

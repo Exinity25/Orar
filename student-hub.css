@@ -1421,7 +1421,7 @@ body[data-orar-theme="custom"].orar-custom-light{color-scheme:light}
 .gemini-pending-files:empty{display:none}
 .gemini-pending-files button{border:0;background:transparent;color:inherit;padding:0;font-size:13px}
 .gemini-composer{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:end;gap:8px;padding:7px;border:1px solid var(--glass-border,#ffffff22);border-radius:20px;background:color-mix(in srgb,var(--glass-surface,rgba(9,13,20,.92)) 94%,transparent);box-shadow:0 16px 45px rgba(0,0,0,.22),0 0 20px color-mix(in srgb,var(--accent) 7%,transparent);backdrop-filter:blur(22px)}
-.gemini-composer textarea{min-height:42px;max-height:150px;resize:none;border:0!important;outline:0!important;box-shadow:none!important;background:transparent!important;padding:10px 6px!important;font-size:16px!important;color:var(--glass-ink,#fff)!important}
+.gemini-composer textarea{min-height:42px;max-height:150px;resize:none;border:0!important;outline:0!important;box-shadow:none!important;background:transparent!important;padding:10px 6px!important;font-size:16px!important;line-height:1.35!important;color:var(--glass-ink,#fff)!important}
 .gemini-attach,.gemini-send{width:42px;height:42px;display:grid!important;place-items:center;border:1px solid var(--glass-border,#ffffff1b)!important;border-radius:50%!important;background:rgba(255,255,255,.055)!important;color:var(--glass-ink,#fff)!important;padding:0!important;margin:0!important;font-size:20px!important;cursor:pointer}
 .gemini-attach input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
 .gemini-send{background:var(--accent)!important;color:#fff!important;border-color:transparent!important;font-weight:900}
@@ -1718,7 +1718,8 @@ body:not([data-orar-theme]):not(.orar-custom-background)::after{
       line-height:1.35!important;
       padding-top:10px!important;
       padding-bottom:10px!important;
-      transition:height 150ms cubic-bezier(.2,.8,.2,1),max-height 150ms cubic-bezier(.2,.8,.2,1)!important;
+      /* Snap to whole text lines; don't animate through intermediate heights. */
+      transition:none!important;
     }
     .gemini-composer textarea.is-scrollable{
       overflow-y:auto!important;
