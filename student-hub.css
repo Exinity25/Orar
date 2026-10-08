@@ -3051,3 +3051,22 @@ body.classroom-viewer-open .classroom-viewer-backdrop{
     }
   }
 }
+
+/* v120: Keep the iOS editor at a fixed pixel anchor as the keyboard closes.
+   Only its vertical position animates. Never tween its height or contents. */
+@supports (-webkit-touch-callout:none){
+  @media(max-width:900px){
+    .gemini-page.is-gemini-composer-settling .gemini-composer{
+      transition:top 280ms cubic-bezier(.22,1,.36,1),box-shadow 180ms ease,border-color 160ms ease!important;
+    }
+    .gemini-page.is-gemini-composer-settling .gemini-pending-files{
+      transition:top 280ms cubic-bezier(.22,1,.36,1),opacity 180ms ease!important;
+    }
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  .gemini-page.is-gemini-composer-settling .gemini-composer,
+  .gemini-page.is-gemini-composer-settling .gemini-pending-files{
+    transition:none!important;
+  }
+}
