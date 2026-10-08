@@ -213,6 +213,7 @@
       let geminiPickerActive=false;
       let geminiDismissRaf=0;
       let geminiDismissTimeout=0;
+      let geminiConversationDismissRaf=0;
       const geminiViewport=()=>window.visualViewport||null;
       const composerField=()=>page.querySelector('.gemini-composer textarea');
       const pendingFilesMarkup=()=>pendingFiles.map((file,index)=>`<span>▧ ${esc(file.name)} <button type="button" data-gemini-remove-file="${index}" aria-label="Elimină fișierul">×</button></span>`).join('');
@@ -362,9 +363,20 @@
       const cancelGeminiDismiss=()=>{
         clearTimeout(geminiDismissTimeout);
         cancelAnimationFrame(geminiDismissRaf);
+        cancelAnimationFrame(geminiConversationDismissRaf);
         geminiDismissTimeout=0;
         geminiDismissRaf=0;
+        geminiConversationDismissRaf=0;
         page.classList.remove('is-gemini-composer-settling');
+      };
+      const followGeminiConversationDismiss=()=>{
+        geminiConversationDismissRaf=0;
+        if(!page.classList.contains('is-gemini-composer-settling'))return;
+        // The conversation's bottom padding is easing to zero alongside
+        // the composer. Track its changing scrollHeight every frame so the
+        // latest bubble stays above the composer rather than jumping at end.
+        pinConversationToLatest();
+        geminiConversationDismissRaf=requestAnimationFrame(followGeminiConversationDismiss);
       };
       const beginGeminiDismiss=()=>{
         if(!iosKeyboardMode||geminiPickerActive||composerField()===document.activeElement)return;
@@ -386,7 +398,12 @@
         geminiDismissRaf=requestAnimationFrame(()=>{
           geminiDismissRaf=0;
           if(!page.classList.contains('is-gemini-composer-settling'))return;
+          // Launch both transitions in the same frame with the same easing.
           page.style.setProperty('--gemini-composer-top',destination+'px');
+          page.style.setProperty('--gemini-keyboard-inset','0px');
+          if(!geminiConversationDismissRaf){
+            geminiConversationDismissRaf=requestAnimationFrame(followGeminiConversationDismiss);
+          }
         });
         const finish=()=>{
           if(!page.classList.contains('is-gemini-composer-settling')||geminiPickerActive||composerField()===document.activeElement)return;
@@ -399,6 +416,10 @@
             return;
           }
           if(visible>=geminiUnfocusedViewportHeight-12)geminiUnfocusedViewportHeight=visible;
+          cancelAnimationFrame(geminiConversationDismissRaf);
+          geminiConversationDismissRaf=0;
+          // Padding reached zero through its CSS transition; avoid the
+          // previous one-frame jump in the conversation layout.
           page.style.setProperty('--gemini-keyboard-inset','0px');
           page.style.setProperty('--gemini-viewport-offset','0px');
           document.body.style.setProperty('--gemini-viewport-offset','0px');
