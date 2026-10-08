@@ -209,6 +209,10 @@
       let geminiStageHeight=0;
       let geminiStageWidth=0;
       let geminiViewportRaf=0;
+      let geminiRestComposerBottom=10;
+      let geminiPickerActive=false;
+      let geminiDismissRaf=0;
+      let geminiDismissTimeout=0;
       const geminiViewport=()=>window.visualViewport||null;
       const composerField=()=>page.querySelector('.gemini-composer textarea');
       const pendingFilesMarkup=()=>pendingFiles.map((file,index)=>`<span>▧ ${esc(file.name)} <button type="button" data-gemini-remove-file="${index}" aria-label="Elimină fișierul">×</button></span>`).join('');
@@ -352,26 +356,81 @@
           }
         });
       };
+      // Keep the iOS composer anchored to a measured pixel position until
+      // keyboard dismissal finishes. Switching top:auto/bottom during blur
+      // made WebKit paint it briefly beside the Gemini header.
+      const cancelGeminiDismiss=()=>{
+        clearTimeout(geminiDismissTimeout);
+        cancelAnimationFrame(geminiDismissRaf);
+        geminiDismissTimeout=0;
+        geminiDismissRaf=0;
+        page.classList.remove('is-gemini-composer-settling');
+      };
+      const beginGeminiDismiss=()=>{
+        if(!iosKeyboardMode||geminiPickerActive||composerField()===document.activeElement)return;
+        if(!document.body.classList.contains('gemini-keyboard-open'))return;
+        if(page.classList.contains('is-gemini-composer-settling'))return;
+        cancelGeminiDismiss();
+        const composer=page.querySelector('.gemini-composer');
+        if(!composer)return;
+        const pageRect=page.getBoundingClientRect();
+        const composerRect=composer.getBoundingClientRect();
+        const from=Math.round(composerRect.top-pageRect.top);
+        const stageHeight=geminiStageHeight||Math.round(pageRect.height);
+        const destination=Math.max(4,Math.round(stageHeight-composerRect.height-geminiRestComposerBottom));
+        // Freeze the exact visible position BEFORE enabling the transition.
+        page.style.setProperty('--gemini-composer-top',from+'px');
+        void composer.getBoundingClientRect().top;
+        page.classList.add('is-gemini-composer-settling');
+        const started=Date.now();
+        geminiDismissRaf=requestAnimationFrame(()=>{
+          geminiDismissRaf=0;
+          if(!page.classList.contains('is-gemini-composer-settling'))return;
+          page.style.setProperty('--gemini-composer-top',destination+'px');
+        });
+        const finish=()=>{
+          if(!page.classList.contains('is-gemini-composer-settling')||geminiPickerActive||composerField()===document.activeElement)return;
+          const vv=geminiViewport();
+          const visible=vv?Math.round(vv.height+Math.max(0,vv.offsetTop)):0;
+          // Wait for WebKit's visualViewport to finish expanding; never
+          // restore bottom anchoring while the keyboard still animates.
+          if(vv&&visible<geminiUnfocusedViewportHeight-12&&Date.now()-started<850){
+            geminiDismissTimeout=setTimeout(finish,70);
+            return;
+          }
+          if(visible>=geminiUnfocusedViewportHeight-12)geminiUnfocusedViewportHeight=visible;
+          page.style.setProperty('--gemini-keyboard-inset','0px');
+          page.style.setProperty('--gemini-viewport-offset','0px');
+          document.body.style.setProperty('--gemini-viewport-offset','0px');
+          setGeminiMotionTargets(0,0);
+          setGeminiKeyboardOpen(false);
+          geminiStageHeight=0;
+          geminiStageWidth=0;
+          // The regular bottom inset matches the target; do both in one
+          // style update so there is no intermediate top/auto flash.
+          page.classList.remove('is-gemini-composer-settling');
+          page.style.removeProperty('--gemini-composer-top');
+          pinConversationToLatest();
+        };
+        geminiDismissTimeout=setTimeout(finish,340);
+      };
+      const releaseGeminiPicker=()=>{
+        if(!geminiPickerActive)return;
+        geminiPickerActive=false;
+        if(composerField()!==document.activeElement)beginGeminiDismiss();
+      };
       const syncGeminiKeyboard=()=>{
         if(!iosKeyboardMode)return;
         cancelAnimationFrame(geminiViewportRaf);
         geminiViewportRaf=requestAnimationFrame(()=>{
           const vv=geminiViewport(),field=composerField(),focused=Boolean(field&&field===document.activeElement);
-          if(!vv){
-            page.style.setProperty('--gemini-keyboard-inset','0px');
-            page.style.setProperty('--gemini-viewport-offset','0px');
-            page.style.removeProperty('--gemini-composer-top');
-            document.body.style.setProperty('--gemini-viewport-offset','0px');
-            setGeminiMotionTargets(0,0);
-            return;
-          }
+          if(!vv)return;
           if(!focused){
-            geminiUnfocusedViewportHeight=Math.max(1,Math.round(vv.height+Math.max(0,vv.offsetTop)));
-            page.style.setProperty('--gemini-keyboard-inset','0px');
-            page.style.setProperty('--gemini-viewport-offset','0px');
-            page.style.removeProperty('--gemini-composer-top');
-            document.body.style.setProperty('--gemini-viewport-offset','0px');
-            setGeminiMotionTargets(0,0);
+            // File chooser temporarily steals focus. Preserve the composer
+            // and keep the attachment chooser from resizing or jumping it.
+            if(geminiPickerActive||page.classList.contains('is-gemini-composer-settling'))return;
+            if(document.body.classList.contains('gemini-keyboard-open'))beginGeminiDismiss();
+            else geminiUnfocusedViewportHeight=Math.max(1,Math.round(vv.height+Math.max(0,vv.offsetTop)));
             return;
           }
           if(!geminiUnfocusedViewportHeight)geminiUnfocusedViewportHeight=Math.max(1,Math.round(vv.height+Math.max(0,vv.offsetTop)));
@@ -842,6 +901,14 @@
       });
       page.addEventListener('focusin',e=>{
         const field=e.target.closest('.gemini-composer textarea');if(!field)return;
+        const alreadyOpen=document.body.classList.contains('gemini-keyboard-open');
+        cancelGeminiDismiss();
+        geminiPickerActive=false;
+        if(!alreadyOpen){
+          const composer=field.closest('.gemini-composer');
+          const bottom=parseFloat(getComputedStyle(composer).bottom);
+          geminiRestComposerBottom=Number.isFinite(bottom)?bottom:Math.max(0,page.getBoundingClientRect().bottom-composer.getBoundingClientRect().bottom);
+        }
         captureGeminiStage();
         setGeminiKeyboardOpen(true);
         const vv=geminiViewport();
@@ -855,27 +922,33 @@
       });
       page.addEventListener('focusout',e=>{
         const field=e.target.closest('.gemini-composer textarea');if(!field)return;
-        setTimeout(()=>{
-          page.style.setProperty('--gemini-keyboard-inset','0px');
-          page.style.setProperty('--gemini-viewport-offset','0px');
-          page.style.removeProperty('--gemini-composer-top');
-          document.body.style.setProperty('--gemini-viewport-offset','0px');
-          setGeminiMotionTargets(0,0);
-          setGeminiKeyboardOpen(false);
-          geminiStageHeight=0;
-          geminiStageWidth=0;
-          const vv=geminiViewport();
-          if(vv)geminiUnfocusedViewportHeight=Math.max(1,Math.round(vv.height+Math.max(0,vv.offsetTop)));
-          captureGeminiStage();
-          pinConversationToLatest();
-        },320);
+        if(!geminiPickerActive)beginGeminiDismiss();
       });
+      // Flag the native chooser before it can blur the editor. Never reset
+      // the editor's height or its pixel anchor while the sheet is open.
+      page.addEventListener('pointerdown',e=>{
+        if(e.target.closest('.gemini-attach'))geminiPickerActive=true;
+        else if(geminiPickerActive)releaseGeminiPicker();
+      },true);
+      page.addEventListener('click',e=>{
+        if(e.target.closest('.gemini-attach'))geminiPickerActive=true;
+      },true);
+      page.addEventListener('cancel',e=>{
+        if(e.target.closest('[data-gemini-files]'))releaseGeminiPicker();
+      },true);
+      window.addEventListener('focus',()=>{
+        if(geminiPickerActive)setTimeout(()=>{
+          if(document.hasFocus()&&geminiPickerActive)releaseGeminiPicker();
+        },220);
+      });
+      window.addEventListener('pageshow',()=>releaseGeminiPicker());
       page.addEventListener('change',e=>{
         const input=e.target.closest('[data-gemini-files]');if(!input)return;
         const selected=[...input.files].filter(file=>file.size<=MAX_FILE_BYTES).slice(0,8);
         pendingFiles=[...pendingFiles,...selected].slice(0,8);
         input.value='';
         updatePendingFiles();
+        releaseGeminiPicker();
       });
       page.addEventListener('click',e=>{
         if(e.target.closest('[data-gemini-stop]')){e.preventDefault();stopMessage();}
@@ -923,6 +996,9 @@
           page.style.setProperty('--gemini-keyboard-inset','0px');
           page.style.setProperty('--gemini-viewport-offset','0px');
           document.body.style.setProperty('--gemini-viewport-offset','0px');
+          cancelGeminiDismiss();
+          geminiPickerActive=false;
+          page.style.removeProperty('--gemini-composer-top');
           setGeminiKeyboardOpen(false);
           geminiStageHeight=0;geminiStageWidth=0;
           setTimeout(()=>{
@@ -947,7 +1023,7 @@
       return {
         element:page,
         show(){chatMenuOpen=false;setGeminiKeyboardOpen(false);resetGeminiMotion(true);geminiStageHeight=0;geminiStageWidth=0;const vv=geminiViewport();geminiUnfocusedViewportHeight=Math.round(vv?(vv.height+Math.max(0,vv.offsetTop)):(window.innerHeight||0));page.classList.remove('is-entering');void page.offsetWidth;page.classList.add('is-entering');render();requestAnimationFrame(()=>{captureGeminiStage();pinConversationToLatest();});page.querySelector('#geminiHeading')?.focus({preventScroll:true});},
-        hide(){setGeminiKeyboardOpen(false);page.style.setProperty('--gemini-keyboard-inset','0px');page.style.setProperty('--gemini-viewport-offset','0px');page.style.setProperty('--gemini-composer-lift','0px');document.body.style.setProperty('--gemini-viewport-offset','0px');resetGeminiMotion(true);},
+        hide(){cancelGeminiDismiss();geminiPickerActive=false;page.style.removeProperty('--gemini-composer-top');setGeminiKeyboardOpen(false);page.style.setProperty('--gemini-keyboard-inset','0px');page.style.setProperty('--gemini-viewport-offset','0px');page.style.setProperty('--gemini-composer-lift','0px');document.body.style.setProperty('--gemini-viewport-offset','0px');resetGeminiMotion(true);},
         openScheduleImport,
         contextSnapshot(){return {chats:chats.map(chat=>({id:chat.id,title:chat.title,updated:chat.updated,messages:chat.messages.slice(-20).map(m=>({role:m.role,text:m.text,attachments:m.attachments}))}))};}
       };
