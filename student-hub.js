@@ -335,6 +335,7 @@
         try{document.activeElement.blur();}catch{}
       }
       if(leavingGemini)gemini?.hide?.();
+      if(next==='schedule')window.dispatchEvent(new CustomEvent('orar-schedule-open'));
       view=next;
       try{sessionStorage.setItem(VIEW_SESSION_KEY,view);}catch{}
       closeMenu(false);if(planner){planner.hide();if(view.startsWith('planner:'))planner.show(view.slice(8));}
