@@ -1,0 +1,135 @@
+/* Keep non-timetable surfaces clear of the notch/Dynamic Island in either
+   landscape direction. Loaded after theme styles, which also set page padding. */
+@media (orientation:landscape) and (max-height:520px) and (hover:none) and (pointer:coarse) {
+  :root {
+    --hub-safe-left:calc(env(safe-area-inset-left,0px) + 18px);
+    --hub-safe-right:calc(env(safe-area-inset-right,0px) + 18px);
+    --hub-safe-top:calc(env(safe-area-inset-top,0px) + 12px);
+    --hub-safe-bottom:calc(env(safe-area-inset-bottom,0px) + 18px);
+  }
+
+  /* Regular pages own their insets; the planner owns them on its inner content
+     so its full-width scrolling surface does not receive double padding. */
+  #studentHub .hub-page:not(.planner-page):not(.gemini-page) {
+    padding-left:var(--hub-safe-left);
+    padding-right:var(--hub-safe-right);
+    padding-bottom:var(--hub-safe-bottom);
+  }
+  #studentHub .pl-content {
+    padding:calc(var(--hub-safe-top) + 60px) var(--hub-safe-right) var(--hub-safe-bottom) var(--hub-safe-left);
+  }
+  #studentHub :is(.pl-header,.hub-page-header,.gemini-header) {
+    flex-wrap:wrap;
+  }
+  #studentHub :is(.pl-header,.hub-page-header,.gemini-header) > * {
+    min-width:0;
+    max-width:100%;
+    overflow-wrap:anywhere;
+  }
+  #studentHub .pl-columns {grid-template-columns:repeat(2,minmax(0,1fr))}
+  #studentHub :is(.pl-columns,.pl-grid,.pl-kanban) > * {min-width:0}
+  #studentHub .pl-grid {grid-template-columns:repeat(auto-fit,minmax(min(260px,100%),1fr))}
+  #studentHub :is(.pl-hero,.hub-subject,.hub-custom-section) {overflow-wrap:anywhere}
+
+  /* Drawers paint edge-to-edge while their controls remain inside the safe area. */
+  #studentHub .hub-drawer {
+    width:min(calc(330px + env(safe-area-inset-left,0px)),100vw);
+    padding-left:var(--hub-safe-left);
+    padding-right:var(--hub-safe-right);
+    padding-bottom:var(--hub-safe-bottom);
+  }
+  #studentHub .gemini-sidebar {
+    width:min(calc(280px + env(safe-area-inset-right,0px)),100vw)!important;
+    padding-right:var(--hub-safe-right)!important;
+    padding-bottom:var(--hub-safe-bottom)!important;
+  }
+  #studentHub .gemini-shell.is-collapsed .gemini-sidebar {
+    width:calc(68px + env(safe-area-inset-right,0px))!important;
+  }
+  #studentHub .gemini-main {
+    padding-left:var(--hub-safe-left)!important;
+    padding-right:var(--hub-safe-right)!important;
+  }
+  #studentHub :is(.gemini-composer,.gemini-pending-files) {
+    left:var(--hub-safe-left)!important;
+    right:var(--hub-safe-right)!important;
+  }
+
+  /* Large iPhones exceed the older 900px mobile breakpoint when rotated.
+     Keep the existing iOS composer/keyboard model on those screens as well. */
+  @supports (-webkit-touch-callout:none) {
+    @media (min-width:901px) {
+      #studentHub .gemini-main {
+        grid-template-rows:auto minmax(0,1fr)!important;
+        padding-bottom:0!important;
+        overflow:hidden!important;
+      }
+      #studentHub .gemini-conversation {
+        padding-bottom:calc(var(--gemini-composer-height,58px) + var(--gemini-pending-height,0px) + var(--gemini-pending-gap,0px) + var(--gemini-keyboard-inset,0px) + 30px + env(safe-area-inset-bottom))!important;
+      }
+      #studentHub .gemini-composer {
+        position:absolute!important;
+        bottom:calc(max(10px,env(safe-area-inset-bottom)) + var(--gemini-composer-lift,0px))!important;
+        width:auto!important;
+        margin:0!important;
+      }
+      #studentHub .gemini-pending-files {
+        position:absolute!important;
+        bottom:calc(max(10px,env(safe-area-inset-bottom)) + var(--gemini-composer-height,58px) + var(--gemini-composer-lift,0px) + 7px)!important;
+        width:auto!important;
+        max-height:86px;
+        overflow:auto;
+      }
+      body.gemini-keyboard-open #studentHub .gemini-composer {
+        top:var(--gemini-composer-top,auto)!important;
+        bottom:auto!important;
+      }
+      body.gemini-keyboard-open #studentHub .gemini-pending-files {
+        top:calc(var(--gemini-composer-top,0px) - var(--gemini-pending-height,0px) - var(--gemini-pending-gap,0px))!important;
+        bottom:auto!important;
+      }
+    }
+  }
+
+  /* Native dialogs are centered in the usable rectangle, including asymmetric
+     insets. Keep their own vertical scrolling on the short landscape viewport. */
+  #studentHub .planner-dialog {
+    left:var(--hub-safe-left);
+    right:var(--hub-safe-right);
+    top:var(--hub-safe-top);
+    bottom:var(--hub-safe-bottom);
+    width:min(680px,calc(100vw - var(--hub-safe-left) - var(--hub-safe-right)));
+    max-width:calc(100vw - var(--hub-safe-left) - var(--hub-safe-right));
+    max-height:calc(100dvh - var(--hub-safe-top) - var(--hub-safe-bottom));
+    margin:auto;
+    padding:18px;
+    overflow-y:auto;
+  }
+  #studentHub .pl-dialog-head {min-width:0}
+  #studentHub .pl-dialog-head h2 {min-width:0;overflow-wrap:anywhere}
+
+  /* The file viewer is a separate full-screen surface; its header and document
+     need their own insets. Fullscreen video already manages its safe areas. */
+  body:not(.classroom-video-app-fullscreen) #studentHub .classroom-viewer-dialog {
+    padding:var(--hub-safe-top) var(--hub-safe-right) var(--hub-safe-bottom) var(--hub-safe-left)!important;
+  }
+  #studentHub .classroom-viewer-header {
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  #studentHub .classroom-viewer-header h2 {
+    min-width:0;
+    max-width:100%;
+    overflow-wrap:anywhere;
+  }
+  #studentHub .classroom-viewer-actions {flex-wrap:wrap;min-width:0;max-width:100%}
+  #studentHub .hub-status {
+    left:var(--hub-safe-left);
+    right:var(--hub-safe-right);
+    width:fit-content;
+    max-width:calc(100vw - var(--hub-safe-left) - var(--hub-safe-right));
+    margin-inline:auto;
+    transform:translateY(10px);
+  }
+  #studentHub .hub-status.is-visible {transform:translateY(0)}
+}
