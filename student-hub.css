@@ -3075,3 +3075,7 @@ body.classroom-viewer-open .classroom-viewer-backdrop{
     transition:none!important;
   }
 }
+
+.schedule-footer{display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;margin:18px 16px max(22px,env(safe-area-inset-bottom))}
+.schedule-footer .schedule-gemini-upload{width:min(260px,100%);margin:0}
+.schedule-footer [data-current-week]{font:500 12px/1.4 system-ui,-apple-system,sans-serif;color:var(--muted,#a4a9b4);white-space:nowrap}

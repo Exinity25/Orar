@@ -1036,7 +1036,11 @@
       scheduleButton.type='button';scheduleButton.className='schedule-gemini-upload';scheduleButton.innerHTML='<span>✦</span> Upload';
       scheduleButton.setAttribute('aria-label','Importă orarul din poză sau PDF cu Gemini');
       scheduleButton.addEventListener('click',()=>openScheduleImport());
-      document.querySelector('.app')?.append(scheduleButton);
+      const scheduleFooter=document.createElement('div');scheduleFooter.className='schedule-footer';
+      const currentWeek=document.createElement('small');currentWeek.dataset.currentWeek='';
+      currentWeek.textContent=`Săptămâna ${window.OrarWeek.current().number}`;
+      scheduleFooter.append(scheduleButton,currentWeek);
+      document.querySelector('.app')?.append(scheduleFooter);
       window.addEventListener('orar-gemini-import-request',event=>openScheduleImport(String(event.detail?.scheduleId||'')));
 
       if(!chats.length)createChat();else render();

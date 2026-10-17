@@ -1067,11 +1067,11 @@
     let data = activeScheduleEntry().schedule;
     normalizeScheduleData(data);
     let scheduleViewMode = scheduleBook.schedules.length > 1 && scheduleBook.view === 'combined' ? 'combined' : 'single';
-    let selectedWeek = storageGet('c11_1_selected_week') === 'IMPARĂ' ? 'IMPARĂ' : 'PARĂ';
+    let selectedWeek = window.OrarWeek.current().parity;
     let editing = false;
     let expandedKey = null;
     const iosStandaloneWebKit=Boolean(window.CSS&&CSS.supports&&CSS.supports('-webkit-touch-callout','none'));
-    let selectedDay = Number(storageGet('c11_1_selected_day') || 0);
+    let selectedDay = window.OrarWeek.current().day;
     if (!Number.isInteger(selectedDay) || selectedDay < 0 || selectedDay > 4) selectedDay = 0;
 
     const grid = document.getElementById('scheduleGrid');
@@ -2287,6 +2287,23 @@
     scheduleTitle.textContent=data.title;
     scheduleSubtitle.textContent=data.subtitle;
     updateUndoButton();
+    let currentWeekSignature='';
+    function refreshCurrentWeek(reset=false){
+      const current=window.OrarWeek.current();
+      const signature=[new Date().toDateString(),current.number,current.parity].join(':');
+      document.querySelectorAll('[data-current-week]').forEach(el=>{el.textContent=`Săptămâna ${current.number}`;});
+      if(reset||signature!==currentWeekSignature){
+        selectedDay=current.day;selectedWeek=current.parity;expandedKey=null;render();
+      }
+      currentWeekSignature=signature;
+    }
+    window.addEventListener('orar-schedule-open',()=>refreshCurrentWeek(true));
+    window.addEventListener('orar-local-change',e=>{if(e.detail?.key==='orar_planner_v1')refreshCurrentWeek();});
+    window.addEventListener('storage',e=>{if(e.key==='orar_planner_v1'||e.key===null)refreshCurrentWeek();});
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refreshCurrentWeek();});
+    setInterval(()=>{if(document.visibilityState==='visible')refreshCurrentWeek();},60000);
+    refreshCurrentWeek();
+
     render();
 
     if(window.OrarStudentHub) window.OrarStudentHub.init({
@@ -2296,6 +2313,8 @@
       getScheduleById:id=>clone(scheduleById(id)||data),
       applyScheduleTo:(id,next)=>applyScheduleToId(id,next)
     });
+
+    refreshCurrentWeek();
 
     let pendingAppUpdate = false;
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
