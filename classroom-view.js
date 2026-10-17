@@ -882,6 +882,7 @@
       });
     }
     const configured=()=>/^[\w.-]+\.apps\.googleusercontent\.com$/.test(window.ORAR_CLASSROOM_CLIENT_ID||'');
+    let sectionReconnectAttempted=false;
     function rememberedAccount(){try{const value=JSON.parse(localStorage.getItem(ACCOUNT_KEY)||'null');return value&&value.email?value:null;}catch{return null;}}
     function renderProfile(account,connected=Boolean(token&&Date.now()<expires)){
       profile.classList.remove('is-open');
@@ -1247,7 +1248,7 @@
     function restoreSession(){
       /* Reuse a still-valid Google access token across PWA restarts. Once Google
          expires it, the app stays quiet and waits for an explicit reconnect
-         instead of opening an OAuth window by itself. */
+         or a navigation tap in a Google section, instead of opening an OAuth window on load. */
       try{
         let scopes='';
         const meta=JSON.parse(localStorage.getItem(AUTH_META_KEY)||'null');
@@ -1694,7 +1695,7 @@
               if(wasSilent){scheduleHardExpiry();return;}
               message='Conectarea nu a fost finalizată. Poți încerca din nou.';renderProfile(rememberedAccount(),false);render();renderMail();renderDrive();return;
             }
-            reauthenticating=false;token=response.access_token;expires=Date.now()+Number(response.expires_in||3600)*1000;grantedScopes=String(response.scope||grantedScopes||'');saveSession();scheduleExpiry();const authSession=++session;
+            reauthenticating=false;sectionReconnectAttempted=false;token=response.access_token;expires=Date.now()+Number(response.expires_in||3600)*1000;grantedScopes=String(response.scope||grantedScopes||'');saveSession();scheduleExpiry();const authSession=++session;
             message='';renderProfile(rememberedAccount(),true);render();renderMail();renderDrive();
             if(wasSilent){
               restoreCloudForAccount(rememberedAccount()?.email||'').catch(()=>{});
@@ -1720,15 +1721,11 @@
         }
       }catch(e){message=e.message;renderProfile(rememberedAccount(),Boolean(token&&Date.now()<expires));render();renderMail();renderDrive();}
     }
-    function hasAllRequestedScopes(){
-      const granted=new Set(String(grantedScopes||'').split(/\s+/).filter(Boolean));
-      return scopes.every(scope=>granted.has(scope));
-    }
     function requestAccess(preferRemembered=false,silent=false){
       if(!client||reauthenticating||silentRenewing)return;
       const remembered=rememberedAccount();authRequestSilent=silent;
       if(silent)silentRenewing=true;else{reauthenticating=true;message='';renderProfile(remembered,Boolean(token&&Date.now()<expires));render();}
-      const options=silent&&remembered?{prompt:'',login_hint:remembered.email}:preferRemembered&&remembered?{prompt:hasAllRequestedScopes()?'':'consent',login_hint:remembered.email}:{prompt:'select_account'};
+      const options=silent&&remembered?{prompt:'',login_hint:remembered.email}:preferRemembered&&remembered?{prompt:'',login_hint:remembered.email}:{prompt:'select_account'};
       try{client.requestAccessToken(options);}catch{
         authRequestSilent=false;silentRenewing=false;reauthenticating=false;
         if(silent){scheduleHardExpiry();return;}
@@ -1769,6 +1766,14 @@
     const ensureGoogleSessionForSection=()=>{
       prepareSignIn();
       if(token&&Date.now()>=expires)clearSession('',false);
+      // Reuse the user's navigation tap, never an on-load/timer popup. Google
+      // may still show its own window; an empty prompt is not a silent refresh.
+      // A failed/cancelled attempt is not repeated on every section change.
+      if(!token&&client&&rememberedAccount()&&navigator.userActivation?.isActive&&
+         !reauthenticating&&!silentRenewing&&!sectionReconnectAttempted){
+        sectionReconnectAttempted=true;
+        requestAccess(true);
+      }
     };
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')ensureFreshGoogleSession();});
     window.addEventListener('pageshow',()=>setTimeout(ensureFreshGoogleSession,0),{passive:true});
@@ -1791,7 +1796,7 @@
         drive:{folder:driveFolderName||'',query:driveQuery,items:driveItems.slice(0,80).map(file=>({name:file.name,mimeType:file.mimeType,modifiedTime:file.modifiedTime}))}
       }),
       isConnected:()=>Boolean(token&&Date.now()<expires),showDrive(){driveVisible=true;ensureGoogleSessionForSection();const shouldLoad=driveScopeOk()&&!driveLoading&&!driveItems.length;if(shouldLoad)driveLoading=true;renderDrive();if(shouldLoad){driveLoading=false;loadDrive(false);}drivePage.classList.remove('is-entering');drivePage.querySelector('h1')?.focus({preventScroll:true});},showMail(){mailVisible=true;ensureGoogleSessionForSection();const shouldLoad=mailScopeOk()&&!mailLoading&&!mailItems.length;if(shouldLoad)mailLoading=true;renderMail();if(shouldLoad){mailLoading=false;refreshMail();}mailPage.classList.remove('is-entering');mailPage.querySelector('h1')?.focus({preventScroll:true});},show(){
-      visible=true;const shouldLoad=Boolean(token&&Date.now()<expires&&!courses.length&&!loading);if(shouldLoad)loading=true;render();prepareSignIn();
+      visible=true;ensureGoogleSessionForSection();const shouldLoad=Boolean(token&&Date.now()<expires&&!courses.length&&!loading);if(shouldLoad)loading=true;render();prepareSignIn();
       if(shouldLoad){loading=false;loadCourses();}
       page.classList.remove('is-entering');page.querySelector('h1').focus({preventScroll:true});
     }};
