@@ -27,3 +27,11 @@ Tokenul de acces este păstrat local împreună cu momentul expirării, ca redes
 Înainte de configurarea Client ID, sunt testabile doar starea neconfigurată și fluxurile cu răspunsuri API simulate. După activare, testează autentificarea pe iPhone, lista claselor, deschiderea materialelor, expirarea și deconectarea cu un cont real.
 
 Documentație: https://developers.google.com/workspace/classroom/quickstart/js și https://developers.google.com/identity/oauth2/web/guides/use-token-model
+
+## Reînnoire fără fereastră Google
+
+Deschiderea secțiunilor Classroom, Gmail și Drive reutilizează tokenul valid și nu lansează autentificarea. După expirare, utilizatorul apasă explicit butonul de reconectare. `prompt: ''` poate evita selectarea repetată a contului, dar nu face cererea GIS invizibilă.
+
+Reînnoirea efectivă în fundal necesită migrarea la fluxul authorization-code cu un backend, stocarea securizată a refresh tokenurilor pe server și o sesiune a aplicației. GitHub Pages nu poate executa acest backend. Nu adăuga client secret sau refresh tokenuri în fișierele publice. Prima autorizare și situațiile în care Google cere din nou consimțământul rămân interactive.
+
+Referință: https://developers.google.com/identity/oauth2/web/guides/use-code-model
