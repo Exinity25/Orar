@@ -882,7 +882,6 @@
       });
     }
     const configured=()=>/^[\w.-]+\.apps\.googleusercontent\.com$/.test(window.ORAR_CLASSROOM_CLIENT_ID||'');
-    let sectionReconnectAttempted=false;
     function rememberedAccount(){try{const value=JSON.parse(localStorage.getItem(ACCOUNT_KEY)||'null');return value&&value.email?value:null;}catch{return null;}}
     function renderProfile(account,connected=Boolean(token&&Date.now()<expires)){
       profile.classList.remove('is-open');
@@ -1695,7 +1694,7 @@
               if(wasSilent){scheduleHardExpiry();return;}
               message='Conectarea nu a fost finalizată. Poți încerca din nou.';renderProfile(rememberedAccount(),false);render();renderMail();renderDrive();return;
             }
-            reauthenticating=false;sectionReconnectAttempted=false;token=response.access_token;expires=Date.now()+Number(response.expires_in||3600)*1000;grantedScopes=String(response.scope||grantedScopes||'');saveSession();scheduleExpiry();const authSession=++session;
+            reauthenticating=false;token=response.access_token;expires=Date.now()+Number(response.expires_in||3600)*1000;grantedScopes=String(response.scope||grantedScopes||'');saveSession();scheduleExpiry();const authSession=++session;
             message='';renderProfile(rememberedAccount(),true);render();renderMail();renderDrive();
             if(wasSilent){
               restoreCloudForAccount(rememberedAccount()?.email||'').catch(()=>{});
@@ -1766,14 +1765,9 @@
     const ensureGoogleSessionForSection=()=>{
       prepareSignIn();
       if(token&&Date.now()>=expires)clearSession('',false);
-      // Reuse the user's navigation tap, never an on-load/timer popup. Google
-      // may still show its own window; an empty prompt is not a silent refresh.
-      // A failed/cancelled attempt is not repeated on every section change.
-      if(!token&&client&&rememberedAccount()&&navigator.userActivation?.isActive&&
-         !reauthenticating&&!silentRenewing&&!sectionReconnectAttempted){
-        sectionReconnectAttempted=true;
-        requestAccess(true);
-      }
+      // Section navigation must never open Google's authorization window.
+      // Reuse valid tokens; expired sessions use the explicit reconnect button.
+      // GIS token requests (even prompt:'') are not background refreshes.
     };
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')ensureFreshGoogleSession();});
     window.addEventListener('pageshow',()=>setTimeout(ensureFreshGoogleSession,0),{passive:true});

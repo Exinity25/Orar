@@ -1,4 +1,4 @@
-const CACHE = 'orar-v124-google-reconnect-on-entry';
+const CACHE = 'orar-v125-no-google-popup-on-entry';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './student-hub.css', './student-hub.js', './classroom-config.js', './classroom-view.js', './student-planner.js', './gemini-view.js', './student-planner.css', './theme-glass.css', './iphone-landscape.css'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
